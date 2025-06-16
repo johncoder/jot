@@ -114,6 +114,22 @@ Examples:
 			} else {
 				finalContent = renderedTemplate
 			}
+
+			// Use DestinationFile if specified
+			destinationFile := t.DestinationFile
+			if destinationFile == "" {
+				destinationFile = ws.InboxPath
+			}
+
+			if err := ws.AppendToFile(destinationFile, finalContent); err != nil {
+				return fmt.Errorf("failed to save note: %w", err)
+			}
+
+			fmt.Printf("✓ Note captured (%d characters)\n", len(finalContent))
+			fmt.Printf("✓ Used template: %s\n", captureTemplate)
+			fmt.Printf("✓ Added to %s\n", destinationFile)
+
+			return nil
 		} else {
 			// No template - handle as before
 			if appendContent == "" && useEditor {

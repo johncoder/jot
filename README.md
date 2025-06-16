@@ -86,6 +86,75 @@ jot refile --exact "2025-06-06"       # Refile by exact match
 jot refile --pattern "Meeting|Task"   # Refile by regex pattern
 ```
 
+## Interactive Refile
+
+**Overview**: The `refile` command allows users to move notes from `inbox.md` to organized files interactively or using various targeting mechanisms.
+
+### Targeting Mechanisms
+
+1. **Index-based Selection**:
+   - Select notes by their index in the inbox.
+   - Example:
+     ```bash
+     jot refile 1
+     ```
+
+2. **Exact Match**:
+   - Specify the exact text or timestamp of the note to refile.
+   - Example:
+     ```bash
+     jot refile --exact "2025-06-06 10:30"
+     ```
+
+3. **Pattern Matching**:
+   - Use regex patterns to match notes for refiling.
+   - Example:
+     ```bash
+     jot refile --pattern "meeting"
+     ```
+
+4. **Offset-based Targeting**:
+   - Specify a byte offset for editor integration.
+   - Example:
+     ```bash
+     jot refile --offset 150
+     ```
+
+5. **Select All Notes**:
+   - Refile all notes in the inbox.
+   - Example:
+     ```bash
+     jot refile --all
+     ```
+
+### Interactive Workflow
+
+1. **List Notes**:
+   - The command displays all notes in the inbox with their index and a preview.
+
+2. **Select Notes**:
+   - Users can select notes interactively or specify targeting mechanisms.
+
+3. **Specify Destination**:
+   - Prompt to choose a destination file or topic in the `lib/` directory.
+
+4. **Move Notes**:
+   - Notes are moved while preserving metadata and updating the workspace index.
+
+### Examples
+
+- **Interactive Selection**:
+  ```bash
+  jot refile
+  ```
+  Displays notes and allows interactive selection.
+
+- **Specify Destination**:
+  ```bash
+  jot refile --dest topics.md
+  ```
+  Moves selected notes to `topics.md` in the `lib/` directory.
+
 ### `jot find <query>`
 Search through all notes with full-text search.
 
@@ -175,11 +244,77 @@ refile_target: "lib/meetings/"
 ## Action Items
 ```
 
-Templates support:
-- YAML frontmatter for metadata
-- Shell command execution for dynamic content
-- Security approval workflow for commands
-- Integration with capture workflow
+## Template System Updates
+
+**Template Locations**: Templates can be stored in two locations:
+
+1. **Templates Directory**: Templates are stored in the `.jot/templates/` directory within the workspace. This is the recommended location for workspace-specific templates.
+2. **Configuration File (`.jotrc`)**: Templates can also be defined directly in the `.jotrc` configuration file for quick access.
+
+### Template Approval Workflow
+
+Templates that include shell commands require explicit approval before they can be used. This ensures security and prevents unauthorized execution of commands.
+
+#### Approval Steps
+
+1. **Create or Edit a Template**:
+   - Place the template in `.jot/templates/` or define it in `.jotrc`.
+
+2. **Approve the Template**:
+   - Run the following command:
+     ```bash
+     jot template approve <template_name>
+     ```
+   - This calculates the SHA256 hash of the template content and stores it in `.jot/template_permissions`.
+
+3. **Use the Template**:
+   - Once approved, the template can be used with the `capture` command:
+     ```bash
+     jot capture --template <template_name>
+     ```
+
+#### Security Features
+
+- **Permission Tokens**: Approved templates are identified by their SHA256 hash stored in `.jot/template_permissions`.
+- **Invalidation**: If a template is modified, its hash will no longer match, and it must be re-approved.
+- **Error Handling**: Unauthorized templates will produce a clear error message:
+  ```
+  Template '<template_name>' requires approval before use. Run: jot template approve <template_name>
+  ```
+
+### Example
+
+**Templates Directory**:
+Place Markdown files in `.jot/templates/`:
+
+```markdown
+.jot/templates/meeting.md
+.jot/templates/standup.md
+```
+
+Access these templates using:
+```bash
+jot capture --template meeting
+```
+
+**Configuration File**:
+Define templates in `.jotrc`:
+
+```json
+{
+  "templates": {
+    "meeting": {
+      "destination_file": "lib/meeting_notes.md",
+      "content": "---\n# Meeting Notes\n\n**Date:** $(date '+%Y-%m-%d')\n**Time:** $(date '+%H:%M %Z')\n\n## Attendees\n\n## Agenda\n\n## Notes\n\n## Action Items\n"
+    }
+  }
+}
+```
+
+Access these templates using:
+```bash
+jot capture --template meeting
+```
 
 ## External Commands
 

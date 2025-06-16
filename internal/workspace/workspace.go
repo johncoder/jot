@@ -9,8 +9,8 @@ import (
 
 // Workspace represents a jot workspace
 type Workspace struct {
-	Root     string
-	JotDir   string
+	Root      string
+	JotDir    string
 	InboxPath string
 	LibDir    string
 }
@@ -88,4 +88,20 @@ func (w *Workspace) InboxExists() bool {
 func (w *Workspace) LibExists() bool {
 	info, err := os.Stat(w.LibDir)
 	return err == nil && info.IsDir()
+}
+
+// AppendToFile appends content to a specified file
+func (w *Workspace) AppendToFile(filePath, content string) error {
+	file, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to open file: %w", err)
+	}
+	defer file.Close()
+
+	_, err = file.WriteString(content + "\n")
+	if err != nil {
+		return fmt.Errorf("failed to write to file: %w", err)
+	}
+
+	return nil
 }

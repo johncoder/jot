@@ -14,12 +14,14 @@ import (
 )
 
 // Template represents a note template
+// Added DestinationFile field to specify where notes should be stored
 type Template struct {
-	Name     string
-	Path     string
-	Content  string
-	Hash     string
-	Approved bool
+	Name          string
+	Path          string
+	Content       string
+	Hash          string
+	Approved      bool
+	DestinationFile string
 }
 
 // Manager handles template operations
@@ -58,12 +60,14 @@ func (m *Manager) List() ([]Template, error) {
 			hash := calculateHash(string(content))
 			approved := m.isApproved(hash)
 			
+			metadata := parseMetadata(string(content))
 			templates = append(templates, Template{
 				Name:     name,
 				Path:     path,
 				Content:  string(content),
 				Hash:     hash,
 				Approved: approved,
+				DestinationFile: metadata["destination_file"],
 			})
 		}
 		return nil
@@ -88,12 +92,14 @@ func (m *Manager) Get(name string) (*Template, error) {
 	hash := calculateHash(string(content))
 	approved := m.isApproved(hash)
 	
+	metadata := parseMetadata(string(content))
 	return &Template{
 		Name:     name,
 		Path:     templatePath,
 		Content:  string(content),
 		Hash:     hash,
 		Approved: approved,
+		DestinationFile: metadata["destination_file"],
 	}, nil
 }
 
@@ -111,6 +117,11 @@ func (m *Manager) Create(name, content string) error {
 	// Check if template already exists
 	if _, err := os.Stat(templatePath); !os.IsNotExist(err) {
 		return fmt.Errorf("template '%s' already exists", name)
+	}
+	
+	metadata := parseMetadata(content)
+	if metadata["destination_file"] == "" {
+		return fmt.Errorf("destination_file is required in template metadata")
 	}
 	
 	return os.WriteFile(templatePath, []byte(content), 0644)
@@ -227,4 +238,20 @@ func (m *Manager) isApproved(hash string) bool {
 func calculateHash(content string) string {
 	hash := sha256.Sum256([]byte(content))
 	return fmt.Sprintf("%x", hash)
+}
+
+// parseMetadata extracts metadata from template content
+func parseMetadata(content string) map[string]string {
+    metadata := make(map[string]string)
+    lines := strings.Split(content, "\n")
+    for _, line := range lines {
+        if strings.HasPrefix(line, "#") {
+            continue
+        }
+        parts := strings.SplitN(line, ":", 2)
+        if len(parts) == 2 {
+            metadata[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
+        }
+    }
+    return metadata
 }
