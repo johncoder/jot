@@ -1,0 +1,113 @@
+# jot - Go CLI Tool .gitignore
+
+# Build outputs
+/dist/
+/jot
+/jot.exe
+
+# Go build cache
+.cache/
+
+# Go module downloads
+/vendor/
+
+# Go test coverage
+*.out
+coverage.html
+
+# Go build artifacts
+*.so
+*.dylib
+*.dll
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# Editor and IDE files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+.DS_Store
+Thumbs.db
+
+# Log files
+*.log
+/logs/
+
+# Development and testing directories
+/tmp/
+/test-workspace/
+/test-output/
+/debug/
+
+# jot-specific test workspaces (from development/testing)
+/jot-*-test/
+/tmp/jot-*/
+
+# Local configuration files (user-specific)
+/.jotrc.local
+/.env
+/.env.local
+
+# Backup files
+*.bak
+*.backup
+
+# OS-specific files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Archives and compressed files
+*.7z
+*.dmg
+*.gz
+*.iso
+*.jar
+*.rar
+*.tar
+*.zip
+
+# Go-specific
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# Dependency directories (remove the comment below to include it)
+# vendor/
+
+# Go workspace file
+go.work
+
+# Air live reload tool
+tmp/
+
+# jot workspace files (development/testing artifacts)
+# These are created during development and testing but shouldn't be committed
+inbox.md
+lib/
+.jot/
+
+# jot configuration (users should create their own)
+.jotrc
+
+# Additional jot build artifacts
+jot_*
