@@ -131,9 +131,8 @@ Examples:
 				return fmt.Errorf("failed to save note: %w", err)
 			}
 
-			fmt.Printf("✓ Note captured (%d characters)\n", len(finalContent))
-			fmt.Printf("✓ Used template: %s\n", captureTemplate)
-			fmt.Printf("✓ Added to %s\n", destinationFile)
+			// Consolidate output message
+			fmt.Printf("Captured '%s' to '%s'.\n", captureTemplate, destinationFile)
 
 			return nil
 		} else {
@@ -174,6 +173,4 @@ Examples:
 func init() {
 	captureCmd.Flags().StringVar(&captureTemplate, "template", "", "Use a named template for structured capture")
 	captureCmd.Flags().StringVar(&captureContent, "content", "", "Note content to append (skips editor)")
-	captureCmd.Flags().StringVar(&captureNote, "note", "", "(deprecated) Use --content instead")
-	captureCmd.Flags().BoolVar(&captureStdin, "stdin", false, "(deprecated) Piped input is auto-detected")
 }
