@@ -232,9 +232,34 @@ current content hash - any changes will require re-approval.`,
 	},
 }
 
+var templateViewCmd = &cobra.Command{
+	Use:   "view <name>",
+	Short: "View the raw content of a template",
+	Long:  `Display the raw content of a specified template.`,
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		ws, err := workspace.RequireWorkspace()
+		if err != nil {
+			return err
+		}
+
+		name := args[0]
+		tm := template.NewManager(ws)
+
+		t, err := tm.Get(name)
+		if err != nil {
+			return fmt.Errorf("failed to retrieve template: %w", err)
+		}
+
+		fmt.Println(t.Content)
+		return nil
+	},
+}
+
 func init() {
 	templateCmd.AddCommand(templateListCmd)
 	templateCmd.AddCommand(templateNewCmd)
 	templateCmd.AddCommand(templateEditCmd)
 	templateCmd.AddCommand(templateApproveCmd)
+	templateCmd.AddCommand(templateViewCmd)
 }

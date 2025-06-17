@@ -40,10 +40,16 @@ Examples:
   jot capture --template standup --content "Completed API design"
   echo "Notes here" | jot capture --template meeting
   jot capture --content "Quick note"       # Direct append to inbox`,
+	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ws, err := workspace.RequireWorkspace()
 		if err != nil {
 			return err
+		}
+
+		// Use positional argument as template name if provided
+		if len(args) > 0 {
+			captureTemplate = args[0]
 		}
 
 		// Determine content source

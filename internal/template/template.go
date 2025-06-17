@@ -93,13 +93,17 @@ func (m *Manager) Get(name string) (*Template, error) {
 	approved := m.isApproved(hash)
 	
 	metadata := parseMetadata(string(content))
+	destinationFile := metadata["destination_file"]
+	if destinationFile == "" {
+		destinationFile = "inbox.md"
+	}
 	return &Template{
 		Name:     name,
 		Path:     templatePath,
 		Content:  string(content),
 		Hash:     hash,
 		Approved: approved,
-		DestinationFile: metadata["destination_file"],
+		DestinationFile: destinationFile,
 	}, nil
 }
 
@@ -120,9 +124,13 @@ func (m *Manager) Create(name, content string) error {
 	}
 	
 	metadata := parseMetadata(content)
-	if metadata["destination_file"] == "" {
-		return fmt.Errorf("destination_file is required in template metadata")
+	destinationFile := metadata["destination_file"]
+	if destinationFile == "" {
+		destinationFile = "inbox.md"
 	}
+	
+	// Update the metadata to include the default destination_file
+	metadata["destination_file"] = destinationFile
 	
 	return os.WriteFile(templatePath, []byte(content), 0644)
 }
