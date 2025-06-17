@@ -35,9 +35,9 @@ Examples:
 		fmt.Println("Jot Workspace Status")
 		fmt.Println("===================")
 		fmt.Println()
-		
+
 		fmt.Printf("Location: %s\n", ws.Root)
-		
+
 		// Check workspace structure
 		issues := []string{}
 		if !ws.InboxExists() {
@@ -46,20 +46,20 @@ Examples:
 		if !ws.LibExists() {
 			issues = append(issues, "lib/ directory is missing")
 		}
-		
+
 		// Count notes in inbox
 		inboxNotes := countNotesInFile(ws.InboxPath)
-		
+
 		// Count notes in lib
 		libNotes, libFiles := countNotesInDir(ws.LibDir)
-		
+
 		fmt.Println()
 		fmt.Println("Notes Summary:")
 		fmt.Printf("  Inbox:     %d notes\n", inboxNotes)
 		fmt.Printf("  Library:   %d notes (%d files)\n", libNotes, libFiles)
 		fmt.Printf("  Total:     %d notes\n", inboxNotes+libNotes)
 		fmt.Println()
-		
+
 		// Check recent activity
 		if ws.InboxExists() {
 			if info, err := os.Stat(ws.InboxPath); err == nil {
@@ -67,7 +67,7 @@ Examples:
 				fmt.Printf("Last inbox activity: %s\n", formatRelativeTime(lastModified))
 			}
 		}
-		
+
 		fmt.Println()
 		if len(issues) == 0 {
 			fmt.Println("Workspace Health: ✓ Good")
@@ -78,7 +78,7 @@ Examples:
 			}
 			fmt.Println("\nRun 'jot doctor' for repair suggestions")
 		}
-		
+
 		return nil
 	},
 }
@@ -117,10 +117,10 @@ func countNotesInDir(dir string) (int, int) {
 			if strings.ToLower(info.Name()) == "readme.md" {
 				return nil
 			}
-			
+
 			notes := countNotesInFile(path)
 			fileCount++
-			
+
 			// If file has ## headers, count those as individual notes
 			// Otherwise, count the file itself as one note
 			if notes > 0 {

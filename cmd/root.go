@@ -36,22 +36,22 @@ Examples:
 func Execute() error {
 	// Custom execution to handle external commands
 	args := os.Args[1:]
-	
+
 	// If no arguments, show help
 	if len(args) == 0 {
 		return rootCmd.Help()
 	}
-	
+
 	// Check if this is a known command first
 	if cmd, _, err := rootCmd.Find(args); err == nil && cmd != rootCmd {
 		// It's a known command, let cobra handle it normally
 		return rootCmd.Execute()
 	}
-	
+
 	// Not a known command, try external command
 	subcommand := args[0]
 	externalCmd := "jot-" + subcommand
-	
+
 	if externalPath, err := exec.LookPath(externalCmd); err == nil {
 		extCmd := exec.Command(externalPath, args[1:]...)
 		extCmd.Stdin = os.Stdin
@@ -59,7 +59,7 @@ func Execute() error {
 		extCmd.Stderr = os.Stderr
 		return extCmd.Run()
 	}
-	
+
 	// No external command found, let cobra handle normally to show error
 	return rootCmd.Execute()
 }

@@ -104,13 +104,13 @@ Templates require approval before shell commands can execute.`,
 
 		// Open in editor
 		templatePath := filepath.Join(ws.JotDir, "templates", name+".md")
-		
+
 		// Read the current template content
 		content, err := os.ReadFile(templatePath)
 		if err != nil {
 			return fmt.Errorf("failed to read template file: %w", err)
 		}
-		
+
 		// Open in editor
 		editedContent, err := editor.OpenEditor(string(content))
 		if err != nil {
@@ -153,19 +153,19 @@ var templateEditCmd = &cobra.Command{
 
 		// Open in editor
 		templatePath := filepath.Join(ws.JotDir, "templates", name+".md")
-		
+
 		// Read the current template content
 		content, err := os.ReadFile(templatePath)
 		if err != nil {
 			return fmt.Errorf("failed to read template file: %w", err)
 		}
-		
+
 		// Open in editor
 		editedContent, err := editor.OpenEditor(string(content))
 		if err != nil {
 			return fmt.Errorf("failed to open editor: %w", err)
 		}
-		
+
 		// Write back the edited content
 		err = os.WriteFile(templatePath, []byte(editedContent), 0644)
 		if err != nil {

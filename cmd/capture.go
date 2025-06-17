@@ -165,7 +165,7 @@ Examples:
 			fmt.Printf("✓ Used template: %s\n", captureTemplate)
 		}
 		fmt.Printf("✓ Added to %s\n", ws.InboxPath)
-		
+
 		return nil
 	},
 }

@@ -30,26 +30,26 @@ Examples:
 
 		fmt.Println("Starting archive process...")
 		fmt.Println()
-		
+
 		// Create archive directory structure if it doesn't exist
 		archiveDir := filepath.Join(ws.JotDir, "archive")
 		if err := os.MkdirAll(archiveDir, 0755); err != nil {
 			return fmt.Errorf("failed to create archive directory: %w", err)
 		}
-		
+
 		// Create current month's archive file
 		now := time.Now()
 		archiveFile := filepath.Join(archiveDir, now.Format("2006-01.md"))
-		
+
 		if _, err := os.Stat(archiveFile); os.IsNotExist(err) {
-			archiveContent := fmt.Sprintf("# Archive %s\n\nArchived notes from %s\n\n---\n\n", 
+			archiveContent := fmt.Sprintf("# Archive %s\n\nArchived notes from %s\n\n---\n\n",
 				now.Format("January 2006"), now.Format("January 2006"))
 			if err := os.WriteFile(archiveFile, []byte(archiveContent), 0644); err != nil {
 				return fmt.Errorf("failed to create archive file: %w", err)
 			}
 			fmt.Printf("✓ Created archive file: %s\n", archiveFile)
 		}
-		
+
 		fmt.Println("Archive structure ready!")
 		fmt.Println()
 		fmt.Printf("Archive location: %s\n", archiveDir)
@@ -57,7 +57,7 @@ Examples:
 		fmt.Println()
 		fmt.Println("Note: Interactive archiving functionality coming soon!")
 		fmt.Println("For now, you can manually move old notes to archive files.")
-		
+
 		return nil
 	},
 }

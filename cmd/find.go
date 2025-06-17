@@ -38,25 +38,25 @@ Examples:
 
 		query := strings.Join(args, " ")
 		fmt.Printf("Searching for: %s\n", query)
-		
+
 		if findInArchive {
 			fmt.Println("Including archived notes in search...")
 		}
-		
+
 		// Collect all markdown files to search
 		var filesToSearch []string
-		
+
 		// Add inbox if it exists
 		if ws.InboxExists() {
 			filesToSearch = append(filesToSearch, ws.InboxPath)
 		}
-		
+
 		// Add lib files
 		err = filepath.Walk(ws.LibDir, func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				return nil // Skip files we can't read
 			}
-			
+
 			if !info.IsDir() && strings.HasSuffix(strings.ToLower(path), ".md") {
 				filesToSearch = append(filesToSearch, path)
 			}
@@ -65,39 +65,39 @@ Examples:
 		if err != nil {
 			return fmt.Errorf("failed to scan lib directory: %w", err)
 		}
-		
+
 		// Search files and collect results
 		var results []SearchResult
 		for _, filePath := range filesToSearch {
 			matches := searchInFile(filePath, query, ws.Root)
 			results = append(results, matches...)
 		}
-		
+
 		// Sort results by relevance (simple keyword count for now)
 		sort.Slice(results, func(i, j int) bool {
 			return results[i].Score > results[j].Score
 		})
-		
+
 		// Apply limit
 		if len(results) > findLimit {
 			results = results[:findLimit]
 		}
-		
+
 		// Display results
 		if len(results) == 0 {
 			fmt.Printf("No matches found for '%s'\n", query)
 			return nil
 		}
-		
+
 		fmt.Printf("Found %d matches for '%s':\n\n", len(results), query)
 		for _, result := range results {
 			fmt.Printf("%s:%d | %s\n", result.RelativePath, result.LineNumber, result.Context)
 		}
-		
+
 		if len(results) >= findLimit {
 			fmt.Printf("\nShowing first %d results (use --limit to adjust)\n", findLimit)
 		}
-		
+
 		return nil
 	},
 }
@@ -123,19 +123,19 @@ func searchInFile(filePath, query, workspaceRoot string) []SearchResult {
 	scanner := bufio.NewScanner(file)
 	lineNumber := 0
 	queryLower := strings.ToLower(query)
-	
+
 	// Get relative path for display
 	relativePath, _ := filepath.Rel(workspaceRoot, filePath)
-	
+
 	for scanner.Scan() {
 		lineNumber++
 		line := scanner.Text()
 		lineLower := strings.ToLower(line)
-		
+
 		if strings.Contains(lineLower, queryLower) {
 			// Calculate relevance score (simple keyword count)
 			score := strings.Count(lineLower, queryLower)
-			
+
 			// Trim long lines for display
 			context := strings.TrimSpace(line)
 			if len(context) > 80 {
@@ -160,7 +160,7 @@ func searchInFile(filePath, query, workspaceRoot string) []SearchResult {
 					context = context[:80] + "..."
 				}
 			}
-			
+
 			results = append(results, SearchResult{
 				FilePath:     filePath,
 				RelativePath: relativePath,
@@ -170,7 +170,7 @@ func searchInFile(filePath, query, workspaceRoot string) []SearchResult {
 			})
 		}
 	}
-	
+
 	return results
 }
 

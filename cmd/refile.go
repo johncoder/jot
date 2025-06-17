@@ -42,12 +42,12 @@ Examples:
 
 		fmt.Println("Starting refile process...")
 		fmt.Println()
-		
+
 		if !ws.InboxExists() {
 			fmt.Println("No inbox.md found. Run 'jot doctor --fix' to create it.")
 			return nil
 		}
-		
+
 		// Read and parse inbox notes using enhanced AST-based parser
 		notes, err := parseInboxNotesAST(ws.InboxPath)
 		if err != nil {
@@ -58,14 +58,14 @@ Examples:
 				return fmt.Errorf("failed to parse inbox: %w", err)
 			}
 		}
-		
+
 		if len(notes) == 0 {
 			fmt.Println("No notes found in inbox.md")
 			return nil
 		}
-		
+
 		fmt.Printf("Found %d notes in inbox.md:\n\n", len(notes))
-		
+
 		// Display notes
 		for i, note := range notes {
 			fmt.Printf("%d. %s\n", i+1, note.Title)
@@ -76,16 +76,16 @@ Examples:
 			}
 			fmt.Println()
 		}
-		
+
 		// Get command line arguments and flags
 		all, _ := cmd.Flags().GetBool("all")
 		dest, _ := cmd.Flags().GetString("dest")
 		exact, _ := cmd.Flags().GetString("exact")
 		pattern, _ := cmd.Flags().GetString("pattern")
 		offset, _ := cmd.Flags().GetInt("offset")
-		
+
 		var selectedNotes []Note
-		
+
 		if all {
 			// Select all notes
 			selectedNotes = notes
@@ -96,13 +96,13 @@ Examples:
 			if targeterErr != nil {
 				return fmt.Errorf("invalid exact timestamp specification '%s': %w", exact, targeterErr)
 			}
-			
+
 			var selectErr error
 			selectedNotes, selectErr = targeter.SelectNotes(notes)
 			if selectErr != nil {
 				return fmt.Errorf("failed to select notes by exact match: %w", selectErr)
 			}
-			
+
 			fmt.Printf("Selected %d notes by exact timestamp match: %s\n", len(selectedNotes), exact)
 		} else if pattern != "" {
 			// Pattern-based targeting
@@ -110,13 +110,13 @@ Examples:
 			if targeterErr != nil {
 				return fmt.Errorf("invalid pattern specification '%s': %w", pattern, targeterErr)
 			}
-			
+
 			var selectErr error
 			selectedNotes, selectErr = targeter.SelectNotes(notes)
 			if selectErr != nil {
 				return fmt.Errorf("failed to select notes by pattern: %w", selectErr)
 			}
-			
+
 			fmt.Printf("Selected %d notes by pattern match: %s\n", len(selectedNotes), pattern)
 		} else if offset >= 0 {
 			// Offset-based targeting for editor integration
@@ -124,13 +124,13 @@ Examples:
 			if targeterErr != nil {
 				return fmt.Errorf("invalid byte offset: %w", targeterErr)
 			}
-			
+
 			var selectErr error
 			selectedNotes, selectErr = targeter.SelectNotes(notes)
 			if selectErr != nil {
 				return fmt.Errorf("failed to select notes by byte offset: %w", selectErr)
 			}
-			
+
 			fmt.Printf("Selected %d notes by byte offset: %d\n", len(selectedNotes), offset)
 		} else if len(args) > 0 && args[0] != "" {
 			// Try index-based targeting
@@ -138,13 +138,13 @@ Examples:
 			if targeterErr != nil {
 				return fmt.Errorf("invalid index specification '%s': %w", args[0], targeterErr)
 			}
-			
+
 			var selectErr error
 			selectedNotes, selectErr = targeter.SelectNotes(notes)
 			if selectErr != nil {
 				return fmt.Errorf("failed to select notes: %w", selectErr)
 			}
-			
+
 			fmt.Printf("Selected %d notes by index: %s\n", len(selectedNotes), args[0])
 		} else {
 			// No selection specified, show usage
@@ -159,12 +159,12 @@ Examples:
 			fmt.Println("Or manually organize notes by editing files in lib/")
 			return nil
 		}
-		
+
 		// Validate destination
 		if dest == "" {
 			return fmt.Errorf("destination file must be specified with --dest flag")
 		}
-		
+
 		// Move the selected notes
 		return moveNotes(ws, selectedNotes, dest)
 	},
@@ -172,18 +172,18 @@ Examples:
 
 // Note represents a parsed note from inbox
 type Note struct {
-	Title     string        // Heading text (timestamp)
-	Content   string        // Content as string (for backwards compatibility)
-	LineStart int          // Starting line number (for backwards compatibility)
-	LineEnd   int          // Ending line number (for backwards compatibility)
-	
+	Title     string // Heading text (timestamp)
+	Content   string // Content as string (for backwards compatibility)
+	LineStart int    // Starting line number (for backwards compatibility)
+	LineEnd   int    // Ending line number (for backwards compatibility)
+
 	// Enhanced AST-based fields
-	AST       ast.Node      // Full AST subtree for this note
-	RawContent []byte       // Raw markdown content
-	
+	AST        ast.Node // Full AST subtree for this note
+	RawContent []byte   // Raw markdown content
+
 	// Byte offset tracking for editor integration
-	ByteStart int          // Starting byte offset in source file
-	ByteEnd   int          // Ending byte offset in source file
+	ByteStart int // Starting byte offset in source file
+	ByteEnd   int // Ending byte offset in source file
 }
 
 // parseInboxNotes extracts individual notes from inbox.md
@@ -198,11 +198,11 @@ func parseInboxNotes(inboxPath string) ([]Note, error) {
 	var currentNote *Note
 	scanner := bufio.NewScanner(file)
 	lineNumber := 0
-	
+
 	for scanner.Scan() {
 		lineNumber++
 		line := scanner.Text()
-		
+
 		// Look for timestamp headers (## YYYY-MM-DD HH:MM:SS)
 		if strings.HasPrefix(line, "## ") && len(line) > 10 {
 			// Save previous note if it exists
@@ -210,7 +210,7 @@ func parseInboxNotes(inboxPath string) ([]Note, error) {
 				currentNote.LineEnd = lineNumber - 1
 				notes = append(notes, *currentNote)
 			}
-			
+
 			// Start new note
 			currentNote = &Note{
 				Title:     strings.TrimSpace(line[3:]), // Remove "## "
@@ -224,13 +224,13 @@ func parseInboxNotes(inboxPath string) ([]Note, error) {
 			currentNote.Content += strings.TrimSpace(line)
 		}
 	}
-	
+
 	// Save the last note
 	if currentNote != nil {
 		currentNote.LineEnd = lineNumber
 		notes = append(notes, *currentNote)
 	}
-	
+
 	return notes, scanner.Err()
 }
 
@@ -241,16 +241,16 @@ func parseInboxNotesAST(inboxPath string) ([]Note, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read inbox file: %w", err)
 	}
-	
+
 	// Parse with goldmark
 	md := goldmark.New()
 	reader := text.NewReader(content)
 	_ = md.Parser().Parse(reader) // We're using manual parsing instead
-	
+
 	var notes []Note
 	var headingPositions []int
 	var headingTitles []string
-	
+
 	// First pass: find all heading positions manually
 	lines := bytes.Split(content, []byte("\n"))
 	byteOffset := 0
@@ -263,7 +263,7 @@ func parseInboxNotesAST(inboxPath string) ([]Note, error) {
 		}
 		byteOffset += len(line) + 1 // +1 for the newline character
 	}
-	
+
 	// Second pass: create notes with proper byte ranges
 	for i, title := range headingTitles {
 		start := headingPositions[i]
@@ -273,12 +273,12 @@ func parseInboxNotesAST(inboxPath string) ([]Note, error) {
 		} else {
 			end = len(content) - 1 // End at the end of file
 		}
-		
+
 		// Extract content for this note (for backwards compatibility)
-		noteBytes := content[start:end+1]
+		noteBytes := content[start : end+1]
 		lines := bytes.Split(noteBytes, []byte("\n"))
 		var contentParts []string
-		
+
 		// Skip the heading line and collect content
 		for j := 1; j < len(lines); j++ {
 			line := strings.TrimSpace(string(lines[j]))
@@ -286,7 +286,7 @@ func parseInboxNotesAST(inboxPath string) ([]Note, error) {
 				contentParts = append(contentParts, line)
 			}
 		}
-		
+
 		note := Note{
 			Title:      title,
 			Content:    strings.Join(contentParts, " "),
@@ -296,10 +296,10 @@ func parseInboxNotesAST(inboxPath string) ([]Note, error) {
 			ByteEnd:    end,
 			RawContent: noteBytes,
 		}
-		
+
 		notes = append(notes, note)
 	}
-	
+
 	return notes, nil
 }
 
@@ -330,7 +330,7 @@ func isContentNode(node ast.Node) bool {
 // extractNodeContent extracts text content from various node types
 func extractNodeContent(node ast.Node, source []byte) string {
 	var buf bytes.Buffer
-	
+
 	// Extract text content recursively
 	err := ast.Walk(node, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
 		if entering {
@@ -343,11 +343,11 @@ func extractNodeContent(node ast.Node, source []byte) string {
 		}
 		return ast.WalkContinue, nil
 	})
-	
+
 	if err != nil {
 		return ""
 	}
-	
+
 	return buf.String()
 }
 
@@ -361,7 +361,7 @@ func getNodeStart(node ast.Node) int {
 			}
 		}
 	}
-	
+
 	// For text nodes and other leaf nodes, try to get segment info
 	if hasSegment, ok := node.(interface{ Segment() *text.Segment }); ok {
 		seg := hasSegment.Segment()
@@ -369,7 +369,7 @@ func getNodeStart(node ast.Node) int {
 			return seg.Start
 		}
 	}
-	
+
 	return 0
 }
 
@@ -386,21 +386,21 @@ func getNodeEnd(node ast.Node) int {
 // getNodeEndRecursive recursively finds the end position
 func getNodeEndRecursive(node ast.Node) int {
 	maxEnd := 0
-	
+
 	if hasSegment, ok := node.(interface{ Segment() *text.Segment }); ok {
 		seg := hasSegment.Segment()
 		if seg != nil && seg.Stop > maxEnd {
 			maxEnd = seg.Stop
 		}
 	}
-	
+
 	// Check children
 	for child := node.FirstChild(); child != nil; child = child.NextSibling() {
 		if childEnd := getNodeEndRecursive(child); childEnd > maxEnd {
 			maxEnd = childEnd
 		}
 	}
-	
+
 	return maxEnd
 }
 
@@ -412,7 +412,7 @@ func calculateLineNumber(content []byte, offset int) int {
 	if offset < 0 {
 		offset = 0
 	}
-	
+
 	lineNumber := 1
 	for i := 0; i < offset; i++ {
 		if content[i] == '\n' {
@@ -432,10 +432,10 @@ func NewIndexTargeter(indexStr string) (*IndexTargeter, error) {
 	if indexStr == "" {
 		return nil, fmt.Errorf("empty index string")
 	}
-	
+
 	var indices []int
 	parts := strings.Split(indexStr, ",")
-	
+
 	for _, part := range parts {
 		part = strings.TrimSpace(part)
 		if strings.Contains(part, "-") {
@@ -444,21 +444,21 @@ func NewIndexTargeter(indexStr string) (*IndexTargeter, error) {
 			if len(rangeParts) != 2 {
 				return nil, fmt.Errorf("invalid range format: %s", part)
 			}
-			
+
 			start, err := parseInt(strings.TrimSpace(rangeParts[0]))
 			if err != nil {
 				return nil, fmt.Errorf("invalid start index: %s", rangeParts[0])
 			}
-			
+
 			end, err := parseInt(strings.TrimSpace(rangeParts[1]))
 			if err != nil {
 				return nil, fmt.Errorf("invalid end index: %s", rangeParts[1])
 			}
-			
+
 			if start > end {
 				return nil, fmt.Errorf("start index %d is greater than end index %d", start, end)
 			}
-			
+
 			for i := start; i <= end; i++ {
 				indices = append(indices, i)
 			}
@@ -471,21 +471,21 @@ func NewIndexTargeter(indexStr string) (*IndexTargeter, error) {
 			indices = append(indices, idx)
 		}
 	}
-	
+
 	return &IndexTargeter{indices: indices}, nil
 }
 
 // SelectNotes selects notes by their index (1-based)
 func (t *IndexTargeter) SelectNotes(notes []Note) ([]Note, error) {
 	var selected []Note
-	
+
 	for _, idx := range t.indices {
 		if idx < 1 || idx > len(notes) {
 			return nil, fmt.Errorf("index %d is out of range (1-%d)", idx, len(notes))
 		}
 		selected = append(selected, notes[idx-1]) // Convert to 0-based
 	}
-	
+
 	return selected, nil
 }
 
@@ -505,23 +505,23 @@ func NewExactTargeter(timestamp string) (*ExactTargeter, error) {
 // SelectNotes selects notes that match the exact timestamp
 func (t *ExactTargeter) SelectNotes(notes []Note) ([]Note, error) {
 	var selected []Note
-	
+
 	for _, note := range notes {
 		if strings.Contains(note.Title, t.timestamp) {
 			selected = append(selected, note)
 		}
 	}
-	
+
 	if len(selected) == 0 {
 		return nil, fmt.Errorf("no notes found matching timestamp: %s", t.timestamp)
 	}
-	
+
 	return selected, nil
 }
 
 // PatternTargeter handles regex pattern matching
 type PatternTargeter struct {
-	pattern *regexp.Regexp
+	pattern    *regexp.Regexp
 	rawPattern string
 }
 
@@ -530,14 +530,14 @@ func NewPatternTargeter(pattern string) (*PatternTargeter, error) {
 	if pattern == "" {
 		return nil, fmt.Errorf("empty pattern string")
 	}
-	
+
 	compiled, err := regexp.Compile(pattern)
 	if err != nil {
 		return nil, fmt.Errorf("invalid regex pattern '%s': %w", pattern, err)
 	}
-	
+
 	return &PatternTargeter{
-		pattern: compiled,
+		pattern:    compiled,
 		rawPattern: pattern,
 	}, nil
 }
@@ -545,18 +545,18 @@ func NewPatternTargeter(pattern string) (*PatternTargeter, error) {
 // SelectNotes selects notes that match the regex pattern (title or content)
 func (t *PatternTargeter) SelectNotes(notes []Note) ([]Note, error) {
 	var selected []Note
-	
+
 	for _, note := range notes {
 		// Check both title and content for pattern match
 		if t.pattern.MatchString(note.Title) || t.pattern.MatchString(note.Content) {
 			selected = append(selected, note)
 		}
 	}
-	
+
 	if len(selected) == 0 {
 		return nil, fmt.Errorf("no notes found matching pattern: %s", t.rawPattern)
 	}
-	
+
 	return selected, nil
 }
 
@@ -581,7 +581,7 @@ func (t *OffsetTargeter) SelectNotes(notes []Note) ([]Note, error) {
 			return []Note{note}, nil
 		}
 	}
-	
+
 	return nil, fmt.Errorf("no note found at byte offset %d", t.offset)
 }
 
@@ -590,18 +590,18 @@ func parseInt(s string) (int, error) {
 	if s == "" {
 		return 0, fmt.Errorf("empty string")
 	}
-	
+
 	var result int
 	var err error
-	
+
 	if result, err = parseIntHelper(s); err != nil {
 		return 0, fmt.Errorf("'%s' is not a valid number", s)
 	}
-	
+
 	if result < 1 {
 		return 0, fmt.Errorf("index must be positive, got %d", result)
 	}
-	
+
 	return result, nil
 }
 
@@ -622,18 +622,18 @@ func moveNotes(ws *workspace.Workspace, notes []Note, destFile string) error {
 	if len(notes) == 0 {
 		return fmt.Errorf("no notes to move")
 	}
-	
+
 	// Validate destination file path
 	destPath := filepath.Join(ws.LibDir, destFile)
-	
+
 	fmt.Printf("Moving %d notes to %s...\n", len(notes), destFile)
-	
+
 	// Read the source inbox file for precise byte extraction
 	sourceContent, err := os.ReadFile(ws.InboxPath)
 	if err != nil {
 		return fmt.Errorf("failed to read source inbox: %w", err)
 	}
-	
+
 	// Read current destination file content (if it exists)
 	var destContent []byte
 	if _, err := os.Stat(destPath); err == nil {
@@ -642,13 +642,13 @@ func moveNotes(ws *workspace.Workspace, notes []Note, destFile string) error {
 			return fmt.Errorf("failed to read destination file: %w", err)
 		}
 	}
-	
+
 	// Append notes to destination
 	var newContent []byte
 	if len(destContent) > 0 {
 		newContent = append(destContent, '\n')
 	}
-	
+
 	// Add each note using precise byte extraction
 	for _, note := range notes {
 		// Extract the exact bytes from the source file
@@ -662,17 +662,17 @@ func moveNotes(ws *workspace.Workspace, notes []Note, destFile string) error {
 			newContent = append(newContent, []byte(noteContent)...)
 		}
 	}
-	
+
 	// Write to destination file
 	if err := os.WriteFile(destPath, newContent, 0644); err != nil {
 		return fmt.Errorf("failed to write destination file: %w", err)
 	}
-	
+
 	// Remove notes from inbox
 	if err := removeNotesFromInbox(ws.InboxPath, notes); err != nil {
 		return err
 	}
-	
+
 	// Success message
 	fmt.Printf("Successfully moved %d notes to %s\n", len(notes), destFile)
 	return nil
@@ -685,29 +685,29 @@ func removeNotesFromInbox(inboxPath string, notesToRemove []Note) error {
 	for _, note := range notesToRemove {
 		removeMap[note.Title] = true
 	}
-	
+
 	// Use the legacy parser to avoid recursion with the AST parser
 	allNotes, err := parseInboxNotes(inboxPath)
 	if err != nil {
 		return fmt.Errorf("failed to parse inbox for removal: %w", err)
 	}
-	
+
 	// Build new content with remaining notes
 	var newContent strings.Builder
 	newContent.WriteString("# Inbox\n\n")
-	
+
 	for _, note := range allNotes {
 		if !removeMap[note.Title] {
 			// Keep this note
 			newContent.WriteString(fmt.Sprintf("## %s\n%s\n\n", note.Title, note.Content))
 		}
 	}
-	
+
 	// Write the updated content back to inbox
 	if err := os.WriteFile(inboxPath, []byte(newContent.String()), 0644); err != nil {
 		return fmt.Errorf("failed to update inbox: %w", err)
 	}
-	
+
 	return nil
 }
 
