@@ -378,14 +378,14 @@ func getNodeStart(node ast.Node, content []byte) int {
 	if node.Kind() == ast.KindFencedCodeBlock {
 		codeBlock := node.(*ast.FencedCodeBlock)
 		lang := string(codeBlock.Language(content))
-		
+
 		// Look for the opening fence with the language
 		marker := "```" + lang
 		start := bytes.Index(content, []byte(marker))
 		if start >= 0 {
 			return start
 		}
-		
+
 		// Fallback to just looking for any opening fence
 		marker = "```"
 		start = bytes.Index(content, []byte(marker))
@@ -412,7 +412,7 @@ func getNodeEnd(node ast.Node, content []byte) int {
 	if node.Kind() == ast.KindFencedCodeBlock {
 		codeBlock := node.(*ast.FencedCodeBlock)
 		lang := string(codeBlock.Language(content))
-		
+
 		// Find the opening fence first
 		marker := "```" + lang
 		start := bytes.Index(content, []byte(marker))
@@ -429,7 +429,7 @@ func getNodeEnd(node ast.Node, content []byte) int {
 				return end
 			}
 		}
-		
+
 		// Fallback: find any closing fence
 		start = bytes.Index(content, []byte("```"))
 		if start >= 0 {
