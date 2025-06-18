@@ -195,6 +195,14 @@ jot template edit meeting             # Edit existing template
 jot template approve meeting          # Approve template for execution
 ```
 
+## New Features: `eval` and `tangle`
+
+**`eval`**: Evaluate code blocks in Markdown files and append results inline. Supports session-based execution for persistent interpreters.
+
+**`tangle`**: Extract code blocks with `:tangle` or `:file` headers into standalone files, creating directories as needed.
+
+For detailed usage and examples, see the [Eval and Tangle Documentation](docs/projects/jot_eval_tangle.md).
+
 ## Workspace Structure
 
 A jot workspace has a simple, organized structure:

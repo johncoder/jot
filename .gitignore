@@ -108,6 +108,3 @@ lib/
 
 # jot configuration (users should create their own)
 .jotrc
-
-# Additional jot build artifacts
-jot_*

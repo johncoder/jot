@@ -352,11 +352,11 @@ func extractNodeContent(node ast.Node, source []byte) string {
 }
 
 // getNodeStart gets the start position of a node by walking its segments
-func getNodeStart(node ast.Node) int {
+func getNodeStart(node ast.Node, content []byte) int {
 	if node.HasChildren() {
 		// For nodes with children, find the first text segment
 		for child := node.FirstChild(); child != nil; child = child.NextSibling() {
-			if start := getNodeStart(child); start >= 0 {
+			if start := getNodeStart(child, content); start >= 0 {
 				return start
 			}
 		}
@@ -366,7 +366,31 @@ func getNodeStart(node ast.Node) int {
 	if hasSegment, ok := node.(interface{ Segment() *text.Segment }); ok {
 		seg := hasSegment.Segment()
 		if seg != nil {
-			return seg.Start
+			start := seg.Start
+			if start > 0 && content[start-1] == '`' {
+				start--
+			}
+			return start
+		}
+	}
+
+	// Fallback: For fenced code blocks, find the start of the opening fence
+	if node.Kind() == ast.KindFencedCodeBlock {
+		codeBlock := node.(*ast.FencedCodeBlock)
+		lang := string(codeBlock.Language(content))
+		
+		// Look for the opening fence with the language
+		marker := "```" + lang
+		start := bytes.Index(content, []byte(marker))
+		if start >= 0 {
+			return start
+		}
+		
+		// Fallback to just looking for any opening fence
+		marker = "```"
+		start = bytes.Index(content, []byte(marker))
+		if start >= 0 {
+			return start
 		}
 	}
 
@@ -374,17 +398,59 @@ func getNodeStart(node ast.Node) int {
 }
 
 // getNodeEnd gets the end position of a node
-func getNodeEnd(node ast.Node) int {
+func getNodeEnd(node ast.Node, content []byte) int {
 	// Try to find the last segment in this node and its children
-	end := getNodeEndRecursive(node)
+	end := getNodeEndRecursive(node, content)
 	if end > 0 {
+		if end < len(content) && content[end] == '`' {
+			end++
+		}
 		return end
 	}
+
+	// Fallback: For fenced code blocks, find the end of the closing fence
+	if node.Kind() == ast.KindFencedCodeBlock {
+		codeBlock := node.(*ast.FencedCodeBlock)
+		lang := string(codeBlock.Language(content))
+		
+		// Find the opening fence first
+		marker := "```" + lang
+		start := bytes.Index(content, []byte(marker))
+		if start >= 0 {
+			// Look for the closing fence after the opening fence
+			afterOpening := start + len(marker)
+			closingStart := bytes.Index(content[afterOpening:], []byte("```"))
+			if closingStart >= 0 {
+				// Return position after the closing fence
+				end := afterOpening + closingStart + 3
+				if end < len(content) && content[end] == '\n' {
+					end++
+				}
+				return end
+			}
+		}
+		
+		// Fallback: find any closing fence
+		start = bytes.Index(content, []byte("```"))
+		if start >= 0 {
+			// Look for the next closing fence
+			afterOpening := start + 3
+			closingStart := bytes.Index(content[afterOpening:], []byte("```"))
+			if closingStart >= 0 {
+				end := afterOpening + closingStart + 3
+				if end < len(content) && content[end] == '\n' {
+					end++
+				}
+				return end
+			}
+		}
+	}
+
 	return 0
 }
 
 // getNodeEndRecursive recursively finds the end position
-func getNodeEndRecursive(node ast.Node) int {
+func getNodeEndRecursive(node ast.Node, content []byte) int {
 	maxEnd := 0
 
 	if hasSegment, ok := node.(interface{ Segment() *text.Segment }); ok {
@@ -396,7 +462,7 @@ func getNodeEndRecursive(node ast.Node) int {
 
 	// Check children
 	for child := node.FirstChild(); child != nil; child = child.NextSibling() {
-		if childEnd := getNodeEndRecursive(child); childEnd > maxEnd {
+		if childEnd := getNodeEndRecursive(child, content); childEnd > maxEnd {
 			maxEnd = childEnd
 		}
 	}
@@ -422,7 +488,7 @@ func calculateLineNumber(content []byte, offset int) int {
 	return lineNumber
 }
 
-// IndexTargeter handles numeric targeting (e.g., "1,3,5" or "1-3,5")
+// IndexTargeter handles numeric targeting (e.g., "1,3,5" or "1-3")
 type IndexTargeter struct {
 	indices []int
 }

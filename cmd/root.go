@@ -128,6 +128,6 @@ func addCommands() {
 	rootCmd.AddCommand(statusCmd)
 	rootCmd.AddCommand(doctorCmd)
 	rootCmd.AddCommand(templateCmd)
+	rootCmd.AddCommand(evalCmd)
+	rootCmd.AddCommand(tangleCmd)
 }
-
-// Removed addPlaceholderCommands - using real implementations now
