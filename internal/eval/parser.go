@@ -12,44 +12,43 @@ type EvalMetadata struct {
 	Params map[string]string
 }
 
-// ParseEvalLink parses a markdown link of the form [](eval key1=val1 key2=val2 ...)
-func ParseEvalLink(link string) (*EvalMetadata, error) {
-	link = strings.TrimSpace(link)
-	if !strings.HasPrefix(link, "[](") || !strings.HasSuffix(link, ")") {
-		return nil, fmt.Errorf("not a valid markdown link")
+// ParseEvalElement parses an HTML eval element of the form <eval name="foo" shell="python3" timeout="5s" />
+func ParseEvalElement(element string) (*EvalMetadata, error) {
+	element = strings.TrimSpace(element)
+	if !strings.HasPrefix(element, "<eval") || !strings.HasSuffix(element, "/>") {
+		return nil, fmt.Errorf("not a valid eval element")
 	}
-	content := link[3 : len(link)-1]
-	if !strings.HasPrefix(content, "eval ") {
-		return nil, fmt.Errorf("not an eval link")
-	}
-	paramsStr := strings.TrimSpace(content[5:])
-	params, err := parseKeyValueParams(paramsStr)
+	
+	// Extract the attributes portion between <eval and />
+	content := element[5 : len(element)-2] // Remove "<eval" and "/>"
+	content = strings.TrimSpace(content)
+	
+	params, err := parseHTMLAttributes(content)
 	if err != nil {
 		return nil, err
 	}
+	
 	return &EvalMetadata{Params: params}, nil
 }
 
-// parseKeyValueParams parses key=value pairs, supporting quoted values
-func parseKeyValueParams(s string) (map[string]string, error) {
+// parseHTMLAttributes parses HTML-style attributes: name="value" key="value with spaces"
+func parseHTMLAttributes(s string) (map[string]string, error) {
 	params := make(map[string]string)
-	// Regex: key=value or key="value with spaces"
-	re := regexp.MustCompile(`([a-zA-Z0-9_]+)=(("[^"]*")|([^\s]+))`)
+	// Regex: key="value" or key='value' 
+	re := regexp.MustCompile(`([a-zA-Z0-9_-]+)=["']([^"']*)["']`)
 	matches := re.FindAllStringSubmatch(s, -1)
+	
 	for _, m := range matches {
 		key := m[1]
-		val := m[3]
-		if val == "" {
-			val = m[4]
-		}
-		val = strings.Trim(val, `"`)
-		params[key] = val
+		value := m[2]
+		params[key] = value
 	}
+	
 	return params, nil
 }
 
-// IsEvalLink returns true if the given line is an eval link
-func IsEvalLink(line string) bool {
+// IsEvalElement returns true if the given line is an eval element
+func IsEvalElement(line string) bool {
 	line = strings.TrimSpace(line)
-	return strings.HasPrefix(line, "[](") && strings.Contains(line, "eval")
+	return strings.HasPrefix(line, "<eval") && strings.Contains(line, "/>")
 }

@@ -64,9 +64,9 @@ func ParseMarkdownForEvalBlocks(filename string) ([]*CodeBlock, error) {
 			codeBlock.Code = append(codeBlock.Code, line)
 			continue
 		}
-		// If not in code, check for eval link
-		if IsEvalLink(trim) && lastCodeBlock != nil && lastCodeBlock.Eval == nil {
-			meta, err := ParseEvalLink(trim)
+		// If not in code, check for eval element
+		if IsEvalElement(trim) && lastCodeBlock != nil && lastCodeBlock.Eval == nil {
+			meta, err := ParseEvalElement(trim)
 			if err == nil {
 				lastCodeBlock.Eval = meta
 			}

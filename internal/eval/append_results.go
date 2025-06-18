@@ -27,32 +27,32 @@ func UpdateMarkdownWithResults(filename string, results []*EvalResult) error {
 			continue // Don't insert results for these modes
 		}
 
-		// Find the eval link for this specific block using line numbers
-		// The eval link should be right after the code block ends
-		evalLinkLineIndex := -1
+		// Find the eval element for this specific block using line numbers
+		// The eval element should be right after the code block ends
+		evalElementLineIndex := -1
 		for i := r.Block.EndLine - 1; i < len(lines) && i < r.Block.EndLine + 4; i++ { // search within 5 lines after code block (0-indexed)
 			if i < 0 || i >= len(lines) {
 				continue
 			}
-			if IsEvalLink(strings.TrimSpace(lines[i])) {
-				// Verify this is the correct eval link by checking if it matches our block's metadata
-				if meta, err := ParseEvalLink(strings.TrimSpace(lines[i])); err == nil {
+			if IsEvalElement(strings.TrimSpace(lines[i])) {
+				// Verify this is the correct eval element by checking if it matches our block's metadata
+				if meta, err := ParseEvalElement(strings.TrimSpace(lines[i])); err == nil {
 					if blockName, ok := r.Block.Eval.Params["name"]; ok {
-						if linkName, ok := meta.Params["name"]; ok && linkName == blockName {
-							evalLinkLineIndex = i
+						if elemName, ok := meta.Params["name"]; ok && elemName == blockName {
+							evalElementLineIndex = i
 							break
 						}
 					} else {
-						// If no name, match by line proximity (first eval link found)
-						evalLinkLineIndex = i
+						// If no name, match by line proximity (first eval element found)
+						evalElementLineIndex = i
 						break
 					}
 				}
 			}
 		}
 
-		if evalLinkLineIndex == -1 {
-			continue // Couldn't find corresponding eval link
+		if evalElementLineIndex == -1 {
+			continue // Couldn't find corresponding eval element
 		}
 
 		// Format the output based on results parameters
@@ -69,13 +69,13 @@ func UpdateMarkdownWithResults(filename string, results []*EvalResult) error {
 		handling := getResultsHandling(r.Block.Eval.Params)
 		switch handling {
 		case "replace":
-			lines = replaceResultBlock(lines, evalLinkLineIndex, formattedResult)
+			lines = replaceResultBlock(lines, evalElementLineIndex, formattedResult)
 		case "append":
-			lines = appendResultBlock(lines, evalLinkLineIndex, formattedResult)
+			lines = appendResultBlock(lines, evalElementLineIndex, formattedResult)
 		case "prepend":
-			lines = prependResultBlock(lines, evalLinkLineIndex, formattedResult)
+			lines = prependResultBlock(lines, evalElementLineIndex, formattedResult)
 		default:
-			lines = replaceResultBlock(lines, evalLinkLineIndex, formattedResult) // default to replace
+			lines = replaceResultBlock(lines, evalElementLineIndex, formattedResult) // default to replace
 		}
 	}
 
@@ -283,12 +283,13 @@ func formatAsFile(output string, params map[string]string, baseFilename string) 
 	}
 }
 
-// replaceResultBlock replaces any existing result block after the eval link
-func replaceResultBlock(lines []string, evalLinkIndex int, result string) []string {
-	// Remove any existing result blocks after this eval link
-	j := evalLinkIndex + 1
+// replaceResultBlock replaces any existing result block after the eval element
+func replaceResultBlock(lines []string, evalElementIndex int, result string) []string {
+	// Remove any existing result blocks after this eval element
+	j := evalElementIndex + 1
 	for j < len(lines) {
-		if strings.HasPrefix(strings.TrimSpace(lines[j]), "```") {
+		line := strings.TrimSpace(lines[j])
+		if strings.HasPrefix(line, "```") {
 			// Found start of a code block, find its end
 			k := j + 1
 			for k < len(lines) && !strings.HasPrefix(strings.TrimSpace(lines[k]), "```") {
@@ -299,28 +300,77 @@ func replaceResultBlock(lines []string, evalLinkIndex int, result string) []stri
 			}
 			// Remove this code block
 			lines = append(lines[:j], lines[k:]...)
-		} else if strings.TrimSpace(lines[j]) == "" {
+		} else if isTableLine(line) {
+			// Found start of a markdown table, find its end
+			k := j
+			for k < len(lines) {
+				if isTableLine(strings.TrimSpace(lines[k])) {
+					k++
+				} else if strings.TrimSpace(lines[k]) == "" {
+					// Skip empty lines after table
+					k++
+				} else {
+					// Hit non-table, non-empty content
+					break
+				}
+			}
+			// Remove the table
+			lines = append(lines[:j], lines[k:]...)
+		} else if line == "" {
 			// Skip empty lines
 			j++
 		} else {
-			// Hit non-empty, non-code content, stop removing
+			// Hit non-empty, non-result content, stop removing
 			break
 		}
 	}
 	
-	// Insert new result
+	// Insert new result with proper blank line separation
 	resultLines := strings.Split(result, "\n")
-	lines = append(lines[:evalLinkIndex+1], append(resultLines, lines[evalLinkIndex+1:]...)...)
+	
+	// After removing existing results, j points to where we should insert
+	// Check if there's already a blank line at the insertion point or just before it
+	needsBlankLine := true
+	if j > 0 && j <= len(lines) {
+		// Check if there's a blank line just before our insertion point
+		if j > evalElementIndex+1 && strings.TrimSpace(lines[j-1]) == "" {
+			needsBlankLine = false
+		}
+		// Also check if the line right after eval element is already blank
+		if j == evalElementIndex+1 && j < len(lines) && strings.TrimSpace(lines[j]) == "" {
+			needsBlankLine = false
+		}
+	}
+	
+	var newContent []string
+	if needsBlankLine {
+		newContent = append([]string{""}, resultLines...)
+	} else {
+		newContent = resultLines
+	}
+	
+	lines = append(lines[:j], append(newContent, lines[j:]...)...)
 	
 	return lines
 }
 
+// isTableLine returns true if the line looks like a markdown table row
+func isTableLine(line string) bool {
+	if line == "" {
+		return false
+	}
+	// A table line contains pipes and typically starts/ends with |
+	return strings.Contains(line, "|") && 
+		   (strings.HasPrefix(line, "|") || strings.HasSuffix(line, "|") || strings.Count(line, "|") >= 2)
+}
+
 // appendResultBlock adds result after existing results
-func appendResultBlock(lines []string, evalLinkIndex int, result string) []string {
+func appendResultBlock(lines []string, evalElementIndex int, result string) []string {
 	// Find end of existing results
-	j := evalLinkIndex + 1
+	j := evalElementIndex + 1
 	for j < len(lines) {
-		if strings.HasPrefix(strings.TrimSpace(lines[j]), "```") {
+		line := strings.TrimSpace(lines[j])
+		if strings.HasPrefix(line, "```") {
 			// Skip over code blocks
 			k := j + 1
 			for k < len(lines) && !strings.HasPrefix(strings.TrimSpace(lines[k]), "```") {
@@ -330,25 +380,43 @@ func appendResultBlock(lines []string, evalLinkIndex int, result string) []strin
 				k++ // include closing ```
 			}
 			j = k
-		} else if strings.TrimSpace(lines[j]) == "" {
+		} else if isTableLine(line) {
+			// Skip over markdown tables
+			k := j
+			for k < len(lines) && (isTableLine(strings.TrimSpace(lines[k])) || strings.TrimSpace(lines[k]) == "") {
+				if isTableLine(strings.TrimSpace(lines[k])) {
+					k++
+				} else {
+					// Empty line after table, include it
+					k++
+				}
+			}
+			j = k
+		} else if line == "" {
 			j++
 		} else {
 			break
 		}
 	}
 	
-	// Insert result at position j
+	// Insert result at position j with proper blank line separation
 	resultLines := strings.Split(result, "\n")
-	lines = append(lines[:j], append(resultLines, lines[j:]...)...)
+	
+	// Add a blank line before the result for proper Markdown parsing
+	newContent := append([]string{""}, resultLines...)
+	lines = append(lines[:j], append(newContent, lines[j:]...)...)
 	
 	return lines
 }
 
 // prependResultBlock adds result before existing results
-func prependResultBlock(lines []string, evalLinkIndex int, result string) []string {
-	// Insert right after eval link
+func prependResultBlock(lines []string, evalElementIndex int, result string) []string {
+	// Insert right after eval element with proper blank line separation
 	resultLines := strings.Split(result, "\n")
-	lines = append(lines[:evalLinkIndex+1], append(resultLines, lines[evalLinkIndex+1:]...)...)
+	
+	// Always add a blank line before the result for proper Markdown parsing
+	newContent := append([]string{""}, resultLines...)
+	lines = append(lines[:evalElementIndex+1], append(newContent, lines[evalElementIndex+1:]...)...)
 	
 	return lines
 }
