@@ -28,7 +28,7 @@ var evalCmd = &cobra.Command{
 Examples:
   jot eval example.md                    # List blocks with approval status
   jot eval example.md hello_python       # Execute specific block (if approved)
-  jot eval example.md hello_python --approve --mode hash  # Approve and execute
+  jot eval example.md hello_python --approve --mode hash  # Approve block (doesn't execute)
   jot eval example.md --all              # Execute all approved blocks
   jot eval example.md --approve-document --mode always    # Approve entire document
   jot eval --list-approved               # List all approved blocks`,
@@ -76,7 +76,7 @@ Examples:
 			if blockName == "" {
 				return fmt.Errorf("please specify a block name to approve")
 			}
-			return approveAndExecuteBlock(filename, blockName, evalMode)
+			return approveBlock(filename, blockName, evalMode)
 		}
 		
 		// Execute blocks
@@ -195,7 +195,7 @@ func revokeApproval(filename, blockName string) error {
 	return nil
 }
 
-func approveAndExecuteBlock(filename, blockName, mode string) error {
+func approveBlock(filename, blockName, mode string) error {
 	// Parse and validate mode
 	var approvalMode eval.ApprovalMode
 	switch mode {
@@ -266,31 +266,7 @@ func approveAndExecuteBlock(filename, blockName, mode string) error {
 	}
 	
 	fmt.Printf("✓ Block '%s' approved with %s mode.\n", blockName, approvalMode)
-	
-	// Execute the block
-	fmt.Println("Executing...")
-	results, err := eval.ExecuteEvaluableBlockByName(filename, blockName)
-	if err != nil {
-		return fmt.Errorf("error executing block: %w", err)
-	}
-	
-	// Update results in markdown
-	err = eval.UpdateMarkdownWithResults(filename, results)
-	if err != nil {
-		return fmt.Errorf("error updating results: %w", err)
-	}
-	
-	// Show execution results
-	for _, result := range results {
-		if result.Err != nil {
-			fmt.Printf("❌ Execution failed: %v\n", result.Err)
-		} else {
-			fmt.Printf("✓ Execution completed successfully.\n")
-			if result.Output != "" {
-				fmt.Printf("Output:\n%s\n", result.Output)
-			}
-		}
-	}
+	fmt.Println("Use 'jot eval' to execute the approved block.")
 	
 	return nil
 }
