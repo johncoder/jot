@@ -54,12 +54,12 @@ f7g8h9i0j1k2...	prompt	notes.md:data_analysis:2025-06-18T11:00:00Z
 
 When executing unapproved blocks with the standards-compliant syntax:
 
-```python
-import requests
-response = requests.get("https://api.github.com")
-print(response.status_code)
-```
-<eval name="api_request" />
+    ```python
+    import requests
+    response = requests.get("https://api.github.com")
+    print(response.status_code)
+    ```
+    <eval name="api_request" />
 
 The approval workflow shows:
 
@@ -92,35 +92,25 @@ Security settings in `.jotrc` using path-based configuration objects:
         // Global defaults
         "path": "*",
         "require_approval": true,
-        "default_mode": "hash",
-        "prompt_on_network": true,
-        "prompt_on_file_write": true
+        "default_mode": "hash"
       },
       {
         // Development environment
         "path": "./dev-notes/*",
         "require_approval": true,
-        "default_mode": "prompt",
-        "prompt_on_network": false,
-        "prompt_on_file_write": false
+        "default_mode": "prompt"
       },
       {
         // Trusted documentation
         "path": "./docs/examples/*",
         "require_approval": false,
-        "default_mode": "always",
-        "prompt_on_network": false,
-        "prompt_on_file_write": false
+        "default_mode": "always"
       },
       {
         // High-security production files
         "path": "./production/*",
         "require_approval": true,
-        "default_mode": "hash",
-        "prompt_on_network": true,
-        "prompt_on_file_write": true,
-        "block_network": true,
-        "block_file_write": true
+        "default_mode": "hash"
       }
     ]
   }
@@ -134,10 +124,8 @@ Each security configuration object supports:
 - **`path`**: Glob pattern for matching files (required)
 - **`require_approval`**: Whether approval is needed (default: true)
 - **`default_mode`**: Approval mode - "hash", "prompt", or "always" (default: "hash")
-- **`prompt_on_network`**: Warn before network operations (default: true)
-- **`prompt_on_file_write`**: Warn before file writes (default: true)
-- **`block_network`**: Completely block network access (default: false)
-- **`block_file_write`**: Completely block file writes (default: false)
+
+*Note: Additional properties like network and file system controls are deferred to future phases.*
 
 ### Path Matching Rules
 
@@ -159,35 +147,45 @@ Examples:
 ### Basic Commands
 
 ```bash
-# Approve a specific block
-jot eval --approve <block_name> [file...]
+# List blocks in a file with approval status
+jot eval <file>
 
-# Approve with specific mode
-jot eval --approve <block_name> --mode hash [file...]
-jot eval --approve <block_name> --mode prompt [file...]
-jot eval --approve <block_name> --mode always [file...]
+# Approve and execute a specific block
+jot eval <file> <block_name> --approve --mode <mode>
 
-# List approved blocks
+# Execute a specific block (if approved)
+jot eval <file> <block_name>
+
+# Execute all approved blocks in a file
+jot eval <file> --all
+
+# List all approved blocks
 jot eval --list-approved
 
-# Remove approval
+# Remove approval for a block
 jot eval --revoke <block_name> [file...]
-
-# Interactive approval
-jot eval --approve-interactive [file...]
 ```
 
-### Execution Commands
+### Examples
 
 ```bash
-# Execute with approval checks
-jot eval [file...]
+# List blocks and their approval status
+$ jot eval example.md
+Blocks in example.md:
+✓ hello_python (line 5) - APPROVED (hash mode)
+⚠ api_request (line 15) - NEEDS APPROVAL
+⚠ file_ops (line 25) - NEEDS APPROVAL
 
-# Execute only pre-approved blocks
-jot eval --approved-only [file...]
+# Approve and execute a block
+$ jot eval example.md api_request --approve --mode hash
+Approving and executing 'api_request'...
+[execution output]
 
-# Show what would execute (dry run)
-jot eval --dry-run [file...]
+# Execute all approved blocks
+$ jot eval example.md --all
+Executing 2 approved blocks...
+✓ hello_python completed
+⚠ Skipping api_request (needs approval)
 ```
 
 ## Integration with Standards-Compliant Proposal
@@ -201,14 +199,7 @@ print(response.status_code)
 ```
 <eval name="api_test" />
 
-After approval, the system can optionally add approval metadata:
-
-```python
-import requests
-response = requests.get("https://api.github.com")
-print(response.status_code)
-```
-<eval name="api_test" approved="a1b2c3d4" />
+**Note**: The system does not store approval hashes directly in the document (as this would be insecure - users could modify the hash to match previously approved content). Instead, jot maintains its own internal tracking of approved content hashes and performs verification during execution.
 
 ## Example Workflows
 
@@ -222,9 +213,7 @@ For trusted development environments:
       {
         "path": "*",
         "require_approval": true,
-        "default_mode": "prompt",
-        "prompt_on_network": false,
-        "prompt_on_file_write": false
+        "default_mode": "prompt"
       },
       {
         "path": "./dev-notes/*",
@@ -246,16 +235,7 @@ For shared or production environments:
       {
         "path": "*",
         "require_approval": true,
-        "default_mode": "hash",
-        "prompt_on_network": true,
-        "prompt_on_file_write": true
-      },
-      {
-        "path": "./production/*",
-        "require_approval": true,
-        "default_mode": "hash",
-        "block_network": true,
-        "block_file_write": true
+        "default_mode": "hash"
       }
     ]
   }
@@ -277,9 +257,7 @@ For presentations with known code:
       {
         "path": "./presentation/*",
         "require_approval": false,
-        "default_mode": "always",
-        "prompt_on_network": false,
-        "prompt_on_file_write": false
+        "default_mode": "always"
       }
     ]
   }
@@ -292,13 +270,23 @@ For presentations with known code:
 1. **Permission Storage**: Implement `.jot/eval_permissions` file
 2. **Hash-Based Tracking**: Content hash generation and comparison
 3. **Interactive Approval**: Command-line approval workflow
-4. **Basic Configuration**: Core security settings in `.jotrc`
+4. **Hierarchical Configuration**: 
+   - Load all `.jotrc` files in the hierarchy (parent directories)
+   - Apply rules with closer files taking precedence
+   - Support path-based security configuration objects
 
 ### Phase 2: Enhanced Workflows
 1. **File Path Approval**: Trusted path support
 2. **Prompt Mode**: On-demand approval without storage
 3. **Bulk Operations**: Approve multiple blocks at once
 4. **Status Commands**: List and manage approved blocks
+
+### Configuration Resolution
+The system will load `.jotrc` files from the directory hierarchy:
+1. Start from the directory containing the file being executed
+2. Walk up the directory tree looking for `.jotrc` files
+3. Merge configurations with closer files taking precedence
+4. Apply the most specific path pattern that matches the target file
 
 ### Future Phases (Advanced Security)
 The following features are planned for future development but are not part of this initial proposal:
@@ -310,31 +298,16 @@ The following features are planned for future development but are not part of th
 
 These advanced features would be designed and implemented as separate proposals once the core approval system is stable.
 
-## Migration and Compatibility
-
-### Backward Compatibility
-- Existing eval elements work in permissive mode with warnings
-- New security features are opt-in initially
-- Gradual migration path available
-
-### Migration Commands
-```bash
-# Initialize security for existing documents
-jot eval --init-security [file...]
-
-# Bulk approve trusted content
-jot eval --bulk-approve --mode hash trusted-docs/*.md
-```
-
 ## Example: Complete Approval Flow
 
 ```bash
-# First execution attempt
-$ jot eval analysis.md --name data_load
-Code block 'data_load' requires approval.
+# List blocks in a file
+$ jot eval analysis.md
+Blocks in analysis.md:
+⚠ data_load (line 5) - NEEDS APPROVAL
 
-# Approve the block
-$ jot eval --approve data_load analysis.md
+# Approve and execute the block
+$ jot eval analysis.md data_load --approve --mode hash
 Approving code block 'data_load':
 ────────────────────────────────────────
 ```python
@@ -343,15 +316,16 @@ data = pd.read_csv("data.csv")
 print(f"Loaded {len(data)} rows")
 ```
 ────────────────────────────────────────
-Approve with hash-based expiration? [y/N]: y
-Block 'data_load' approved.
+Approve with hash-based mode? [y/N]: y
+Block 'data_load' approved and executed.
+Loaded 1000 rows
 
-# Now execution works
-$ jot eval analysis.md --name data_load
+# Now subsequent execution works without approval
+$ jot eval analysis.md data_load
 Loaded 1000 rows
 
 # If code changes, re-approval needed
-$ jot eval analysis.md --name data_load  
+$ jot eval analysis.md data_load
 Code block 'data_load' has changed and requires re-approval.
 ```
 
@@ -362,13 +336,13 @@ Code block 'data_load' has changed and requires re-approval.
 3. **User-Friendly**: Clear approval workflows that don't impede productivity
 4. **Flexible**: Configurable policies for different environments
 5. **Transparent**: Users always know what code will execute
-6. **Compatible**: Works with existing standards-compliant proposal
+6. **Hierarchical Configuration**: Path-based rules with directory hierarchy support
 
 ## Conclusion
 
 This simplified security and approval system provides essential protection for code execution while maintaining jot's focus on practical utility. By concentrating on change detection and user approval rather than complex code analysis, the system remains understandable and maintainable.
 
-The three-mode approach (hash-based, prompt, always) covers the most common use cases while leaving room for advanced features in future phases.
+The three-mode approach (hash-based, prompt, always) combined with hierarchical path-based configuration covers the most common use cases while leaving room for advanced features in future phases.
 
 ---
 
