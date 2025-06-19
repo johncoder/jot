@@ -369,7 +369,6 @@ func revokeDocumentApproval(filename string) error {
 }
 
 func init() {
-	rootCmd.AddCommand(evalCmd)
 	evalCmd.Flags().BoolVarP(&evalList, "list", "l", false, "List evaluable code blocks (deprecated, use without arguments)")
 	evalCmd.Flags().BoolVarP(&evalAll, "all", "a", false, "Execute all approved evaluable code blocks")
 	evalCmd.Flags().BoolVar(&evalApprove, "approve", false, "Approve and execute the specified block")

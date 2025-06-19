@@ -32,7 +32,6 @@ It uses the :tangle and :file header arguments to determine the output file path
 }
 
 func init() {
-	rootCmd.AddCommand(tangleCmd)
 }
 
 func tangleMarkdown(filePath string) {

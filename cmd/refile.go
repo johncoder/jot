@@ -29,15 +29,36 @@ This command allows you to:
 
 Examples:
   jot refile                     # Interactive selection
-  jot refile --all               # Process all inbox notes
-  jot refile --dest topics.md    # Specify destination file
-  jot refile --offset 150        # Target note at cursor position (editor integration)
-  jot refile --exact "2025-06-06 10:30" # Target specific timestamp
-  jot refile --pattern "meeting" # Target notes matching pattern`,
+  jot refile --all --dest topics.md    # Process all inbox notes
+  jot refile 1,3,5 --dest work.md # Move specific notes by index
+  jot refile --dest topics.md    # Specify destination file (interactive selection)
+  jot refile --offset 150 --dest work.md        # Target note at cursor position (editor integration)
+  jot refile --exact "2025-06-06 10:30" --dest notes.md # Target specific timestamp
+  jot refile --pattern "meeting" --dest work.md # Target notes matching pattern`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ws, err := workspace.RequireWorkspace()
 		if err != nil {
 			return err
+		}
+
+		// Get command line arguments and flags early for validation
+		all, _ := cmd.Flags().GetBool("all")
+		dest, _ := cmd.Flags().GetString("dest")
+		exact, _ := cmd.Flags().GetString("exact")
+		pattern, _ := cmd.Flags().GetString("pattern")
+		offset, _ := cmd.Flags().GetInt("offset")
+
+		// Early validation of arguments before processing inbox
+		if len(args) > 0 && args[0] != "" {
+			// Validate that the argument looks like a valid index specification
+			if strings.Contains(args[0], ".") {
+				return fmt.Errorf("invalid argument '%s': looks like a filename, but expected numeric indices (e.g., '1,2,3' or '1-5')\nTo move notes to a file, use: jot refile --all --dest %s", args[0], args[0])
+			}
+			// Try to validate the index format early
+			_, err := NewIndexTargeter(args[0])
+			if err != nil {
+				return fmt.Errorf("invalid index specification '%s': expected numeric indices like '1,2,3' or '1-5'\nFor other options, see: jot refile --help", args[0])
+			}
 		}
 
 		fmt.Println("Starting refile process...")
@@ -76,13 +97,6 @@ Examples:
 			}
 			fmt.Println()
 		}
-
-		// Get command line arguments and flags
-		all, _ := cmd.Flags().GetBool("all")
-		dest, _ := cmd.Flags().GetString("dest")
-		exact, _ := cmd.Flags().GetString("exact")
-		pattern, _ := cmd.Flags().GetString("pattern")
-		offset, _ := cmd.Flags().GetInt("offset")
 
 		var selectedNotes []Note
 
@@ -133,11 +147,8 @@ Examples:
 
 			fmt.Printf("Selected %d notes by byte offset: %d\n", len(selectedNotes), offset)
 		} else if len(args) > 0 && args[0] != "" {
-			// Try index-based targeting
-			targeter, targeterErr := NewIndexTargeter(args[0])
-			if targeterErr != nil {
-				return fmt.Errorf("invalid index specification '%s': %w", args[0], targeterErr)
-			}
+			// Index-based targeting (already validated early)
+			targeter, _ := NewIndexTargeter(args[0]) // We know this won't error due to early validation
 
 			var selectErr error
 			selectedNotes, selectErr = targeter.SelectNotes(notes)
@@ -692,7 +703,7 @@ func moveNotes(ws *workspace.Workspace, notes []Note, destFile string) error {
 	// Validate destination file path
 	destPath := filepath.Join(ws.LibDir, destFile)
 
-	fmt.Printf("Moving %d notes to %s...\n", len(notes), destFile)
+	fmt.Printf("Moving %d notes to lib/%s...\n", len(notes), destFile)
 
 	// Read the source inbox file for precise byte extraction
 	sourceContent, err := os.ReadFile(ws.InboxPath)
@@ -740,7 +751,7 @@ func moveNotes(ws *workspace.Workspace, notes []Note, destFile string) error {
 	}
 
 	// Success message
-	fmt.Printf("Successfully moved %d notes to %s\n", len(notes), destFile)
+	fmt.Printf("Successfully moved %d notes to lib/%s\n", len(notes), destFile)
 	return nil
 }
 
