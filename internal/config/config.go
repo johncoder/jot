@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -104,11 +105,11 @@ func setDefaults(v *viper.Viper) {
 
 // getDefaultEditor returns platform-specific default editor
 func getDefaultEditor() string {
-	// Try common editors in order of preference
-	editors := []string{"nano", "vim", "vi"}
+	// Follow Git's approach: try system 'editor' first, then common editors
+	editors := []string{"editor", "nano", "vim", "vi"}
 
 	for _, editor := range editors {
-		if _, err := os.Stat(editor); err == nil {
+		if _, err := exec.LookPath(editor); err == nil {
 			return editor
 		}
 	}
@@ -166,19 +167,40 @@ func GetLocation(name string) (string, error) {
 }
 
 // GetEditor returns the configured editor command
+// Follows Git's priority: $EDITOR -> $VISUAL -> config -> default
 func GetEditor() string {
+	// Check environment variables first (like Git does)
+	if editor := os.Getenv("EDITOR"); editor != "" {
+		return editor
+	}
+	if visual := os.Getenv("VISUAL"); visual != "" {
+		return visual
+	}
+	
+	// Then check config file
 	cfg := Get()
 	if cfg.Editor != "" {
 		return cfg.Editor
 	}
+	
+	// Finally fall back to system default
 	return getDefaultEditor()
 }
 
 // GetPager returns the configured pager command
+// Follows Git's priority: $PAGER -> config -> default
 func GetPager() string {
+	// Check environment variable first
+	if pager := os.Getenv("PAGER"); pager != "" {
+		return pager
+	}
+	
+	// Then check config file
 	cfg := Get()
 	if cfg.Pager != "" {
 		return cfg.Pager
 	}
+	
+	// Finally fall back to default
 	return "less"
 }
