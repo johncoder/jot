@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -23,11 +24,49 @@ func ExecuteEvaluableBlocks(filename string) ([]*EvalResult, error) {
 	if err != nil {
 		return nil, err
 	}
+	
+	// Initialize security manager
+	sm, err := NewSecurityManager()
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize security manager: %w", err)
+	}
+	
+	// Get absolute path for consistent checking
+	absPath, err := filepath.Abs(filename)
+	if err != nil {
+		return nil, err
+	}
+	
 	var results []*EvalResult
 	for _, b := range blocks {
 		if b.Eval == nil {
 			continue
 		}
+		
+		// Check security approval
+		approved, err := sm.CheckApproval(absPath, b)
+		if err != nil {
+			results = append(results, &EvalResult{
+				Block:  b,
+				Output: "",
+				Err:    fmt.Errorf("security check failed: %w", err),
+			})
+			continue
+		}
+		
+		if !approved {
+			blockName := "unnamed"
+			if b.Eval.Params["name"] != "" {
+				blockName = b.Eval.Params["name"]
+			}
+			results = append(results, &EvalResult{
+				Block:  b,
+				Output: "",
+				Err:    fmt.Errorf("code block '%s' requires approval", blockName),
+			})
+			continue
+		}
+		
 		output, err := executeBlock(b)
 		results = append(results, &EvalResult{Block: b, Output: output, Err: err})
 	}
@@ -40,6 +79,19 @@ func ExecuteEvaluableBlockByName(filename, name string) ([]*EvalResult, error) {
 	if err != nil {
 		return nil, err
 	}
+	
+	// Initialize security manager
+	sm, err := NewSecurityManager()
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize security manager: %w", err)
+	}
+	
+	// Get absolute path for consistent checking
+	absPath, err := filepath.Abs(filename)
+	if err != nil {
+		return nil, err
+	}
+	
 	var results []*EvalResult
 	for _, b := range blocks {
 		if b.Eval == nil {
@@ -49,6 +101,27 @@ func ExecuteEvaluableBlockByName(filename, name string) ([]*EvalResult, error) {
 		if !ok || blockName != name {
 			continue
 		}
+		
+		// Check security approval
+		approved, err := sm.CheckApproval(absPath, b)
+		if err != nil {
+			results = append(results, &EvalResult{
+				Block:  b,
+				Output: "",
+				Err:    fmt.Errorf("security check failed: %w", err),
+			})
+			break
+		}
+		
+		if !approved {
+			results = append(results, &EvalResult{
+				Block:  b,
+				Output: "",
+				Err:    fmt.Errorf("code block '%s' requires approval", name),
+			})
+			break
+		}
+		
 		output, err := executeBlock(b)
 		results = append(results, &EvalResult{Block: b, Output: output, Err: err})
 	}
