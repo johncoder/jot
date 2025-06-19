@@ -20,7 +20,7 @@ var (
 )
 
 var captureCmd = &cobra.Command{
-	Use:   "capture",
+	Use:   "capture [template]",
 	Short: "Capture a new note",
 	Long: `Capture a new note and add it to inbox.md.
 
@@ -36,9 +36,10 @@ Input methods:
 
 Examples:
   jot capture                              # Open editor
-  jot capture --template meeting           # Use meeting template in editor
-  jot capture --template standup --content "Completed API design"
-  echo "Notes here" | jot capture --template meeting
+  jot capture meeting                      # Use meeting template in editor
+  jot capture --template meeting           # Use meeting template in editor (same as above)
+  jot capture standup --content "Completed API design"
+  echo "Notes here" | jot capture meeting
   jot capture --content "Quick note"       # Direct append to inbox`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {

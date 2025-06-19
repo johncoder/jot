@@ -12,16 +12,14 @@ import (
 
 var archiveCmd = &cobra.Command{
 	Use:   "archive",
-	Short: "Archive notes for long-term storage",
-	Long: `Archive notes from inbox.md or lib/ files for long-term storage.
+	Short: "Initialize archive structure for notes",
+	Long: `Initialize archive structure for long-term storage of notes.
 
-Archived notes are moved to the archive location while maintaining
-searchability and metadata for future retrieval.
+Currently creates the archive directory structure and monthly archive files.
+Interactive archiving functionality is planned for future releases.
 
 Examples:
-  jot archive                    # Interactive archive selection
-  jot archive --older-than 30d   # Archive notes older than 30 days
-  jot archive --from lib/old.md  # Archive from specific file`,
+  jot archive                    # Initialize archive structure`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ws, err := workspace.RequireWorkspace()
 		if err != nil {
@@ -63,6 +61,5 @@ Examples:
 }
 
 func init() {
-	archiveCmd.Flags().String("older-than", "", "Archive notes older than specified duration (e.g., 30d, 6m)")
-	archiveCmd.Flags().String("from", "", "Archive from specific file")
+	// Archive functionality is basic for now - no flags needed
 }

@@ -27,7 +27,7 @@ Examples:
   jot init              # Initialize a new jot workspace
   jot capture           # Capture a new note
   jot refile            # Move notes from inbox to organized files
-  jot archive           # Archive notes for long-term storage
+  jot archive           # Initialize archive structure
   jot find <query>      # Search through your notes
   jot status            # Show workspace status
   jot doctor            # Diagnose and fix common issues`,

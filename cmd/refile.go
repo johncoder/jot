@@ -17,7 +17,7 @@ import (
 )
 
 var refileCmd = &cobra.Command{
-	Use:   "refile",
+	Use:   "refile [indices]",
 	Short: "Move notes from inbox to organized files",
 	Long: `Move notes from inbox.md to organized files in the lib/ directory.
 
@@ -28,11 +28,12 @@ This command allows you to:
 - Update workspace index
 
 Examples:
-  jot refile                     # Interactive selection
-  jot refile --all --dest topics.md    # Process all inbox notes
-  jot refile 1,3,5 --dest work.md # Move specific notes by index
-  jot refile --dest topics.md    # Specify destination file (interactive selection)
-  jot refile --offset 150 --dest work.md        # Target note at cursor position (editor integration)
+  jot refile                              # Interactive selection
+  jot refile --all --dest topics.md       # Process all inbox notes
+  jot refile 1,3,5 --dest work.md         # Move specific notes by index
+  jot refile 1-3 --dest work.md           # Move range of notes by index
+  jot refile --dest topics.md             # Specify destination file (interactive selection)
+  jot refile --offset 150 --dest work.md  # Target note at cursor position (editor integration)
   jot refile --exact "2025-06-06 10:30" --dest notes.md # Target specific timestamp
   jot refile --pattern "meeting" --dest work.md # Target notes matching pattern`,
 	RunE: func(cmd *cobra.Command, args []string) error {

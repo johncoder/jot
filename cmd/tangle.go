@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,29 +14,31 @@ import (
 )
 
 var tangleCmd = &cobra.Command{
-	Use:   "tangle",
+	Use:   "tangle <file>",
 	Short: "Extract code blocks into standalone source files",
-	Long: `The tangle command extracts code blocks from Markdown files into standalone source files.
-It uses the :tangle and :file header arguments to determine the output file paths.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		if len(args) < 1 {
-			fmt.Println("Error: You must specify a Markdown file to tangle.")
-			os.Exit(1)
-		}
+	Long: `Extract code blocks from Markdown files into standalone source files.
 
+The tangle command looks for code blocks with :tangle or :file header arguments 
+and extracts them to the specified file paths. Directories are created as needed.
+
+Examples:
+  jot tangle notes.md              # Extract code blocks from notes.md
+  jot tangle docs/tutorial.md      # Extract from tutorial file`,
+	Args: cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
 		filePath := args[0]
 		fmt.Printf("Tangling code blocks in file: %s\n", filePath)
-		tangleMarkdown(filePath)
+		return tangleMarkdown(filePath)
 	},
 }
 
 func init() {
 }
 
-func tangleMarkdown(filePath string) {
+func tangleMarkdown(filePath string) error {
 	content, err := ioutil.ReadFile(filePath)
 	if err != nil {
-		log.Fatalf("Failed to read file: %s", err)
+		return fmt.Errorf("failed to read file: %w", err)
 	}
 
 	md := goldmark.New()
@@ -53,33 +54,38 @@ func tangleMarkdown(filePath string) {
 			if _, ok := args["tangle"]; ok {
 				filePath, hasFile := args["file"]
 				if !hasFile {
-					log.Printf("Skipping code block without :file argument\n")
+					fmt.Printf("Skipping code block without :file argument\n")
 					return ast.WalkContinue, nil
 				}
 
 				code := string(codeBlock.Text(content))
-				writeToFile(filePath, code)
+				if err := writeToFile(filePath, code); err != nil {
+					return ast.WalkStop, err
+				}
 			}
 		}
 		return ast.WalkContinue, nil
 	}
 
 	if err := ast.Walk(node, walker); err != nil {
-		log.Fatalf("Failed to walk AST: %s", err)
+		return fmt.Errorf("failed to walk AST: %w", err)
 	}
+	
+	return nil
 }
 
-func writeToFile(filePath, content string) {
+func writeToFile(filePath, content string) error {
 	dir := filepath.Dir(filePath)
 	if err := os.MkdirAll(dir, 0755); err != nil {
-		log.Fatalf("Failed to create directories for %s: %s", filePath, err)
+		return fmt.Errorf("failed to create directories for %s: %w", filePath, err)
 	}
 
 	if err := ioutil.WriteFile(filePath, []byte(content), 0644); err != nil {
-		log.Fatalf("Failed to write file %s: %s", filePath, err)
+		return fmt.Errorf("failed to write file %s: %w", filePath, err)
 	}
 
 	fmt.Printf("Wrote code block to %s\n", filePath)
+	return nil
 }
 
 func parseHeaderArguments(info string) map[string]string {
