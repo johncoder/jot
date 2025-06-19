@@ -24,40 +24,40 @@ The current jot eval implementation has several limitations:
 
 ### Overview
 
-Use special markdown links immediately following code blocks to encode execution metadata and options. This approach leverages standard Markdown link syntax with empty link text, making the metadata completely invisible in rendered Markdown while encoding structured data in the URL portion.
+Use HTML-style self-closing tags immediately following code blocks to encode execution metadata and options. This approach leverages valid HTML syntax that is compatible with Markdown parsers while providing structured metadata for code execution.
 
 ### Syntax
 
     ```javascript
     console.log("Hello, world!");
     ```
-    [](eval name=hello timeout=5s env=node)
+    <eval name="hello" timeout="5s" />
     
     ```python
     import datetime 
     print(f"Current time: {datetime.datetime.now()}")
     ```
-    [](eval name=timestamp shell=python3)
+    <eval name="timestamp" shell="python3" />
     
     ```bash
     ls -la | head -5
     ```
-    [](eval shell=bash cwd=/tmp)
+    <eval shell="bash" cwd="/tmp" />
 
 
-### Link Format Specification
+### Element Format Specification
 
-**Basic Format**: `[](eval key1=value1 key2=value2 ...)`
+**Basic Format**: `<eval key1="value1" key2="value2" />`
 
 #### Core Parameters
 
 | Parameter | Type | Description | Example |
 |-----------|------|-------------|---------|
-| `name` | string | Unique identifier for the code block | `name=data_analysis` |
-| `shell` | string | Shell/interpreter to use (default: inferred from language) | `shell=python3` |
-| `timeout` | duration | Execution timeout | `timeout=30s` |
-| `cwd` | path | Working directory for execution | `cwd=/tmp` |
-| `env` | key=value pairs | Environment variables (comma-separated) | `env=PATH=/usr/bin,DEBUG=1` |
+| `name` | string | Unique identifier for the code block | `name="data_analysis"` |
+| `shell` | string | Shell/interpreter to use (default: inferred from language) | `shell="python3"` |
+| `timeout` | duration | Execution timeout | `timeout="30s"` |
+| `cwd` | path | Working directory for execution | `cwd="/tmp"` |
+| `env` | key=value pairs | Environment variables (comma-separated) | `env="PATH=/usr/bin,DEBUG=1"` |
 | `args` | string | Additional arguments to pass to interpreter | `args="--verbose"` |
 
 #### Results Parameters (inspired by org-mode)
@@ -66,43 +66,43 @@ Use special markdown links immediately following code blocks to encode execution
 
 | Parameter | Description | Use Case |
 |-----------|-------------|----------|
-| `results=output` | Capture stdout/stderr (default, scripting mode) | Shell scripts, system commands |
-| `results=value` | Return function/expression value (functional mode) | Mathematical expressions, data analysis |
+| `results="output"` | Capture stdout/stderr (default, scripting mode) | Shell scripts, system commands |
+| `results="value"` | Return function/expression value (functional mode) | Mathematical expressions, data analysis |
 
 **Type** (what kind of result):
 
 | Parameter | Description | Output Format | Example Use |
 |-----------|-------------|---------------|-------------|
-| `results=code` | Wrap in code block (default) | ````text` | General purpose output |
-| `results=table` | Format as markdown table | `| col1 | col2 |` | Structured data, CSV output |
-| `results=list` | Format as markdown list | `- item1` | Lists, arrays |
-| `results=raw` | Insert directly as markdown | Raw markdown | Pre-formatted markdown |
-| `results=file` | Save to file and insert link | `![](path)` or `[link](path)` | Images, documents |
-| `results=html` | HTML export block | ```html` | HTML content |
-| `results=verbatim` | Plain text, no formatting | Plain text | Log output, simple text |
+| `results="code"` | Wrap in code block (default) | ````text` | General purpose output |
+| `results="table"` | Format as markdown table | `| col1 | col2 |` | Structured data, CSV output |
+| `results="list"` | Format as markdown list | `- item1` | Lists, arrays |
+| `results="raw"` | Insert directly as markdown | Raw markdown | Pre-formatted markdown |
+| `results="file"` | Save to file and insert link | `![](path)` or `[link](path)` | Images, documents |
+| `results="html"` | HTML export block | ```html` | HTML content |
+| `results="verbatim"` | Plain text, no formatting | Plain text | Log output, simple text |
 
 **Handling** (what to do with results):
 
 | Parameter | Description | Behavior |
 |-----------|-------------|----------|
-| `results=replace` | Replace previous results (default) | Overwrites existing output |
-| `results=append` | Add after previous results | Accumulates output |
-| `results=prepend` | Add before previous results | Adds to top |
-| `results=silent` | Execute but don't show results | Hidden execution |
-| `results=none` | Execute but don't store results | No output stored |
+| `results="replace"` | Replace previous results (default) | Overwrites existing output |
+| `results="append"` | Add after previous results | Accumulates output |
+| `results="prepend"` | Add before previous results | Adds to top |
+| `results="silent"` | Execute but don't show results | Hidden execution |
+| `results="none"` | Execute but don't store results | No output stored |
 
 #### Advanced Parameters
 
 | Parameter | Type | Description | Example |
 |-----------|------|-------------|---------|
-| `session` | string | Named persistent execution environment | `session=analysis` |
-| `var` | assignments | Pass variables from other blocks | `var=data=load_data` |
-| `file` | path | Output filename | `file=/tmp/result.png` |
-| `cache` | yes/no | Cache results to avoid re-execution | `cache=yes` |
-| `depends` | names | Dependencies on other named blocks | `depends=setup,load_data` |
-| `post` | block name | Post-processing block for result transformation | `post=format_output` |
+| `session` | string | Named persistent execution environment | `session="analysis"` |
+| `var` | assignments | Pass variables from other blocks | `var="data=load_data"` |
+| `file` | path | Output filename | `file="/tmp/result.png"` |
+| `cache` | yes/no | Cache results to avoid re-execution | `cache="yes"` |
+| `depends` | names | Dependencies on other named blocks | `depends="setup,load_data"` |
+| `post` | block name | Post-processing block for result transformation | `post="format_output"` |
 
-**Parameter Encoding**: Space-separated key=value pairs. Values with spaces should be quoted (e.g., `name="my script"`).
+**Parameter Encoding**: Standard HTML attribute format with quoted values (e.g., `name="my script"`).
 
 ### Execution Rules
 
@@ -110,39 +110,39 @@ Use special markdown links immediately following code blocks to encode execution
 
 | Scenario | Behavior | Example |
 |----------|----------|---------|
-| **Fenced code block + eval link** | ✅ **Executable** - Code block will be executed with given parameters | ```` ```python`<br/>`code`<br/>```` `<br/>`[](eval name=test)` |
+| **Fenced code block + eval element** | ✅ **Executable** - Code block will be executed with given parameters | ```` ```python`<br/>`code`<br/>```` `<br/>`<eval name="test" />` |
 | **Fenced code block alone** | ❌ **Not executable** - Regular markdown code block, ignored by jot eval | ```` ```python`<br/>`code`<br/>```` ` |
-| **Eval link alone** | ❌ **Ignored** - No preceding code block to execute | `[](eval name=orphan)` |
-| **Eval link + following code block** | ❌ **Ignored** - Must have preceding code block to be valid | `[](eval name=wrong)`<br/>```` ```output`<br/>`result`<br/>```` ` |
+| **Eval element alone** | ❌ **Ignored** - No preceding code block to execute | `<eval name="orphan" />` |
+| **Eval element + following code block** | ❌ **Ignored** - Must have preceding code block to be valid | `<eval name="wrong" />`<br/>```` ```output`<br/>`result`<br/>```` ` |
 
 #### Output Block Management
 
-**Result Block Reuse**: If a fenced code block immediately follows the eval link, it will be **reused for output**:
+**Result Block Reuse**: If a fenced code block immediately follows the eval element, it will be **reused for output**:
 
     ```python
     print("Hello")
     ```
-    [](eval name=greeting)
+    <eval name="greeting" />
     ```  
     # This existing block will be replaced with new output
     Old output here
     ```
 
-**Result Block Creation**: If no fenced code block follows the eval link, jot will **create a new one**:
+**Result Block Creation**: If no fenced code block follows the eval element, jot will **create a new one**:
 
     ```python
     print("Hello")
     ```
-    [](eval name=greeting)
+    <eval name="greeting" />
     # New code block will be created here after execution
 
 #### Processing Flow
 
-1. **Scan document** for fenced code blocks followed by `[](eval ...)` links
-2. **Parse eval parameters** from the link URL section
+1. **Scan document** for fenced code blocks followed by `<eval .../>` elements
+2. **Parse eval parameters** from the HTML attributes
 3. **Execute code block** using specified parameters
-4. **Update or create result block** immediately after the eval link
-5. **Skip orphaned eval links** that don't have preceding code blocks
+4. **Update or create result block** immediately after the eval element
+5. **Skip orphaned eval elements** that don't have preceding code blocks
 
 ### Result Storage: Adjacent Output Blocks
 
@@ -150,17 +150,17 @@ Use special markdown links immediately following code blocks to encode execution
 
 **Convention**: 
 1. Fenced code block (source code) - **required for execution**
-2. Empty anchor link starting with `eval` (execution metadata) - **required for execution**
+2. HTML eval element (execution metadata) - **required for execution**
 3. Optional fenced code block (execution output/results) - **reused or created**
 
-**Key Behavior**: Only fenced code blocks with immediately following eval links are executable. The eval link governs whether an existing result block is reused or a new one is created.
+**Key Behavior**: Only fenced code blocks with immediately following eval elements are executable. The eval element governs whether an existing result block is reused or a new one is created.
 
 Example:
 
     ```javascript
     console.log("Hello, world!");
     ```
-    [](eval name=hello)
+    <eval name="hello" />
     ```
     Hello, world!
     ```
@@ -169,7 +169,7 @@ Example:
     import datetime
     print(f"Current time: {datetime.datetime.now()}")
     ```
-    [](eval name=timestamp shell=python3)
+    <eval name="timestamp" shell="python3" />
     ```
     Current time: 2025-06-17 10:30:45.123456
     ```
@@ -177,7 +177,7 @@ Example:
     ```bash
     ls -la | head -5
     ```
-    [](eval shell=bash cwd=/tmp)
+    <eval shell="bash" cwd="/tmp" />
     ```
     total 8
     drwxrwxrwt  2 root root 4096 Jun 17 10:30 .
@@ -188,10 +188,10 @@ Example:
 **Benefits of This Approach**:
 - **Visible Results**: Output is immediately visible in any Markdown viewer
 - **Clear Association**: Results directly follow their source code blocks
-- **Standards Compliant**: Uses only standard Markdown syntax
+- **Standards Compliant**: Uses valid HTML syntax within Markdown
 - **No Special Formatting**: Output blocks are plain fenced code blocks
 - **Flexible**: Results can be omitted if not yet executed
-- **Clean**: Empty anchor links are invisible in rendered output
+- **Clean**: HTML elements are rendered invisibly in most Markdown viewers
 
 ## Implementation Plan
 
@@ -203,8 +203,8 @@ Example:
 | **Phase 4: Sessions & Dependencies** | Complex workflow features | Session management, variable passing, dependency tracking, caching, post-processing | Phase 3 |
 
 ### Phase 1: Core Infrastructure
-1. **Link Parser**: Parse `[](eval ...)` links following code blocks
-2. **Parameter Decoder**: Parse space-separated key=value parameters with quote support
+1. **HTML Parser**: Parse `<eval .../>` elements following code blocks
+2. **Attribute Decoder**: Parse HTML-style attributes with quoted values
 3. **Results System**: Implement org-mode compatible results collection, type, and handling
 4. **Offset Calculator**: Fix current offset calculation bugs using AST node end positions
 
@@ -254,7 +254,7 @@ notes.md:
     ```python
     print("Hello from Python!")
     ```
-    [](eval name=hello_python)
+    <eval name="hello_python" />
     ```
     Hello from Python!
     ```
@@ -263,7 +263,7 @@ notes.md:
     ```bash
     find . -name "*.go" | wc -l
     ```
-    [](eval name=count_go_files shell=bash cwd=/home/user/project timeout=10s results=verbatim)
+    <eval name="count_go_files" shell="bash" cwd="/home/user/project" timeout="10s" results="verbatim" />
     ```
     42
     ```
@@ -274,7 +274,7 @@ notes.md:
     data = pd.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
     print("Data loaded")
     ```
-    [](eval name=load_data session=analysis results=output)
+    <eval name="load_data" session="analysis" results="output" />
     ```
     Data loaded
     ```
@@ -282,7 +282,7 @@ notes.md:
     ```python
     print(data.describe())
     ```
-    [](eval name=describe_data session=analysis results=table)
+    <eval name="describe_data" session="analysis" results="table" />
     |       |   x |   y |
     |-------|-----|-----|
     | count | 3.0 | 3.0 |
@@ -296,7 +296,7 @@ notes.md:
     plt.savefig('/tmp/plot.png')
     print("Plot saved")
     ```
-    [](eval name=create_plot results=file file=/tmp/plot.png)
+    <eval name="create_plot" results="file" file="/tmp/plot.png" />
     ![Plot](file:/tmp/plot.png)
 
 
@@ -309,7 +309,7 @@ notes.md:
         json.dump(data, f)
     print("Data written to file")
     ```
-    [](eval name=write_data shell=python3)
+    <eval name="write_data" shell="python3" />
     ```
     Data written to file
     ```
@@ -317,7 +317,7 @@ notes.md:
     ```bash
     cat /tmp/data.json | jq .
     ```
-    [](eval name=read_data shell=bash depends=write_data)
+    <eval name="read_data" shell="bash" depends="write_data" />
     ```
     {
       "name": "jot",
@@ -338,7 +338,7 @@ notes.md:
 ### Detailed Test Areas
 
 **Unit Tests**:
-- Link parsing and parameter extraction
+- HTML element parsing and attribute extraction
 - Parameter validation and error handling
 - Offset calculation accuracy
 - Result formatting for all types (table, list, raw, etc.)
@@ -375,6 +375,6 @@ notes.md:
 
 ## Conclusion
 
-This proposal provides a robust, standards-compliant foundation for jot's code execution feature. By leveraging standard Markdown links for metadata encoding and offering flexible result storage options, we maintain full compatibility with the Markdown ecosystem while enabling powerful code execution and result annotation capabilities.
+This proposal provides a robust, standards-compliant foundation for jot's code execution feature. By leveraging HTML-style self-closing tags for metadata encoding and offering flexible result storage options, we maintain compatibility with the Markdown ecosystem while enabling powerful code execution and result annotation capabilities.
 
-The link-based approach is intuitive, extensible, and maintains jot's philosophy of being close to standard tools and formats while adding powerful functionality for knowledge workers.
+The HTML element approach is intuitive, extensible, and maintains jot's philosophy of being close to standard tools and formats while adding powerful functionality for knowledge workers.

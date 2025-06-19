@@ -15,8 +15,14 @@ This roadmap outlines the major projects and milestones for the development of j
 
 ## Planned Projects
 - [Interactive Menu System](projects/interactive_menu_system.md)
+- [jot eval (Standards-Compliant)](projects/jot_eval_standards_compliant_proposal.md) - Code execution and result annotation
+- [jot eval Security & Approval](projects/jot_eval_security_approval.md) - Simplified 3-mode approval system (hash-based, prompt, always)
 - Database Integration (SQLite for indexing and metadata)
 - Configuration System (JSON5 files, environment variables)
 - Archive Search Functionality
+
+## Deprecated Projects
+- [jot eval Original Proposal](projects/jot_eval_proposal.md) ❌ (Superseded by standards-compliant approach)
+- [jot eval Complex Security Proposal](projects/jot_eval_security_approval_complex.md) ❌ (Superseded by simplified 3-mode approach)
 
 _This list will be updated as new projects are identified and priorities shift._
