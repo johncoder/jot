@@ -49,7 +49,16 @@ Examples:
 		prepend, _ := cmd.Flags().GetBool("prepend")
 		verbose, _ := cmd.Flags().GetBool("verbose")
 
+		// No source and no destination: show usage help
+		if len(args) == 0 && to == "" {
+			return fmt.Errorf("provide a source file or --to destination")
+		}
+
 		if to == "" {
+			// Check if this is a request to show selectors for a specific file
+			if len(args) == 1 && !strings.Contains(args[0], "#") {
+				return showSelectorsForFile(ws, args[0])
+			}
 			return fmt.Errorf("destination path required: use --to flag")
 		}
 
@@ -342,4 +351,68 @@ func init() {
 	refileCmd.Flags().String("to", "", "Destination path (e.g., 'work.md#projects/frontend')")
 	refileCmd.Flags().Bool("prepend", false, "Insert content at the beginning under target heading")
 	refileCmd.Flags().BoolP("verbose", "v", false, "Show detailed information about the refile operation")
+}
+
+// showSelectorsForFile displays available selectors for a specific file
+func showSelectorsForFile(ws *workspace.Workspace, filename string) error {
+	// Determine the full file path
+	var filePath string
+	if filename == "inbox.md" {
+		filePath = ws.InboxPath
+	} else {
+		// Handle files in lib/ directory
+		if !strings.HasSuffix(filename, ".md") {
+			filename += ".md"
+		}
+		filePath = filepath.Join(ws.LibDir, filename)
+	}
+
+	// Check if file exists
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		return fmt.Errorf("file not found: %s", filename)
+	}
+
+	// Read and parse the file
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to read file %s: %w", filename, err)
+	}
+
+	if len(content) == 0 {
+		fmt.Printf("File %s is empty (no selectors available)\n", filename)
+		return nil
+	}
+
+	// Parse document and get headings
+	doc := markdown.ParseDocument(content)
+	headings := markdown.FindAllHeadings(doc, content)
+
+	if len(headings) == 0 {
+		fmt.Printf("No headings found in %s\n", filename)
+		return nil
+	}
+
+	// Display selectors
+	fmt.Printf("Available selectors in %s:\n", filename)
+	
+	for _, heading := range headings {
+		if strings.TrimSpace(heading.Text) == "" {
+			continue // Skip empty headings
+		}
+
+		// Build selector based on heading level and path
+		var selector string
+		if heading.Level == 1 {
+			selector = fmt.Sprintf("%s#%s", filename, strings.ToLower(heading.Text))
+		} else {
+			// For level 2+ headings, use skip syntax
+			skipPrefix := strings.Repeat("/", heading.Level-1)
+			selector = fmt.Sprintf("%s#%s%s", filename, skipPrefix, strings.ToLower(heading.Text))
+		}
+
+		fmt.Printf("  %s\n", selector)
+	}
+
+	fmt.Printf("\nUsage: jot refile \"<selector>\" --to \"<destination>\"\n")
+	return nil
 }
