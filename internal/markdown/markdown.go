@@ -273,7 +273,21 @@ func findSubtreeEnd(heading *ast.Heading, content []byte) int {
 	for current != nil {
 		if h, ok := current.(*ast.Heading); ok && h.Level <= heading.Level {
 			// Found next same-level or higher heading
-			return GetNodeOffset(h, content)
+			nextHeadingOffset := GetNodeOffset(h, content)
+			
+			// Find the actual start of the heading line by looking backwards for newline
+			lineStart := nextHeadingOffset
+			for lineStart > 0 && content[lineStart-1] != '\n' {
+				lineStart--
+			}
+			
+			// If we found a newline, the line starts after it
+			// Otherwise, we're at the beginning of the content
+			if lineStart > 0 && content[lineStart-1] == '\n' {
+				return lineStart
+			}
+			
+			return lineStart
 		}
 		current = current.NextSibling()
 	}
