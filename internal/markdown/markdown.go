@@ -239,7 +239,7 @@ func ExtractHeadingText(heading *ast.Heading, content []byte) string {
 	return strings.TrimSpace(text.String())
 }
 
-// GetNodeOffset gets the byte offset of a node in the content
+// GetNodeOffset gets the byte offset of a node in the content  
 func GetNodeOffset(node ast.Node, content []byte) int {
 	// Try to get segment information
 	if hasSegment, ok := node.(interface{ Segment() *text.Segment }); ok {
@@ -248,6 +248,15 @@ func GetNodeOffset(node ast.Node, content []byte) int {
 			return seg.Start
 		}
 	}
+	
+	// Fallback: try to get segment from Lines() method for headings
+	if heading, ok := node.(*ast.Heading); ok {
+		if heading.Lines().Len() > 0 {
+			segment := heading.Lines().At(0)
+			return segment.Start
+		}
+	}
+	
 	return 0
 }
 

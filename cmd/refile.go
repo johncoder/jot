@@ -47,6 +47,7 @@ Examples:
 		// Get flags
 		to, _ := cmd.Flags().GetString("to")
 		prepend, _ := cmd.Flags().GetBool("prepend")
+		verbose, _ := cmd.Flags().GetBool("verbose")
 
 		if to == "" {
 			return fmt.Errorf("destination path required: use --to flag")
@@ -75,10 +76,18 @@ Examples:
 			return fmt.Errorf("failed to extract subtree: %w", err)
 		}
 
+		if verbose {
+			printVerboseSubtreeInfo(subtree, sourcePath.File)
+		}
+
 		// Resolve destination
 		dest, err := ResolveDestination(ws, destPath, prepend)
 		if err != nil {
 			return fmt.Errorf("failed to resolve destination: %w", err)
+		}
+
+		if verbose {
+			printVerboseDestinationInfo(dest)
 		}
 
 		// Transform subtree level
@@ -87,6 +96,10 @@ Examples:
 		// Perform the refile operation
 		if err := performRefile(ws, sourcePath, subtree, dest, transformedContent); err != nil {
 			return fmt.Errorf("refile operation failed: %w", err)
+		}
+
+		if verbose {
+			fmt.Printf("Refile operation completed successfully!\n")
 		}
 
 		fmt.Printf("Successfully refiled '%s' to '%s'\n", 
@@ -289,7 +302,44 @@ func performRefile(ws *workspace.Workspace, sourcePath *markdown.HeadingPath, su
 	return nil
 }
 
+// printVerboseSubtreeInfo prints detailed information about the extracted subtree
+func printVerboseSubtreeInfo(subtree *markdown.Subtree, filename string) {
+	fmt.Printf("Source subtree analysis:\n")
+	fmt.Printf("  File: %s\n", filename)
+	fmt.Printf("  Heading: %q\n", subtree.Heading)
+	fmt.Printf("  Level: %d\n", subtree.Level)
+	fmt.Printf("  Start offset: %d\n", subtree.StartOffset)
+	fmt.Printf("  End offset: %d\n", subtree.EndOffset)
+	fmt.Printf("  Total length: %d bytes\n", len(subtree.Content))
+	
+	// Show head and tail summary
+	content := subtree.Content
+	if len(content) > 100 {
+		head := strings.ReplaceAll(string(content[:50]), "\n", "\\n")
+		tail := strings.ReplaceAll(string(content[len(content)-50:]), "\n", "\\n")
+		fmt.Printf("  Content preview: %q ... %q\n", head, tail)
+	} else {
+		preview := strings.ReplaceAll(string(content), "\n", "\\n")
+		fmt.Printf("  Content: %q\n", preview)
+	}
+	fmt.Println()
+}
+
+// printVerboseDestinationInfo prints detailed information about the destination
+func printVerboseDestinationInfo(dest *DestinationTarget) {
+	fmt.Printf("Destination analysis:\n")
+	fmt.Printf("  File: %s\n", dest.File)
+	fmt.Printf("  Target level: %d\n", dest.TargetLevel)
+	fmt.Printf("  Insert offset: %d\n", dest.InsertOffset)
+	fmt.Printf("  Path exists: %t\n", dest.Exists)
+	if len(dest.CreatePath) > 0 {
+		fmt.Printf("  Will create path: %s\n", strings.Join(dest.CreatePath, " > "))
+	}
+	fmt.Println()
+}
+
 func init() {
 	refileCmd.Flags().String("to", "", "Destination path (e.g., 'work.md#projects/frontend')")
 	refileCmd.Flags().Bool("prepend", false, "Insert content at the beginning under target heading")
+	refileCmd.Flags().BoolP("verbose", "v", false, "Show detailed information about the refile operation")
 }
