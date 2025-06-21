@@ -164,13 +164,7 @@ type HeadingInfo struct {
 
 // tryMatchPath attempts to match a path starting from a given heading
 func tryMatchPath(heading *ast.Heading, content []byte, path *HeadingPath, segmentIndex int) *Subtree {
-	// Check if we need to skip levels due to unusual document structure
-	expectedLevel := segmentIndex + 1 + path.SkipLevels
-	if heading.Level != expectedLevel {
-		return nil
-	}
-
-	// Get heading text
+	// Get heading text for matching
 	headingText := ExtractHeadingText(heading, content)
 	
 	// Check if current segment matches (case-insensitive contains)
@@ -180,6 +174,17 @@ func tryMatchPath(heading *ast.Heading, content []byte, path *HeadingPath, segme
 	
 	segment := path.Segments[segmentIndex]
 	if !strings.Contains(strings.ToLower(headingText), strings.ToLower(segment)) {
+		return nil
+	}
+
+	// For single-segment paths, allow any level (contains matching)
+	if len(path.Segments) == 1 {
+		return extractSubtreeFromHeading(heading, content)
+	}
+
+	// For multi-segment paths, enforce hierarchical level structure
+	expectedLevel := segmentIndex + 1 + path.SkipLevels
+	if heading.Level != expectedLevel {
 		return nil
 	}
 
