@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -20,6 +19,14 @@ type DestinationTarget struct {
 	InsertOffset int      // Byte position for insertion
 	CreatePath   []string // Missing headings to create
 	Exists       bool     // Whether the target path exists
+}
+
+// PathResolution represents the result of path navigation
+type PathResolution struct {
+	TargetHeading    *ast.Heading // The final target heading if found
+	ParentHeading    *ast.Heading // The deepest parent heading found
+	FoundSegments    []string     // Successfully matched segments
+	MissingSegments  []string     // Segments that need to be created
 }
 
 var refileCmd = &cobra.Command{
@@ -125,37 +132,62 @@ func inspectDestination(ws *workspace.Workspace, destPath *markdown.HeadingPath)
 
 	// Check if file exists
 	filePath := filepath.Join(ws.LibDir, destPath.File)
+	if destPath.File == "inbox.md" {
+		filePath = ws.InboxPath
+	}
+	
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
 		fmt.Printf("✗ File not found: %s\n", destPath.File)
 		return nil
 	}
 	fmt.Printf("✓ File exists: %s\n", destPath.File)
 
-	// Resolve destination to check path
-	dest, err := ResolveDestination(ws, destPath, false)
+	// Read and parse the file to analyze the path
+	content, err := os.ReadFile(filePath)
 	if err != nil {
-		// Check if it's an ambiguous path error
-		if strings.Contains(err.Error(), "matches multiple headings") {
-			fmt.Printf("✗ Ambiguous path: %s\n", err.Error())
-			return nil
-		}
-		fmt.Printf("✗ Error: %s\n", err.Error())
+		fmt.Printf("✗ Error reading file: %s\n", err.Error())
 		return nil
 	}
 
-	if dest.Exists {
+	doc := markdown.ParseDocument(content)
+	pathResolution, err := navigateHeadingPath(doc, content, destPath)
+	if err != nil {
+		fmt.Printf("✗ Error analyzing path: %s\n", err.Error())
+		return nil
+	}
+
+	if pathResolution.TargetHeading != nil {
+		// Complete path exists
 		fmt.Printf("✓ Path exists: %s\n", strings.Join(destPath.Segments, " > "))
-		fmt.Printf("Ready to receive content at level %d\n", dest.TargetLevel+1)
-	} else {
-		if len(dest.CreatePath) > 0 {
-			fmt.Printf("✗ Missing path: %s\n", strings.Join(dest.CreatePath, " > "))
-			for i, heading := range dest.CreatePath {
-				level := dest.TargetLevel - len(dest.CreatePath) + i + 1
-				fmt.Printf("Would create: %s %s (level %d)\n", 
-					strings.Repeat("#", level), heading, level)
-			}
+		targetLevel := pathResolution.TargetHeading.Level + 1
+		fmt.Printf("Ready to receive content at level %d\n", targetLevel)
+	} else if len(pathResolution.FoundSegments) > 0 {
+		// Partial path exists
+		fmt.Printf("✓ Partial path exists: %s\n", strings.Join(pathResolution.FoundSegments, " > "))
+		fmt.Printf("✗ Missing path: %s\n", strings.Join(pathResolution.MissingSegments, " > "))
+		
+		// Show what would be created
+		baseLevel := pathResolution.ParentHeading.Level + 1
+		for i, heading := range pathResolution.MissingSegments {
+			level := baseLevel + i
+			fmt.Printf("Would create: %s %s (level %d)\n", 
+				strings.Repeat("#", level), heading, level)
 		}
-		fmt.Printf("Ready to receive content at level %d\n", dest.TargetLevel+1)
+		finalLevel := baseLevel + len(pathResolution.MissingSegments)
+		fmt.Printf("Ready to receive content at level %d\n", finalLevel)
+	} else {
+		// No path exists
+		fmt.Printf("✗ Missing path: %s\n", strings.Join(destPath.Segments, " > "))
+		
+		// Show what would be created  
+		baseLevel := destPath.SkipLevels + 1
+		for i, heading := range destPath.Segments {
+			level := baseLevel + i
+			fmt.Printf("Would create: %s %s (level %d)\n", 
+				strings.Repeat("#", level), heading, level)
+		}
+		finalLevel := baseLevel + len(destPath.Segments)
+		fmt.Printf("Ready to receive content at level %d\n", finalLevel)
 	}
 
 	return nil
@@ -217,22 +249,41 @@ func ResolveDestination(ws *workspace.Workspace, destPath *markdown.HeadingPath,
 
 // resolveDestinationPath finds the target location for insertion
 func resolveDestinationPath(doc ast.Node, content []byte, destPath *markdown.HeadingPath, prepend bool) (*DestinationTarget, error) {
-	// For now, implement simple case: create at end of file
-	// This is a simplified implementation - full version would search for existing paths
-	
-	insertOffset := len(content)
-	if insertOffset > 0 && content[insertOffset-1] != '\n' {
-		insertOffset-- // Insert before final newline if exists
+	// Try to find existing path in the document
+	pathResolution, err := navigateHeadingPath(doc, content, destPath)
+	if err != nil {
+		return nil, err
 	}
+
+	var insertOffset int
+	var targetLevel int
 	
-	targetLevel := len(destPath.Segments) + destPath.SkipLevels
-	
+	if pathResolution.TargetHeading != nil {
+		// Found existing target heading - insert content under it
+		insertOffset = calculateInsertionPoint(pathResolution.TargetHeading, content, prepend)
+		targetLevel = pathResolution.TargetHeading.Level + 1
+	} else {
+		// Need to create missing path
+		if pathResolution.ParentHeading != nil {
+			// Insert under the deepest found parent
+			insertOffset = calculateInsertionPoint(pathResolution.ParentHeading, content, false)
+			targetLevel = pathResolution.ParentHeading.Level + len(pathResolution.MissingSegments) + 1
+		} else {
+			// No parent found, append to end of file
+			insertOffset = len(content)
+			if insertOffset > 0 && content[insertOffset-1] != '\n' {
+				insertOffset = len(content)
+			}
+			targetLevel = destPath.SkipLevels + len(destPath.Segments)
+		}
+	}
+
 	return &DestinationTarget{
 		File:         destPath.File,
 		TargetLevel:  targetLevel,
 		InsertOffset: insertOffset,
-		CreatePath:   destPath.Segments,
-		Exists:       false,
+		CreatePath:   pathResolution.MissingSegments,
+		Exists:       pathResolution.TargetHeading != nil,
 	}, nil
 }
 
@@ -279,19 +330,15 @@ func performRefile(ws *workspace.Workspace, sourcePath *markdown.HeadingPath, su
 	
 	// Add missing headings if needed
 	if len(dest.CreatePath) > 0 {
-		var pathContent []byte
-		baseLevel := dest.TargetLevel - len(dest.CreatePath) + 1
-		for i, heading := range dest.CreatePath {
-			level := baseLevel + i
-			if i > 0 || len(destContent) > 0 {
-				pathContent = append(pathContent, '\n')
-			}
-			levelMarker := bytes.Repeat([]byte("#"), level)
-			pathContent = append(pathContent, levelMarker...)
-			pathContent = append(pathContent, ' ')
-			pathContent = append(pathContent, []byte(heading)...)
-			pathContent = append(pathContent, '\n')
+		// Calculate the base level for missing headings
+		baseLevel := dest.TargetLevel - len(dest.CreatePath)
+		pathContent := markdown.CreateHeadingStructure(dest.CreatePath, baseLevel)
+		
+		// Ensure proper spacing
+		if dest.InsertOffset > 0 && destContent[dest.InsertOffset-1] != '\n' {
+			pathContent = append([]byte("\n"), pathContent...)
 		}
+		
 		insertContent = append(pathContent, insertContent...)
 	}
 	
@@ -415,4 +462,161 @@ func showSelectorsForFile(ws *workspace.Workspace, filename string) error {
 
 	fmt.Printf("\nUsage: jot refile \"<selector>\" --to \"<destination>\"\n")
 	return nil
+}
+
+// navigateHeadingPath navigates through the heading hierarchy following the path
+func navigateHeadingPath(doc ast.Node, content []byte, destPath *markdown.HeadingPath) (*PathResolution, error) {
+	result := &PathResolution{
+		FoundSegments:   []string{},
+		MissingSegments: []string{},
+	}
+
+	if len(destPath.Segments) == 0 {
+		// No path segments, insert at end of file
+		return result, nil
+	}
+
+	// Find all headings in the document
+	allHeadings := markdown.FindAllHeadings(doc, content)
+	
+	// Try to find matches for the path segments
+	var bestMatch *markdown.HeadingInfo
+	var bestMatchDepth int
+	
+	for _, heading := range allHeadings {
+		// Check if this heading's path contains our target segments
+		matchDepth := calculatePathMatch(heading.Path, destPath.Segments, destPath.SkipLevels)
+		
+		if matchDepth == len(destPath.Segments) {
+			// Found a complete match
+			targetHeading := findHeadingByOffset(doc, heading.Offset)
+			if targetHeading != nil {
+				result.TargetHeading = targetHeading
+				result.FoundSegments = destPath.Segments
+				return result, nil
+			}
+		}
+		
+		// Track the best partial match
+		if matchDepth > bestMatchDepth {
+			bestMatchDepth = matchDepth
+			bestMatch = &heading
+		}
+	}
+
+	// Handle partial or no matches
+	if bestMatch != nil && bestMatchDepth > 0 {
+		parentHeading := findHeadingByOffset(doc, bestMatch.Offset)
+		if parentHeading != nil {
+			result.ParentHeading = parentHeading
+			result.FoundSegments = destPath.Segments[:bestMatchDepth]
+			result.MissingSegments = destPath.Segments[bestMatchDepth:]
+		}
+	} else {
+		// No match found, need to create all segments
+		result.MissingSegments = destPath.Segments
+	}
+
+	return result, nil
+}
+
+// calculatePathMatch checks how many consecutive segments match using contains logic
+func calculatePathMatch(headingPath []string, targetSegments []string, skipLevels int) int {
+	if len(headingPath) < skipLevels {
+		return 0
+	}
+	
+	// Adjust the heading path based on skip levels
+	adjustedPath := headingPath[skipLevels:]
+	
+	// Find the best consecutive match of targetSegments within adjustedPath
+	bestMatch := 0
+	
+	// Try starting from each position in the adjusted path
+	for startPos := 0; startPos <= len(adjustedPath)-1; startPos++ {
+		matchCount := 0
+		
+		// Try to match as many consecutive segments as possible from this position
+		for i, targetSeg := range targetSegments {
+			pathIndex := startPos + i
+			if pathIndex >= len(adjustedPath) {
+				break
+			}
+			
+			headingSeg := adjustedPath[pathIndex]
+			if strings.Contains(strings.ToLower(headingSeg), strings.ToLower(targetSeg)) {
+				matchCount++
+			} else {
+				break // Stop on first non-match for consecutive matching
+			}
+		}
+		
+		if matchCount > bestMatch {
+			bestMatch = matchCount
+		}
+		
+		// If we found a complete match, we can stop
+		if matchCount == len(targetSegments) {
+			break
+		}
+	}
+	
+	return bestMatch
+}
+
+// findHeadingByOffset finds a heading node by its byte offset
+func findHeadingByOffset(doc ast.Node, targetOffset int) *ast.Heading {
+	var result *ast.Heading
+	
+	ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
+		if !entering {
+			return ast.WalkContinue, nil
+		}
+		
+		if heading, ok := n.(*ast.Heading); ok {
+			offset := markdown.GetNodeOffset(heading, nil) // We don't need content for offset comparison
+			if offset == targetOffset {
+				result = heading
+				return ast.WalkStop, nil
+			}
+		}
+		
+		return ast.WalkContinue, nil
+	})
+	
+	return result
+}
+
+// calculateInsertionPoint finds where to insert content under a heading
+func calculateInsertionPoint(heading *ast.Heading, content []byte, prepend bool) int {
+	if prepend {
+		// Insert right after the heading line
+		headingEnd := findHeadingLineEnd(heading, content)
+		return headingEnd
+	}
+	
+	// Find the end of this heading's subtree
+	subtreeEnd := markdown.FindSubtreeEnd(heading, content)
+	
+	// Back up to find a good insertion point (before the next heading)
+	insertPoint := subtreeEnd
+	for insertPoint > 0 && content[insertPoint-1] == '\n' {
+		insertPoint--
+	}
+	
+	return insertPoint
+}
+
+// findHeadingLineEnd finds the end of the heading line (after the newline)
+func findHeadingLineEnd(heading *ast.Heading, content []byte) int {
+	startOffset := markdown.GetNodeOffset(heading, content)
+	
+	// Find the end of the heading line
+	for i := startOffset; i < len(content); i++ {
+		if content[i] == '\n' {
+			return i + 1 // Return position after the newline
+		}
+	}
+	
+	return len(content)
 }

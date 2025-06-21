@@ -208,7 +208,14 @@ func tryMatchPath(heading *ast.Heading, content []byte, path *HeadingPath, segme
 // extractSubtreeFromHeading extracts a complete subtree starting from a heading
 func extractSubtreeFromHeading(heading *ast.Heading, content []byte) *Subtree {
 	headingText := ExtractHeadingText(heading, content)
-	startOffset := GetNodeOffset(heading, content)
+	textOffset := GetNodeOffset(heading, content)
+	
+	// Find the actual start of the heading line (including ### markers)
+	// Walk backwards from the text offset to find the beginning of the line
+	startOffset := textOffset
+	for startOffset > 0 && content[startOffset-1] != '\n' {
+		startOffset--
+	}
 	
 	// Find the end of this subtree
 	endOffset := findSubtreeEnd(heading, content)
