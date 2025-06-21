@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/johncoder/jot/internal/editor"
+	"github.com/johncoder/jot/internal/markdown"
 	"github.com/johncoder/jot/internal/template"
 	"github.com/johncoder/jot/internal/workspace"
 	"github.com/spf13/cobra"
@@ -122,18 +124,33 @@ Examples:
 				finalContent = renderedTemplate
 			}
 
-			// Use DestinationFile if specified
-			destinationFile := t.DestinationFile
-			if destinationFile == "" {
-				destinationFile = ws.InboxPath
+			// Use DestinationFile if specified - can be either a file or selector
+			destination := t.DestinationFile
+			if destination == "" {
+				destination = "inbox.md"
 			}
 
-			if err := ws.AppendToFile(destinationFile, finalContent); err != nil {
-				return fmt.Errorf("failed to save note: %w", err)
-			}
+			// Check if destination is a selector (contains #) or just a file
+			if strings.Contains(destination, "#") {
+				// Use selector-based refile logic
+				if err := refileContentToDestination(ws, finalContent, destination, t.RefileMode); err != nil {
+					return fmt.Errorf("failed to refile to destination '%s': %w", destination, err)
+				}
+				fmt.Printf("✓ Captured '%s' and refiled to '%s'\n", captureTemplate, destination)
+			} else {
+				// Simple file destination
+				destinationPath := destination
+				if destination == "inbox.md" {
+					destinationPath = ws.InboxPath
+				} else if !filepath.IsAbs(destination) {
+					destinationPath = filepath.Join(ws.LibDir, destination)
+				}
 
-			// Consolidate output message
-			fmt.Printf("Captured '%s' to '%s'.\n", captureTemplate, destinationFile)
+				if err := ws.AppendToFile(destinationPath, finalContent); err != nil {
+					return fmt.Errorf("failed to save note: %w", err)
+				}
+				fmt.Printf("✓ Captured '%s' to '%s'\n", captureTemplate, destination)
+			}
 
 			return nil
 		} else {
@@ -174,4 +191,81 @@ Examples:
 func init() {
 	captureCmd.Flags().StringVar(&captureTemplate, "template", "", "Use a named template for structured capture")
 	captureCmd.Flags().StringVar(&captureContent, "content", "", "Note content to append (skips editor)")
+}
+
+// refileContentToDestination performs refile operation for captured content
+func refileContentToDestination(ws *workspace.Workspace, content, destination, mode string) error {
+	// Parse the destination
+	destPath, err := markdown.ParsePath(destination)
+	if err != nil {
+		return fmt.Errorf("invalid destination '%s': %w", destination, err)
+	}
+
+	// Create a temporary subtree from the captured content
+	// We'll wrap the content in a heading to make it a proper subtree
+	tempContent := "# Captured Content\n\n" + content
+	capturedSubtree := &markdown.Subtree{
+		Heading:     "Captured Content",
+		Level:       1,
+		Content:     []byte(tempContent),
+		StartOffset: 0,
+		EndOffset:   len(tempContent),
+	}
+
+	// Use the existing refile functionality to resolve the destination
+	dest, err := ResolveDestination(ws, destPath, mode == "prepend")
+	if err != nil {
+		return fmt.Errorf("failed to resolve destination: %w", err)
+	}
+
+	// Transform the subtree level to match the destination
+	transformedContent := TransformSubtreeLevel(capturedSubtree, dest.TargetLevel)
+
+	// Perform the direct insertion (similar to refile but without removing from source)
+	return performDirectInsertion(ws, dest, transformedContent)
+}
+
+// performDirectInsertion inserts content directly into the destination file
+func performDirectInsertion(ws *workspace.Workspace, dest *DestinationTarget, transformedContent []byte) error {
+	// Construct destination file path
+	var destFilePath string
+	if dest.File == "inbox.md" {
+		destFilePath = ws.InboxPath
+	} else {
+		destFilePath = filepath.Join(ws.LibDir, dest.File)
+	}
+
+	// Read destination file
+	destContent, err := os.ReadFile(destFilePath)
+	if err != nil {
+		return fmt.Errorf("failed to read destination file: %w", err)
+	}
+
+	// Prepare content to insert
+	var insertContent []byte = transformedContent
+	
+	// Add missing headings if needed
+	if len(dest.CreatePath) > 0 {
+		// Calculate the base level for missing headings
+		baseLevel := dest.TargetLevel - len(dest.CreatePath)
+		pathContent := markdown.CreateHeadingStructure(dest.CreatePath, baseLevel)
+		
+		// Ensure proper spacing
+		if dest.InsertOffset > 0 && destContent[dest.InsertOffset-1] != '\n' {
+			pathContent = append([]byte("\n"), pathContent...)
+		}
+		
+		insertContent = append(pathContent, insertContent...)
+	}
+
+	// Insert at the specified offset
+	newDestContent := append(destContent[:dest.InsertOffset], insertContent...)
+	newDestContent = append(newDestContent, destContent[dest.InsertOffset:]...)
+
+	// Write back to destination file
+	if err := os.WriteFile(destFilePath, newDestContent, 0644); err != nil {
+		return fmt.Errorf("failed to write destination file: %w", err)
+	}
+
+	return nil
 }

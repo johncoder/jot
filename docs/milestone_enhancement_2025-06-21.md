@@ -4,7 +4,7 @@
 
 Building on jot's production-ready foundation, this milestone outlines three strategic enhancements that significantly expand jot's integration capabilities and power user workflows:
 
-1. **Enhanced Capture Templates**: Selector-based destination targeting for sophisticated note organization  
+1. **Enhanced Capture Templates**: Selector-based destination targeting for sophisticated note organization
 2. **Improved Eval Element Ordering**: Repositioned eval directives for better code block readability
 3. **Universal JSON Output**: Structured data output across all commands for toolchain integration
 
@@ -20,31 +20,36 @@ Building on jot's production-ready foundation, this milestone outlines three str
 #### Technical Implementation
 
 **Enhanced Template Structure**:
+
 ```markdown
 ---
 destination_file: work.md#projects/frontend
-refile_mode: append  # append (default) | prepend
+refile_mode: append # append (default) | prepend
 tags: [meeting, frontend, planning]
 ---
+
 # Frontend Planning Meeting - $(date '+%Y-%m-%d')
 
 **Attendees:**
-- 
+
+-
 
 **Agenda:**
-- 
 
-**Action Items:**
 -
+
+## **Action Items:**
 ```
 
 **Capture Integration Changes**:
+
 - Update template parsing to recognize selector syntax in `destination_file`
 - Integrate with existing refile path resolution engine
 - Support file-only destinations with configurable append/prepend behavior
 - Automatic refile operation during capture completion
 
 **Workflow Example**:
+
 ```bash
 # Template automatically refiles to specific subtree
 jot capture --template meeting
@@ -56,14 +61,16 @@ jot capture --template meeting
 #### Implementation Scope
 
 **Core Changes**:
+
 - `internal/template/template.go`: Enhance destination parsing
 - `cmd/capture.go`: Integrate refile operation after template processing
 - Template metadata parsing for `refile_mode` configuration
 - Error handling for invalid destination selectors
 
 **Integration Points**:
+
 - Reuse existing `refile.ResolveDestination()` function
-- Leverage `markdown.HeadingPath` parsing 
+- Leverage `markdown.HeadingPath` parsing
 - Maintain backward compatibility with simple file destinations
 
 ### Enhancement 2: Eval Element Ordering Improvement
@@ -74,10 +81,13 @@ jot capture --template meeting
 #### Current Structure vs Enhanced Structure
 
 **Current Pattern**:
-```markdown
+
+````markdown
 ```python
 print("Hello, world!")
 ```
+````
+
 <eval name="hello" />
 ```
 Hello, world!
@@ -85,15 +95,18 @@ Hello, world!
 ```
 
 **Enhanced Pattern**:
-```markdown
+
+````markdown
 <eval name="hello" />
 ```python
 print("Hello, world!")
-```
+````
+
 ```
 Hello, world!
 ```
-```
+
+````
 
 #### Technical Implementation
 
@@ -104,7 +117,7 @@ Hello, world!
 
 **Processing Flow**:
 1. Scan document for `<eval .../>` elements
-2. Check for immediately following fenced code blocks  
+2. Check for immediately following fenced code blocks
 3. Associate eval parameters with code block
 4. Process execution using existing security and approval workflows
 
@@ -146,9 +159,10 @@ Hello, world!
     "issues": []
   }
 }
-```
+````
 
 **`jot find --json`**:
+
 ```json
 {
   "query": "search term",
@@ -167,6 +181,7 @@ Hello, world!
 ```
 
 **`jot peek --json`**:
+
 ```json
 {
   "selector": "work.md#projects/frontend",
@@ -185,6 +200,7 @@ Hello, world!
 ```
 
 **`jot refile --json`** (destination analysis):
+
 ```json
 {
   "destination": "work.md#projects/backend",
@@ -204,6 +220,7 @@ Hello, world!
 ```
 
 **`jot eval --json`**:
+
 ```json
 {
   "file": "example.md",
@@ -238,12 +255,14 @@ Hello, world!
 #### Implementation Strategy
 
 **Global Flag Implementation**:
+
 - Add `--json` flag to root command definition
 - Implement JSON marshaling for each command's data structures
 - Replace human-readable output completely when `--json` is specified
 - Ensure consistent error handling in JSON format
 
 **Error Response Format**:
+
 ```json
 {
   "error": {
@@ -257,6 +276,7 @@ Hello, world!
 ```
 
 **Success Response Wrapper**:
+
 ```json
 {
   "success": true,
@@ -276,16 +296,19 @@ Hello, world!
 ### Phase 1: Enhanced Capture Templates (2-3 days)
 
 **Day 1: Core Template Enhancement**
+
 - [ ] Update `internal/template/template.go` to parse selector syntax
-- [ ] Modify template metadata structure to support `refile_mode` 
+- [ ] Modify template metadata structure to support `refile_mode`
 - [ ] Implement destination validation during template loading
 
 **Day 2: Capture Integration**
+
 - [ ] Update `cmd/capture.go` to perform refile after template processing
 - [ ] Integrate with existing refile path resolution engine
 - [ ] Implement error handling for invalid selectors
 
 **Day 3: Testing & Documentation**
+
 - [ ] Add unit tests for template selector parsing
 - [ ] Test integration with complex path scenarios
 - [ ] Update template documentation and examples
@@ -293,11 +316,13 @@ Hello, world!
 ### Phase 2: Eval Element Ordering (1-2 days)
 
 **Day 1: Parser Updates**
+
 - [ ] Modify `internal/eval/scan.go` for new eval element positioning
 - [ ] Update AST traversal logic to associate preceding eval elements
 - [ ] Maintain backward compatibility during transition
 
 **Day 2: Testing & Migration**
+
 - [ ] Add tests for both eval element patterns
 - [ ] Create migration utility for existing documents
 - [ ] Update eval documentation and examples
@@ -305,21 +330,25 @@ Hello, world!
 ### Phase 3: Universal JSON Output (3-4 days)
 
 **Day 1: Schema Design & Core Implementation**
+
 - [ ] Define JSON schemas for all commands
 - [ ] Implement global `--json` flag handling
 - [ ] Create base JSON response structures
 
 **Day 2: Command-Specific Implementation**
+
 - [ ] Implement JSON output for `status`, `find`, `peek`
 - [ ] Add JSON support for `refile`, `eval`, `capture`
 - [ ] Ensure complete information preservation
 
 **Day 3: Advanced Commands & Error Handling**
+
 - [ ] Add JSON support for `doctor`, `archive`, `template`
 - [ ] Implement consistent error response format
 - [ ] Add execution metadata to all responses
 
 **Day 4: Testing & Documentation**
+
 - [ ] Comprehensive JSON output testing
 - [ ] Integration testing with external tools
 - [ ] Documentation with schema examples
@@ -327,16 +356,19 @@ Hello, world!
 ## 🚀 Expected Benefits
 
 ### For Individual Users
+
 - **Enhanced Capture Workflows**: Direct-to-destination capture eliminates manual refiling steps
 - **Improved Code Documentation**: Better eval element readability and organization
 - **Power User Automation**: JSON output enables custom script integration
 
 ### for Tool Integration
+
 - **Programmatic Access**: Complete jot functionality available to external tools
 - **Workflow Automation**: JSON output enables sophisticated automation pipelines
 - **Editor Integration**: Enhanced template targeting improves editor plugin capabilities
 
 ### For Future Development
+
 - **API Foundation**: JSON schemas provide foundation for future web API
 - **Tool Ecosystem**: Enables community development of complementary tools
 - **Analytics Capability**: Structured data supports usage analytics and optimization
@@ -344,18 +376,21 @@ Hello, world!
 ## 📊 Success Criteria
 
 ### Technical Validation
+
 - [ ] All existing tests continue to pass
 - [ ] New functionality covered by comprehensive test suite
 - [ ] Backward compatibility maintained for existing workflows
 - [ ] JSON schemas validate against real-world usage
 
-### User Experience Validation  
+### User Experience Validation
+
 - [ ] Template-based capture reduces manual refiling operations
 - [ ] Eval element ordering improves document readability
 - [ ] JSON output enables external tool integration
 - [ ] Performance impact minimal for interactive usage
 
 ### Integration Validation
+
 - [ ] External tools can consume JSON output effectively
 - [ ] Template selectors work with complex document structures
 - [ ] Eval element repositioning doesn't break existing documents
@@ -364,12 +399,14 @@ Hello, world!
 ## 🔮 Future Integration Opportunities
 
 ### Immediate Extensions (Next Milestone)
+
 - **Template Validation**: Validate destination selectors during template creation
 - **Bulk Template Operations**: Apply templates to multiple captured items
 - **Advanced JSON Filtering**: Support for partial response selection
 - **Schema Versioning**: Prepare for future JSON schema evolution
 
 ### Long-term Possibilities
+
 - **Web API**: RESTful API using JSON schemas as foundation
 - **Real-time Integration**: WebSocket-based live workspace updates
 - **Advanced Analytics**: Usage pattern analysis and optimization suggestions
@@ -378,12 +415,14 @@ Hello, world!
 ## 💡 Implementation Notes
 
 ### Technical Considerations
+
 - **Template Parsing**: Reuse existing markdown frontmatter parsing
 - **Refile Integration**: Leverage robust existing path resolution engine
 - **JSON Performance**: Lazy marshaling for large datasets
 - **Backward Compatibility**: Support transition periods for breaking changes
 
 ### Risk Mitigation
+
 - **Incremental Implementation**: Each enhancement independent and testable
 - **Comprehensive Testing**: Unit, integration, and user acceptance testing
 - **Documentation**: Clear migration guides and examples

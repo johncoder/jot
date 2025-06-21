@@ -10,11 +10,13 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/johncoder/jot/internal/markdown"
 	"github.com/johncoder/jot/internal/workspace"
+	"gopkg.in/yaml.v3"
 )
 
 // Template represents a note template
-// Added DestinationFile field to specify where notes should be stored
+// Enhanced to support selector-based destinations and refile modes
 type Template struct {
 	Name            string
 	Path            string
@@ -22,6 +24,7 @@ type Template struct {
 	Hash            string
 	Approved        bool
 	DestinationFile string
+	RefileMode      string // "append" (default) or "prepend"
 }
 
 // Manager handles template operations
@@ -93,17 +96,29 @@ func (m *Manager) Get(name string) (*Template, error) {
 	approved := m.isApproved(hash)
 
 	metadata := parseMetadata(string(content))
-	destinationFile := metadata["destination_file"]
-	if destinationFile == "" {
-		destinationFile = "inbox.md"
+	
+	// Handle both old 'destination_file' and new 'destination' fields for backward compatibility
+	destinationField := metadata["destination"]
+	if destinationField == "" {
+		destinationField = metadata["destination_file"]
 	}
+	if destinationField == "" {
+		destinationField = "inbox.md"
+	}
+	
+	refileMode := metadata["refile_mode"]
+	if refileMode == "" {
+		refileMode = "append"
+	}
+
 	return &Template{
 		Name:            name,
 		Path:            templatePath,
 		Content:         string(content),
 		Hash:            hash,
 		Approved:        approved,
-		DestinationFile: destinationFile,
+		DestinationFile: destinationField, // This can now be either a file or selector
+		RefileMode:      refileMode,
 	}, nil
 }
 
@@ -249,8 +264,33 @@ func calculateHash(content string) string {
 }
 
 // parseMetadata extracts metadata from template content
+// Enhanced to support YAML frontmatter for destination selectors and refile modes
 func parseMetadata(content string) map[string]string {
 	metadata := make(map[string]string)
+	
+	// Check if content has YAML frontmatter
+	if strings.HasPrefix(content, "---\n") {
+		parts := strings.SplitN(content, "\n---\n", 2)
+		if len(parts) >= 2 {
+			yamlContent := parts[0][4:] // Remove the initial "---\n"
+			
+			var yamlData map[string]interface{}
+			if err := yaml.Unmarshal([]byte(yamlContent), &yamlData); err == nil {
+				// Convert YAML data to string map
+				for key, value := range yamlData {
+					if strValue, ok := value.(string); ok {
+						metadata[key] = strValue
+					} else {
+						// Convert non-string values to string representation
+						metadata[key] = fmt.Sprintf("%v", value)
+					}
+				}
+				return metadata
+			}
+		}
+	}
+	
+	// Fallback to simple key:value parsing for backward compatibility
 	lines := strings.Split(content, "\n")
 	for _, line := range lines {
 		if strings.HasPrefix(line, "#") {
@@ -262,4 +302,75 @@ func parseMetadata(content string) map[string]string {
 		}
 	}
 	return metadata
+}
+
+// DestinationInfo represents parsed destination information
+type DestinationInfo struct {
+	File       string
+	Selector   string
+	IsSelector bool
+	Mode       string // "append" or "prepend"
+}
+
+// ParseDestination parses a destination string that can be either a simple file or a selector
+func (m *Manager) ParseDestination(destination, mode string) (*DestinationInfo, error) {
+	if destination == "" {
+		return &DestinationInfo{
+			File:       "inbox.md",
+			Selector:   "",
+			IsSelector: false,
+			Mode:       mode,
+		}, nil
+	}
+
+	// Check if it contains a selector (has # symbol)
+	if strings.Contains(destination, "#") {
+		// Parse as selector
+		headingPath, err := markdown.ParsePath(destination)
+		if err != nil {
+			return nil, fmt.Errorf("invalid destination selector '%s': %w", destination, err)
+		}
+		
+		return &DestinationInfo{
+			File:       headingPath.File,
+			Selector:   destination,
+			IsSelector: true,
+			Mode:       mode,
+		}, nil
+	}
+
+	// Simple file destination
+	return &DestinationInfo{
+		File:       destination,
+		Selector:   "",
+		IsSelector: false,
+		Mode:       mode,
+	}, nil
+}
+
+// ValidateDestination validates that a destination selector is valid
+func (m *Manager) ValidateDestination(destination string) error {
+	destInfo, err := m.ParseDestination(destination, "append")
+	if err != nil {
+		return err
+	}
+
+	if !destInfo.IsSelector {
+		return nil // Simple file destinations are always valid
+	}
+
+	// For selectors, validate that the file exists
+	// We don't validate the path here since it might be auto-created
+	var filePath string
+	if destInfo.File == "inbox.md" {
+		filePath = m.ws.InboxPath
+	} else {
+		filePath = filepath.Join(m.ws.LibDir, destInfo.File)
+	}
+
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		return fmt.Errorf("destination file does not exist: %s", destInfo.File)
+	}
+
+	return nil
 }
