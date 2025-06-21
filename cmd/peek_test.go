@@ -575,19 +575,19 @@ func TestShortSelectorGeneration(t *testing.T) {
 		{
 			name:           "unique level 1 heading",
 			targetHeading:  HeadingInfo{Text: "Project", Level: 1, Line: 1},
-			expectedShort:  `jot peek "test.md#project"`,
+			expectedShort:  `jot peek "test.md#pr"`,
 			expectedNormal: `jot peek "test.md#project"`,
 		},
 		{
 			name:           "unique level 3 heading with short skip-level",
 			targetHeading:  HeadingInfo{Text: "Performance", Level: 3, Line: 13},
-			expectedShort:  `jot peek "test.md#//performance"`,
+			expectedShort:  `jot peek "test.md#//pe"`,
 			expectedNormal: `jot peek "test.md#project/advanced/performance"`,
 		},
 		{
 			name:           "unique level 3 heading - installation",
 			targetHeading:  HeadingInfo{Text: "Installation", Level: 3, Line: 5},
-			expectedShort:  `jot peek "test.md#//installation"`,
+			expectedShort:  `jot peek "test.md#//ins"`,
 			expectedNormal: `jot peek "test.md#project/getting started/installation"`,
 		},
 	}
