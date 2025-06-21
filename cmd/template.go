@@ -82,8 +82,13 @@ Templates require approval before shell commands can execute.`,
 		name := args[0]
 		tm := template.NewManager(ws)
 
-		// Default template content
-		defaultContent := fmt.Sprintf(`# %s - $(date '+%%Y-%%m-%%d %%H:%%M')
+		// Default template content with frontmatter
+		defaultContent := fmt.Sprintf(`---
+destination: inbox.md
+refile_mode: append
+tags: [%s]
+---
+# %s - $(date '+%%Y-%%m-%%d %%H:%%M')
 
 **Created:** $(date '+%%Y-%%m-%%d')
 
@@ -92,7 +97,7 @@ Templates require approval before shell commands can execute.`,
 
 ## Action Items
 
-`, strings.Title(name))
+`, strings.ToLower(name), strings.Title(name))
 
 		// Create template
 		err = tm.Create(name, defaultContent)

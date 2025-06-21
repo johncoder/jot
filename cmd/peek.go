@@ -195,14 +195,16 @@ func showTableOfContents(ws *workspace.Workspace, selector string, useShortSelec
 		
 		if selector == "inbox.md" {
 			filePath = ws.InboxPath
+		} else if filepath.IsAbs(selector) {
+			filePath = selector
 		} else {
-			// Handle files in lib/ directory
+			// Use workspace root for relative paths, not lib/ directory
 			if !strings.HasSuffix(selector, ".md") {
 				selector += ".md"
 				baseFilename = selector
 				filename = selector
 			}
-			filePath = filepath.Join(ws.LibDir, selector)
+			filePath = filepath.Join(ws.Root, selector)
 		}
 		
 		// Check if file exists

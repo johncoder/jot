@@ -473,12 +473,12 @@ Old stuff
 
 	// Test the refile operation
 	sourcePath := &markdown.HeadingPath{
-		File:     "source.md",
+		File:     "lib/source.md",
 		Segments: []string{"Source", "Important"},
 	}
 
 	destPath := &markdown.HeadingPath{
-		File:     "work.md",
+		File:     "lib/work.md",
 		Segments: []string{"Projects", "Backend"},
 	}
 

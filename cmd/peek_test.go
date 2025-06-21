@@ -75,35 +75,35 @@ Helper functions and utilities.
 	}{
 		{
 			name:           "peek user guide section",
-			selector:       "test_peek.md#doc/user",
+			selector:       "lib/test_peek.md#doc/user",
 			expectedHeading: "User Guide",
 			expectedLevel:   2,
 			expectError:     false,
 		},
 		{
 			name:           "peek getting started subsection",
-			selector:       "test_peek.md#doc/user/getting",
+			selector:       "lib/test_peek.md#doc/user/getting",
 			expectedHeading: "Getting Started",
 			expectedLevel:   3,
 			expectError:     false,
 		},
 		{
 			name:           "peek installation with skip levels",
-			selector:       "test_peek.md#///install",
+			selector:       "lib/test_peek.md#///install",
 			expectedHeading: "Installation",
 			expectedLevel:   4,
 			expectError:     false,
 		},
 		{
 			name:           "peek non-existent section",
-			selector:       "test_peek.md#nonexistent",
+			selector:       "lib/test_peek.md#nonexistent",
 			expectedHeading: "",
 			expectedLevel:   0,
 			expectError:     true,
 		},
 		{
 			name:           "peek with contains matching",
-			selector:       "test_peek.md#doc/api",
+			selector:       "lib/test_peek.md#doc/api",
 			expectedHeading: "API Reference",
 			expectedLevel:   2,
 			expectError:     false,
@@ -387,11 +387,11 @@ How to get help.
 	}{
 		{
 			name:        "full file TOC",
-			selector:    "toc_test.md",
+			selector:    "lib/toc_test.md",
 			expectError: false,
 			checkFunc: func(t *testing.T, output string) {
 				// Should contain the table of contents header
-				if !strings.Contains(output, "Table of Contents: toc_test.md") {
+				if !strings.Contains(output, "Table of Contents: lib/toc_test.md") {
 					t.Error("Expected TOC header not found")
 				}
 				
@@ -417,11 +417,11 @@ How to get help.
 		},
 		{
 			name:        "subtree TOC",
-			selector:    "toc_test.md#doc/getting",
+			selector:    "lib/toc_test.md#doc/getting",
 			expectError: false,
 			checkFunc: func(t *testing.T, output string) {
 				// Should contain the subtree TOC header
-				if !strings.Contains(output, "Table of Contents: toc_test.md#doc/getting") {
+				if !strings.Contains(output, "Table of Contents: lib/toc_test.md#doc/getting") {
 					t.Error("Expected subtree TOC header not found")
 				}
 				
@@ -448,7 +448,7 @@ How to get help.
 		},
 		{
 			name:        "invalid subtree selector",
-			selector:    "toc_test.md#nonexistent",
+			selector:    "lib/toc_test.md#nonexistent",
 			expectError: true,
 			checkFunc:   nil,
 		},
@@ -510,19 +510,19 @@ func TestTableOfContentsEdgeCases(t *testing.T) {
 	}{
 		{
 			name:        "empty file",
-			filename:    "empty.md",
+			filename:    "lib/empty.md",
 			content:     "",
 			expectError: false, // Should handle gracefully
 		},
 		{
 			name:        "file with no headings",
-			filename:    "no_headings.md",
+			filename:    "lib/no_headings.md",
 			content:     "Just some text without any headings.\n\nMore text here.",
 			expectError: false, // Should handle gracefully
 		},
 		{
 			name:        "file with only content",
-			filename:    "content_only.md",
+			filename:    "lib/content_only.md",
 			content:     "This file has content but no markdown headings at all.",
 			expectError: false,
 		},
@@ -530,8 +530,12 @@ func TestTableOfContentsEdgeCases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create test file
-			testFile := filepath.Join(libDir, tt.filename)
+			// Create test file (relative to workspace root)
+			testFile := filepath.Join(tempDir, tt.filename)
+			// Ensure parent directory exists
+			if err := os.MkdirAll(filepath.Dir(testFile), 0755); err != nil {
+				t.Fatalf("Failed to create parent directory: %v", err)
+			}
 			if err := os.WriteFile(testFile, []byte(tt.content), 0644); err != nil {
 				t.Fatalf("Failed to write test file: %v", err)
 			}

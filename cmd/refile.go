@@ -131,9 +131,14 @@ func inspectDestination(ws *workspace.Workspace, destPath *markdown.HeadingPath)
 		destPath.File, strings.Join(destPath.Segments, "/"))
 
 	// Check if file exists
-	filePath := filepath.Join(ws.LibDir, destPath.File)
+	var filePath string
 	if destPath.File == "inbox.md" {
 		filePath = ws.InboxPath
+	} else if filepath.IsAbs(destPath.File) {
+		filePath = destPath.File
+	} else {
+		// Use workspace root for relative paths, not lib/ directory
+		filePath = filepath.Join(ws.Root, destPath.File)
 	}
 	
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
@@ -199,8 +204,11 @@ func ExtractSubtree(ws *workspace.Workspace, sourcePath *markdown.HeadingPath) (
 	var filePath string
 	if sourcePath.File == "inbox.md" {
 		filePath = ws.InboxPath
+	} else if filepath.IsAbs(sourcePath.File) {
+		filePath = sourcePath.File
 	} else {
-		filePath = filepath.Join(ws.LibDir, sourcePath.File)
+		// Use workspace root for relative paths, not lib/ directory
+		filePath = filepath.Join(ws.Root, sourcePath.File)
 	}
 
 	// Read file content
@@ -225,8 +233,11 @@ func ResolveDestination(ws *workspace.Workspace, destPath *markdown.HeadingPath,
 	var filePath string
 	if destPath.File == "inbox.md" {
 		filePath = ws.InboxPath
+	} else if filepath.IsAbs(destPath.File) {
+		filePath = destPath.File
 	} else {
-		filePath = filepath.Join(ws.LibDir, destPath.File)
+		// Use workspace root for relative paths, not lib/ directory
+		filePath = filepath.Join(ws.Root, destPath.File)
 	}
 
 	// Check if file exists
@@ -299,8 +310,11 @@ func performRefile(ws *workspace.Workspace, sourcePath *markdown.HeadingPath, su
 	var sourceFilePath string
 	if sourcePath.File == "inbox.md" {
 		sourceFilePath = ws.InboxPath
+	} else if filepath.IsAbs(sourcePath.File) {
+		sourceFilePath = sourcePath.File
 	} else {
-		sourceFilePath = filepath.Join(ws.LibDir, sourcePath.File)
+		// Use workspace root for relative paths, not lib/ directory
+		sourceFilePath = filepath.Join(ws.Root, sourcePath.File)
 	}
 	
 	sourceContent, err := os.ReadFile(sourceFilePath)
@@ -312,8 +326,11 @@ func performRefile(ws *workspace.Workspace, sourcePath *markdown.HeadingPath, su
 	var destFilePath string
 	if dest.File == "inbox.md" {
 		destFilePath = ws.InboxPath
+	} else if filepath.IsAbs(dest.File) {
+		destFilePath = dest.File
 	} else {
-		destFilePath = filepath.Join(ws.LibDir, dest.File)
+		// Use workspace root for relative paths, not lib/ directory
+		destFilePath = filepath.Join(ws.Root, dest.File)
 	}
 	
 	destContent, err := os.ReadFile(destFilePath)
@@ -406,12 +423,15 @@ func showSelectorsForFile(ws *workspace.Workspace, filename string) error {
 	var filePath string
 	if filename == "inbox.md" {
 		filePath = ws.InboxPath
+	} else if filepath.IsAbs(filename) {
+		filePath = filename
 	} else {
-		// Handle files in lib/ directory
+		// Handle files in workspace root, add .md extension if needed
 		if !strings.HasSuffix(filename, ".md") {
 			filename += ".md"
 		}
-		filePath = filepath.Join(ws.LibDir, filename)
+		// Use workspace root for relative paths, not lib/ directory
+		filePath = filepath.Join(ws.Root, filename)
 	}
 
 	// Check if file exists

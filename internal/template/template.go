@@ -192,11 +192,21 @@ func (m *Manager) Approve(name string) error {
 
 // Render processes a template with shell command execution and content injection
 func (m *Manager) Render(template *Template, appendContent string) (string, error) {
+	return m.RenderWithOptions(template, appendContent, false)
+}
+
+// RenderWithOptions renders a template with control over frontmatter inclusion
+func (m *Manager) RenderWithOptions(template *Template, appendContent string, includeFrontmatter bool) (string, error) {
 	if !template.Approved {
 		return "", fmt.Errorf("template '%s' requires approval before use. Run: jot template approve %s", template.Name, template.Name)
 	}
 
 	content := template.Content
+
+	// Strip frontmatter if not requested (for capture use cases)
+	if !includeFrontmatter {
+		content = stripFrontmatter(content)
+	}
 
 	// Execute shell commands
 	content, err := m.executeShellCommands(content)
@@ -364,8 +374,11 @@ func (m *Manager) ValidateDestination(destination string) error {
 	var filePath string
 	if destInfo.File == "inbox.md" {
 		filePath = m.ws.InboxPath
+	} else if filepath.IsAbs(destInfo.File) {
+		filePath = destInfo.File
 	} else {
-		filePath = filepath.Join(m.ws.LibDir, destInfo.File)
+		// Use workspace root for relative paths, not lib/ directory
+		filePath = filepath.Join(m.ws.Root, destInfo.File)
 	}
 
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
@@ -373,4 +386,26 @@ func (m *Manager) ValidateDestination(destination string) error {
 	}
 
 	return nil
+}
+
+// stripFrontmatter removes YAML frontmatter from content
+func stripFrontmatter(content string) string {
+	lines := strings.Split(content, "\n")
+	
+	// Check if content starts with frontmatter delimiter
+	if len(lines) > 0 && strings.TrimSpace(lines[0]) == "---" {
+		// Find the closing delimiter
+		for i := 1; i < len(lines); i++ {
+			if strings.TrimSpace(lines[i]) == "---" {
+				// Return content after the closing delimiter
+				if i+1 < len(lines) {
+					return strings.Join(lines[i+1:], "\n")
+				}
+				return ""
+			}
+		}
+	}
+	
+	// No frontmatter found, return original content
+	return content
 }

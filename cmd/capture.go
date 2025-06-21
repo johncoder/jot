@@ -143,7 +143,8 @@ Examples:
 				if destination == "inbox.md" {
 					destinationPath = ws.InboxPath
 				} else if !filepath.IsAbs(destination) {
-					destinationPath = filepath.Join(ws.LibDir, destination)
+					// Use workspace root for relative paths, not lib/ directory
+					destinationPath = filepath.Join(ws.Root, destination)
 				}
 
 				if err := ws.AppendToFile(destinationPath, finalContent); err != nil {
@@ -231,8 +232,11 @@ func performDirectInsertion(ws *workspace.Workspace, dest *DestinationTarget, tr
 	var destFilePath string
 	if dest.File == "inbox.md" {
 		destFilePath = ws.InboxPath
+	} else if filepath.IsAbs(dest.File) {
+		destFilePath = dest.File
 	} else {
-		destFilePath = filepath.Join(ws.LibDir, dest.File)
+		// Use workspace root for relative paths, not lib/ directory
+		destFilePath = filepath.Join(ws.Root, dest.File)
 	}
 
 	// Read destination file
