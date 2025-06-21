@@ -459,7 +459,7 @@ How to get help.
 			// Capture stdout for testing
 			// For this test, we'll check that the function doesn't panic
 			// and returns appropriate errors
-			err := showTableOfContents(ws, tt.selector)
+			err := showTableOfContents(ws, tt.selector, false) // Use default (non-short) selectors for tests
 			
 			if tt.expectError {
 				if err == nil {
@@ -537,7 +537,7 @@ func TestTableOfContentsEdgeCases(t *testing.T) {
 			}
 
 			// Test TOC function
-			err := showTableOfContents(ws, tt.filename)
+			err := showTableOfContents(ws, tt.filename, false) // Use default (non-short) selectors for tests
 			
 			if tt.expectError {
 				if err == nil {
@@ -547,6 +547,67 @@ func TestTableOfContentsEdgeCases(t *testing.T) {
 				if err != nil {
 					t.Errorf("Unexpected error: %v", err)
 				}
+			}
+		})
+	}
+}
+
+func TestShortSelectorGeneration(t *testing.T) {
+	// Create test headings that represent a document structure
+	headings := []HeadingInfo{
+		{Text: "Project", Level: 1, Line: 1},
+		{Text: "Getting Started", Level: 2, Line: 3},
+		{Text: "Installation", Level: 3, Line: 5},
+		{Text: "Configuration", Level: 3, Line: 7},
+		{Text: "Advanced", Level: 2, Line: 9},
+		{Text: "Plugin System", Level: 3, Line: 11},
+		{Text: "Performance", Level: 3, Line: 13},
+		{Text: "Getting Started", Level: 2, Line: 15}, // Duplicate
+		{Text: "Quick Start", Level: 3, Line: 17},
+	}
+
+	tests := []struct {
+		name           string
+		targetHeading  HeadingInfo
+		expectedShort  string
+		expectedNormal string
+	}{
+		{
+			name:           "unique level 1 heading",
+			targetHeading:  HeadingInfo{Text: "Project", Level: 1, Line: 1},
+			expectedShort:  `jot peek "test.md#project"`,
+			expectedNormal: `jot peek "test.md#project"`,
+		},
+		{
+			name:           "unique level 3 heading with short skip-level",
+			targetHeading:  HeadingInfo{Text: "Performance", Level: 3, Line: 13},
+			expectedShort:  `jot peek "test.md#//performance"`,
+			expectedNormal: `jot peek "test.md#project/advanced/performance"`,
+		},
+		{
+			name:           "unique level 3 heading - installation",
+			targetHeading:  HeadingInfo{Text: "Installation", Level: 3, Line: 5},
+			expectedShort:  `jot peek "test.md#//installation"`,
+			expectedNormal: `jot peek "test.md#project/getting started/installation"`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			shortSelector := generateShortSelector("test.md", tt.targetHeading, headings)
+			normalSelector := generateOptimalSelector("test.md", tt.targetHeading, headings)
+
+			if shortSelector != tt.expectedShort {
+				t.Errorf("generateShortSelector() = %q, want %q", shortSelector, tt.expectedShort)
+			}
+
+			if normalSelector != tt.expectedNormal {
+				t.Errorf("generateOptimalSelector() = %q, want %q", normalSelector, tt.expectedNormal)
+			}
+
+			// Short selector should generally be shorter than or equal to normal selector
+			if len(shortSelector) > len(normalSelector) {
+				t.Errorf("Short selector %q is longer than normal selector %q", shortSelector, normalSelector)
 			}
 		})
 	}

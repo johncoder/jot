@@ -29,6 +29,7 @@ Examples:
   jot peek "inbox.md#/foo/bar"                  # Skip level 1, find foo/bar
   jot peek "inbox.md" --toc                     # Show table of contents for entire file
   jot peek "work.md#projects" --toc             # Show TOC for projects subtree
+  jot peek "work.md" --toc --short              # Show TOC with shortest selectors
 
 This is useful for quickly reviewing specific sections without opening full files in an editor.`,
 
@@ -43,13 +44,14 @@ This is useful for quickly reviewing specific sections without opening full file
 		raw, _ := cmd.Flags().GetBool("raw")
 		info, _ := cmd.Flags().GetBool("info")
 		toc, _ := cmd.Flags().GetBool("toc")
+		short, _ := cmd.Flags().GetBool("short")
 
 		// Handle TOC mode
 		if toc {
 			if len(args) == 0 {
 				return fmt.Errorf("table of contents requires a file or selector (e.g., 'inbox.md' or 'work.md#projects')")
 			}
-			return showTableOfContents(ws, args[0])
+			return showTableOfContents(ws, args[0], short)
 		}
 
 		// Regular peek mode requires exactly one argument
@@ -161,7 +163,7 @@ func splitLines(content []byte) []string {
 }
 
 // showTableOfContents displays a table of contents for a file or subtree
-func showTableOfContents(ws *workspace.Workspace, selector string) error {
+func showTableOfContents(ws *workspace.Workspace, selector string, useShortSelectors bool) error {
 	// Check if this is a simple file name or a path selector
 	var content []byte
 	var filename string
@@ -252,7 +254,12 @@ func showTableOfContents(ws *workspace.Workspace, selector string) error {
 		
 		// Create accurate selector hint for navigation
 		if subtreePath == "" { // Full file TOC
-			selectorHint := generateOptimalSelector(baseFilename, heading, headings)
+			var selectorHint string
+			if useShortSelectors {
+				selectorHint = generateShortSelector(baseFilename, heading, headings)
+			} else {
+				selectorHint = generateOptimalSelector(baseFilename, heading, headings)
+			}
 			fmt.Printf("%s%s\n", indent, fmt.Sprintf("  → %s", selectorHint))
 		}
 		
@@ -641,6 +648,7 @@ func init() {
 	peekCmd.Flags().BoolP("raw", "r", false, "Output raw content without formatting")
 	peekCmd.Flags().BoolP("info", "i", false, "Show subtree metadata information")
 	peekCmd.Flags().BoolP("toc", "t", false, "Show table of contents for file or subtree")
+	peekCmd.Flags().BoolP("short", "s", false, "Generate shortest possible selectors (use with --toc)")
 	
 	// Add to root command
 	rootCmd.AddCommand(peekCmd)
@@ -748,4 +756,250 @@ func detectUnselectableHeadings(headings []HeadingInfo) map[int]bool {
 	}
 	
 	return unselectable
+}
+
+// generateShortSelector creates the most aggressively short selector possible
+func generateShortSelector(filename string, target HeadingInfo, allHeadings []HeadingInfo) string {
+	targetText := normalizeForMatching(target.Text)
+	
+	// Strategy 1: Single letter shortcuts for very common terms
+	singleLetterShortcuts := map[string]string{
+		"go":         "g",
+		"javascript": "j",
+		"python":     "p",
+		"docker":     "d",
+		"kubernetes": "k",
+		"tools":      "t",
+		"views":      "v",
+		"models":     "m",
+		"functions":  "f",
+		"classes":    "c",
+		"variables":  "v",
+		"routing":    "r",
+		"templates":  "t",
+		"plugins":    "p",
+		"jobs":       "j",
+		"services":   "s",
+		"arrays":     "a",
+		"loops":      "l",
+	}
+	
+	lowerTarget := strings.ToLower(target.Text)
+	if shortcut, exists := singleLetterShortcuts[lowerTarget]; exists {
+		// Check if this single letter is unique using jot's actual contains matching
+		matchCount := 0
+		for _, h := range allHeadings {
+			if target.Level > 1 {
+				if h.Level == target.Level && strings.Contains(normalizeForMatching(h.Text), shortcut) {
+					matchCount++
+				}
+			} else {
+				if strings.Contains(normalizeForMatching(h.Text), shortcut) {
+					matchCount++
+				}
+			}
+		}
+		if matchCount == 1 {
+			if target.Level > 1 {
+				return fmt.Sprintf("jot peek \"%s#%s%s\"", filename, strings.Repeat("/", target.Level-1), shortcut)
+			}
+			return fmt.Sprintf("jot peek \"%s#%s\"", filename, shortcut)
+		}
+	}
+	
+	// Strategy 2: Ultra-short unique character sequences (1-3 chars) using contains matching
+	for length := 1; length <= 4; length++ {
+		if length > len(targetText) {
+			break
+		}
+		
+		prefix := targetText[:length]
+		prefixMatches := 0
+		
+		// Use jot's actual contains matching logic
+		for _, h := range allHeadings {
+			if target.Level > 1 {
+				// For deeper levels, only check same level using contains
+				if h.Level == target.Level && strings.Contains(normalizeForMatching(h.Text), prefix) {
+					prefixMatches++
+				}
+			} else {
+				// For top level, check globally using contains
+				if strings.Contains(normalizeForMatching(h.Text), prefix) {
+					prefixMatches++
+				}
+			}
+		}
+		
+		if prefixMatches == 1 {
+			if target.Level > 1 {
+				return fmt.Sprintf("jot peek \"%s#%s%s\"", filename, strings.Repeat("/", target.Level-1), prefix)
+			}
+			return fmt.Sprintf("jot peek \"%s#%s\"", filename, prefix)
+		}
+	}
+	
+	// Strategy 3: Unique word initials (first letter of each word) 
+	words := strings.Fields(strings.ToLower(target.Text))
+	if len(words) > 1 {
+		initials := ""
+		for _, word := range words {
+			if len(word) > 0 {
+				initials += string(word[0])
+			}
+		}
+		
+		if len(initials) >= 2 && len(initials) <= 4 {
+			matchCount := 0
+			for _, h := range allHeadings {
+				// Test if the heading contains this initials sequence
+				if target.Level > 1 {
+					if h.Level == target.Level && strings.Contains(normalizeForMatching(h.Text), initials) {
+						matchCount++
+					}
+				} else {
+					if strings.Contains(normalizeForMatching(h.Text), initials) {
+						matchCount++
+					}
+				}
+			}
+			
+			if matchCount == 1 {
+				if target.Level > 1 {
+					return fmt.Sprintf("jot peek \"%s#%s%s\"", filename, strings.Repeat("/", target.Level-1), initials)
+				}
+				return fmt.Sprintf("jot peek \"%s#%s\"", filename, initials)
+			}
+		}
+	}
+	
+	// Strategy 4: Consonants only (aggressive compression) using contains matching
+	consonants := extractConsonants(strings.ToLower(target.Text))
+	if len(consonants) >= 2 && len(consonants) <= 6 {
+		matchCount := 0
+		for _, h := range allHeadings {
+			hConsonants := extractConsonants(normalizeForMatching(h.Text))
+			if target.Level > 1 {
+				if h.Level == target.Level && strings.Contains(hConsonants, consonants) {
+					matchCount++
+				}
+			} else {
+				if strings.Contains(hConsonants, consonants) {
+					matchCount++
+				}
+			}
+		}
+		
+		if matchCount == 1 {
+			if target.Level > 1 {
+				return fmt.Sprintf("jot peek \"%s#%s%s\"", filename, strings.Repeat("/", target.Level-1), consonants)
+			}
+			return fmt.Sprintf("jot peek \"%s#%s\"", filename, consonants)
+		}
+	}
+	
+	// Strategy 5: Smart skip-level optimization - use minimum required skips
+	if target.Level > 1 {
+		// Try with minimal skip levels that still work
+		for skipCount := 1; skipCount < target.Level; skipCount++ {
+			skipPrefix := strings.Repeat("/", skipCount)
+			
+			// Try ultra-short prefixes with minimal skips using contains matching
+			for length := 1; length <= 5; length++ {
+				if length > len(targetText) {
+					break
+				}
+				
+				prefix := targetText[:length]
+				prefixMatches := 0
+				
+				for _, h := range allHeadings {
+					if h.Level >= target.Level-skipCount && strings.Contains(normalizeForMatching(h.Text), prefix) {
+						prefixMatches++
+					}
+				}
+				
+				if prefixMatches == 1 {
+					return fmt.Sprintf("jot peek \"%s#%s%s\"", filename, skipPrefix, prefix)
+				}
+			}
+		}
+		
+		// Fall back to standard skip-level with first word or short prefix
+		skipPrefix := strings.Repeat("/", target.Level-1)
+		words := strings.Fields(strings.ToLower(target.Text))
+		
+		if len(words) > 0 {
+			firstWord := words[0]
+			
+			// Try just first 2-4 letters of first word using contains matching
+			for length := 2; length <= min(5, len(firstWord)); length++ {
+				prefix := firstWord[:length]
+				prefixMatches := 0
+				
+				for _, h := range allHeadings {
+					if h.Level == target.Level && strings.Contains(normalizeForMatching(h.Text), prefix) {
+						prefixMatches++
+					}
+				}
+				
+				if prefixMatches == 1 {
+					return fmt.Sprintf("jot peek \"%s#%s%s\"", filename, skipPrefix, prefix)
+				}
+			}
+			
+			// Use full first word if needed
+			return fmt.Sprintf("jot peek \"%s#%s%s\"", filename, skipPrefix, firstWord)
+		}
+		
+		// Ultra-fallback with shortest possible representation
+		return fmt.Sprintf("jot peek \"%s#%s%s\"", filename, skipPrefix, targetText[:min(8, len(targetText))])
+	}
+	
+	// Strategy 6: For level 1 headings, try first word or aggressive abbreviation
+	headingWords := strings.Fields(strings.ToLower(target.Text))
+	if len(headingWords) > 0 {
+		firstWord := headingWords[0]
+		
+		// Try progressively shorter versions of first word using contains matching
+		for length := 2; length <= len(firstWord); length++ {
+			prefix := firstWord[:length]
+			matchCount := 0
+			
+			for _, h := range allHeadings {
+				if strings.Contains(normalizeForMatching(h.Text), prefix) {
+					matchCount++
+				}
+			}
+			
+			if matchCount == 1 {
+				return fmt.Sprintf("jot peek \"%s#%s\"", filename, prefix)
+			}
+		}
+		
+		return fmt.Sprintf("jot peek \"%s#%s\"", filename, firstWord)
+	}
+	
+	// Final ultra-fallback: shortest possible representation
+	return fmt.Sprintf("jot peek \"%s#%s\"", filename, targetText[:min(6, len(targetText))])
+}
+
+// extractConsonants removes vowels for ultra-compressed representation
+func extractConsonants(text string) string {
+	vowels := "aeiou"
+	result := ""
+	for _, char := range strings.ToLower(text) {
+		if char >= 'a' && char <= 'z' && !strings.ContainsRune(vowels, char) {
+			result += string(char)
+		}
+	}
+	return result
+}
+
+// min returns the minimum of two integers
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
