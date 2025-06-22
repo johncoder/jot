@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/johncoder/jot/internal/editor"
 	"github.com/johncoder/jot/internal/template"
@@ -25,7 +26,8 @@ Examples:
   jot template list                # List all templates
   jot template new meeting         # Create new template
   jot template edit meeting        # Edit existing template
-  jot template approve meeting     # Approve template for execution`,
+  jot template approve meeting     # Approve template for execution
+  jot template render meeting      # Render template content`,
 }
 
 var templateListCmd = &cobra.Command{
@@ -33,19 +35,51 @@ var templateListCmd = &cobra.Command{
 	Short: "List available templates",
 	Long:  `List all available templates and their approval status.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		startTime := time.Now()
+		
 		ws, err := workspace.RequireWorkspace()
 		if err != nil {
+			if isJSONOutput(cmd) {
+				return outputJSONError(cmd, err, startTime)
+			}
 			return err
 		}
 
 		tm := template.NewManager(ws)
 		templates, err := tm.List()
 		if err != nil {
-			return fmt.Errorf("failed to list templates: %w", err)
+			err := fmt.Errorf("failed to list templates: %w", err)
+			if isJSONOutput(cmd) {
+				return outputJSONError(cmd, err, startTime)
+			}
+			return err
+		}
+
+		if isJSONOutput(cmd) {
+			var templateItems []TemplateItem
+			for _, t := range templates {
+				templateItems = append(templateItems, TemplateItem{
+					Name:     t.Name,
+					Approved: t.Approved,
+					Hash:     t.Hash,
+				})
+			}
+
+			response := TemplateListResponse{
+				Operation: "template_list",
+				Templates: templateItems,
+				Summary: TemplateListSummary{
+					TotalTemplates:    len(templates),
+					ApprovedTemplates: countApproved(templates),
+				},
+				Metadata: createJSONMetadata(cmd, true, startTime),
+			}
+
+			return outputJSON(response)
 		}
 
 		if len(templates) == 0 {
-			fmt.Println("No templates found. Create one with: jot template new <name>")
+			fmt.Println("No templates found. Create one with: jot template new <n>")
 			return nil
 		}
 
@@ -63,7 +97,7 @@ var templateListCmd = &cobra.Command{
 }
 
 var templateNewCmd = &cobra.Command{
-	Use:   "new <name>",
+	Use:   "new <n>",
 	Short: "Create a new template",
 	Long: `Create a new template and open it in your editor.
 
@@ -74,8 +108,13 @@ The template can contain shell commands using $(command) syntax:
 Templates require approval before shell commands can execute.`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		startTime := time.Now()
+		
 		ws, err := workspace.RequireWorkspace()
 		if err != nil {
+			if isJSONOutput(cmd) {
+				return outputJSONError(cmd, err, startTime)
+			}
 			return err
 		}
 
@@ -102,48 +141,93 @@ tags: [%s]
 		// Create template
 		err = tm.Create(name, defaultContent)
 		if err != nil {
-			return fmt.Errorf("failed to create template: %w", err)
-		}
-
-		fmt.Printf("Created template '%s'\n", name)
-
-		// Open in editor
-		templatePath := filepath.Join(ws.JotDir, "templates", name+".md")
-
-		// Read the current template content
-		content, err := os.ReadFile(templatePath)
-		if err != nil {
-			return fmt.Errorf("failed to read template file: %w", err)
-		}
-
-		// Open in editor
-		editedContent, err := editor.OpenEditor(string(content))
-		if err != nil {
-			fmt.Printf("Template created but failed to open editor: %v\n", err)
-			fmt.Printf("Edit manually: %s\n", templatePath)
-		} else {
-			// Write back the edited content
-			err = os.WriteFile(templatePath, []byte(editedContent), 0644)
-			if err != nil {
-				return fmt.Errorf("failed to save template: %w", err)
+			err := fmt.Errorf("failed to create template: %w", err)
+			if isJSONOutput(cmd) {
+				return outputJSONError(cmd, err, startTime)
 			}
+			return err
 		}
 
-		fmt.Printf("\nTo use this template, first approve it:\n")
-		fmt.Printf("  jot template approve %s\n", name)
+		templatePath := filepath.Join(ws.JotDir, "templates", name+".md")
+		editorError := ""
+		edited := false
+
+		if !isJSONOutput(cmd) {
+			fmt.Printf("Created template '%s'\n", name)
+		}
+
+		// Open in editor (skip for JSON output to avoid interactive prompt)
+		if !isJSONOutput(cmd) {
+			// Read the current template content
+			content, err := os.ReadFile(templatePath)
+			if err != nil {
+				err := fmt.Errorf("failed to read template file: %w", err)
+				if isJSONOutput(cmd) {
+					return outputJSONError(cmd, err, startTime)
+				}
+				return err
+			}
+
+			// Open in editor
+			editedContent, err := editor.OpenEditor(string(content))
+			if err != nil {
+				editorError = err.Error()
+				fmt.Printf("Template created but failed to open editor: %v\n", err)
+				fmt.Printf("Edit manually: %s\n", templatePath)
+			} else {
+				// Write back the edited content
+				err = os.WriteFile(templatePath, []byte(editedContent), 0644)
+				if err != nil {
+					err := fmt.Errorf("failed to save template: %w", err)
+					if isJSONOutput(cmd) {
+						return outputJSONError(cmd, err, startTime)
+					}
+					return err
+				}
+				edited = true
+			}
+
+			fmt.Printf("\nTo use this template, first approve it:\n")
+			fmt.Printf("  jot template approve %s\n", name)
+		}
+
+		if isJSONOutput(cmd) {
+			nextSteps := []string{
+				fmt.Sprintf("jot template approve %s", name),
+				fmt.Sprintf("jot template edit %s", name),
+			}
+
+			response := TemplateCreateResponse{
+				Operation:    "template_new",
+				TemplateName: name,
+				TemplatePath: templatePath,
+				Created:      true,
+				Edited:       edited,
+				EditorError:  editorError,
+				NextSteps:    nextSteps,
+				Metadata:     createJSONMetadata(cmd, true, startTime),
+			}
+
+			return outputJSON(response)
+		}
 
 		return nil
 	},
 }
 
 var templateEditCmd = &cobra.Command{
-	Use:   "edit <name>",
+	Use:   "edit <n>",
 	Short: "Edit an existing template",
 	Long:  `Edit an existing template in your editor. Changes will require re-approval.`,
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		startTime := time.Now()
+		
 		ws, err := workspace.RequireWorkspace()
 		if err != nil {
+			if isJSONOutput(cmd) {
+				return outputJSONError(cmd, err, startTime)
+			}
 			return err
 		}
 
@@ -153,12 +237,35 @@ var templateEditCmd = &cobra.Command{
 		// Check if template exists
 		_, err = tm.Get(name)
 		if err != nil {
+			if isJSONOutput(cmd) {
+				return outputJSONError(cmd, err, startTime)
+			}
 			return err
 		}
 
-		// Open in editor
 		templatePath := filepath.Join(ws.JotDir, "templates", name+".md")
 
+		if isJSONOutput(cmd) {
+			// For JSON output, skip interactive editor and return success
+			nextSteps := []string{
+				fmt.Sprintf("jot template approve %s", name),
+				fmt.Sprintf("Edit manually: %s", templatePath),
+			}
+
+			response := TemplateEditResponse{
+				Operation:    "template_edit",
+				TemplateName: name,
+				TemplatePath: templatePath,
+				Updated:      false,
+				EditorError:  "Editor skipped in JSON mode",
+				NextSteps:    nextSteps,
+				Metadata:     createJSONMetadata(cmd, true, startTime),
+			}
+
+			return outputJSON(response)
+		}
+
+		// Open in editor
 		// Read the current template content
 		content, err := os.ReadFile(templatePath)
 		if err != nil {
@@ -185,7 +292,7 @@ var templateEditCmd = &cobra.Command{
 }
 
 var templateApproveCmd = &cobra.Command{
-	Use:   "approve <name>",
+	Use:   "approve <n>",
 	Short: "Approve a template for execution",
 	Long: `Approve a template to allow shell command execution.
 
@@ -194,8 +301,13 @@ like $(date) or $(git status). Approval is based on the template's
 current content hash - any changes will require re-approval.`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		startTime := time.Now()
+		
 		ws, err := workspace.RequireWorkspace()
 		if err != nil {
+			if isJSONOutput(cmd) {
+				return outputJSONError(cmd, err, startTime)
+			}
 			return err
 		}
 
@@ -205,7 +317,17 @@ current content hash - any changes will require re-approval.`,
 		// Get template to show what we're approving
 		t, err := tm.Get(name)
 		if err != nil {
+			if isJSONOutput(cmd) {
+				return outputJSONError(cmd, err, startTime)
+			}
 			return err
+		}
+
+		if isJSONOutput(cmd) {
+			// For JSON output, we can't do interactive approval
+			// Return an error or require a --force flag
+			err := fmt.Errorf("interactive approval not supported in JSON mode")
+			return outputJSONError(cmd, err, startTime)
 		}
 
 		// Show template content for review
@@ -238,13 +360,18 @@ current content hash - any changes will require re-approval.`,
 }
 
 var templateViewCmd = &cobra.Command{
-	Use:   "view <name>",
+	Use:   "view <n>",
 	Short: "View the raw content of a template",
 	Long:  `Display the raw content of a specified template.`,
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		startTime := time.Now()
+		
 		ws, err := workspace.RequireWorkspace()
 		if err != nil {
+			if isJSONOutput(cmd) {
+				return outputJSONError(cmd, err, startTime)
+			}
 			return err
 		}
 
@@ -253,12 +380,171 @@ var templateViewCmd = &cobra.Command{
 
 		t, err := tm.Get(name)
 		if err != nil {
-			return fmt.Errorf("failed to retrieve template: %w", err)
+			err := fmt.Errorf("failed to retrieve template: %w", err)
+			if isJSONOutput(cmd) {
+				return outputJSONError(cmd, err, startTime)
+			}
+			return err
+		}
+
+		if isJSONOutput(cmd) {
+			response := TemplateViewResponse{
+				Operation:    "template_view",
+				TemplateName: name,
+				Content:      t.Content,
+				Approved:     t.Approved,
+				Hash:         t.Hash,
+				Metadata:     createJSONMetadata(cmd, true, startTime),
+			}
+
+			return outputJSON(response)
 		}
 
 		fmt.Println(t.Content)
 		return nil
 	},
+}
+
+var templateRenderCmd = &cobra.Command{
+	Use:   "render <n>",
+	Short: "Render a template with shell command execution",
+	Long: `Render a template and execute any shell commands within it.
+
+This command outputs the fully rendered template content, executing
+any shell commands like $(date) or $(git status). The template must
+be approved before shell commands can execute.
+
+Examples:
+  jot template render meeting      # Render meeting template
+  jot template render meeting --json  # Output rendered content as JSON`,
+	Args: cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		startTime := time.Now()
+		
+		ws, err := workspace.RequireWorkspace()
+		if err != nil {
+			if isJSONOutput(cmd) {
+				return outputJSONError(cmd, err, startTime)
+			}
+			return err
+		}
+
+		name := args[0]
+		tm := template.NewManager(ws)
+
+		t, err := tm.Get(name)
+		if err != nil {
+			err := fmt.Errorf("failed to retrieve template: %w", err)
+			if isJSONOutput(cmd) {
+				return outputJSONError(cmd, err, startTime)
+			}
+			return err
+		}
+
+		// Render the template (this will respect approval status)
+		renderedContent, err := tm.Render(t, "")
+		if err != nil {
+			err := fmt.Errorf("failed to render template: %w", err)
+			if isJSONOutput(cmd) {
+				return outputJSONError(cmd, err, startTime)
+			}
+			return err
+		}
+
+		if isJSONOutput(cmd) {
+			response := TemplateRenderResponse{
+				Operation:        "template_render",
+				TemplateName:     name,
+				RenderedContent:  renderedContent,
+				Approved:         t.Approved,
+				ExecutionAllowed: t.Approved,
+				Metadata:         createJSONMetadata(cmd, true, startTime),
+			}
+
+			return outputJSON(response)
+		}
+
+		fmt.Print(renderedContent)
+		return nil
+	},
+}
+
+// Helper function to count approved templates
+func countApproved(templates []template.Template) int {
+	count := 0
+	for _, t := range templates {
+		if t.Approved {
+			count++
+		}
+	}
+	return count
+}
+
+// JSON response structures for template commands
+type TemplateListResponse struct {
+	Operation string               `json:"operation"`
+	Templates []TemplateItem       `json:"templates"`
+	Summary   TemplateListSummary  `json:"summary"`
+	Metadata  JSONMetadata         `json:"metadata"`
+}
+
+type TemplateItem struct {
+	Name     string `json:"name"`
+	Approved bool   `json:"approved"`
+	Hash     string `json:"hash"`
+}
+
+type TemplateListSummary struct {
+	TotalTemplates    int `json:"total_templates"`
+	ApprovedTemplates int `json:"approved_templates"`
+}
+
+type TemplateCreateResponse struct {
+	Operation    string       `json:"operation"`
+	TemplateName string       `json:"template_name"`
+	TemplatePath string       `json:"template_path"`
+	Created      bool         `json:"created"`
+	Edited       bool         `json:"edited"`
+	EditorError  string       `json:"editor_error,omitempty"`
+	NextSteps    []string     `json:"next_steps"`
+	Metadata     JSONMetadata `json:"metadata"`
+}
+
+type TemplateEditResponse struct {
+	Operation    string       `json:"operation"`
+	TemplateName string       `json:"template_name"`
+	TemplatePath string       `json:"template_path"`
+	Updated      bool         `json:"updated"`
+	EditorError  string       `json:"editor_error,omitempty"`
+	NextSteps    []string     `json:"next_steps"`
+	Metadata     JSONMetadata `json:"metadata"`
+}
+
+type TemplateApproveResponse struct {
+	Operation     string       `json:"operation"`
+	TemplateName  string       `json:"template_name"`
+	Approved      bool         `json:"approved"`
+	Hash          string       `json:"hash"`
+	UserConfirmed bool         `json:"user_confirmed"`
+	Metadata      JSONMetadata `json:"metadata"`
+}
+
+type TemplateViewResponse struct {
+	Operation    string       `json:"operation"`
+	TemplateName string       `json:"template_name"`
+	Content      string       `json:"content"`
+	Approved     bool         `json:"approved"`
+	Hash         string       `json:"hash"`
+	Metadata     JSONMetadata `json:"metadata"`
+}
+
+type TemplateRenderResponse struct {
+	Operation        string       `json:"operation"`
+	TemplateName     string       `json:"template_name"`
+	RenderedContent  string       `json:"rendered_content"`
+	Approved         bool         `json:"approved"`
+	ExecutionAllowed bool         `json:"execution_allowed"`
+	Metadata         JSONMetadata `json:"metadata"`
 }
 
 func init() {
@@ -267,4 +553,5 @@ func init() {
 	templateCmd.AddCommand(templateEditCmd)
 	templateCmd.AddCommand(templateApproveCmd)
 	templateCmd.AddCommand(templateViewCmd)
+	templateCmd.AddCommand(templateRenderCmd)
 }

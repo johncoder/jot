@@ -69,6 +69,7 @@ func init() {
 
 	// Global flags
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.jotrc)")
+	rootCmd.PersistentFlags().BoolVar(&jsonOutput, "json", false, "output in JSON format")
 
 	// Version handling
 	rootCmd.Version = fmt.Sprintf("%s\nBuild: %s\nCommit: %s", version, buildTime, gitCommit)

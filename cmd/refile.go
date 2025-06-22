@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/johncoder/jot/internal/markdown"
 	"github.com/johncoder/jot/internal/workspace"
@@ -46,8 +47,13 @@ Examples:
   jot refile --to "work.md#projects/frontend"          # Inspect destination`,
 
 	RunE: func(cmd *cobra.Command, args []string) error {
+		startTime := time.Now()
+		
 		ws, err := workspace.RequireWorkspace()
 		if err != nil {
+			if isJSONOutput(cmd) {
+				return outputJSONError(cmd, err, startTime)
+			}
 			return err
 		}
 
@@ -58,7 +64,11 @@ Examples:
 
 		// No source and no destination: show usage help
 		if len(args) == 0 && to == "" {
-			return fmt.Errorf("provide a source file or --to destination")
+			err := fmt.Errorf("provide a source file or --to destination")
+			if isJSONOutput(cmd) {
+				return outputJSONError(cmd, err, startTime)
+			}
+			return err
 		}
 
 		if to == "" {
@@ -66,43 +76,66 @@ Examples:
 			if len(args) == 1 && !strings.Contains(args[0], "#") {
 				return showSelectorsForFile(ws, args[0])
 			}
-			return fmt.Errorf("destination path required: use --to flag")
+			err := fmt.Errorf("destination path required: use --to flag")
+			if isJSONOutput(cmd) {
+				return outputJSONError(cmd, err, startTime)
+			}
+			return err
 		}
 
 		// Parse destination path
 		destPath, err := markdown.ParsePath(to)
 		if err != nil {
-			return fmt.Errorf("invalid destination path '%s': %w", to, err)
+			err := fmt.Errorf("invalid destination path '%s': %w", to, err)
+			if isJSONOutput(cmd) {
+				return outputJSONError(cmd, err, startTime)
+			}
+			return err
 		}
 
 		// Source-less mode: inspect destination
 		if len(args) == 0 {
+			if isJSONOutput(cmd) {
+				return inspectDestinationJSON(cmd, ws, destPath, startTime)
+			}
 			return inspectDestination(ws, destPath)
 		}
 
 		// Parse source path
 		sourcePath, err := markdown.ParsePath(args[0])
 		if err != nil {
-			return fmt.Errorf("invalid source path '%s': %w", args[0], err)
+			err := fmt.Errorf("invalid source path '%s': %w", args[0], err)
+			if isJSONOutput(cmd) {
+				return outputJSONError(cmd, err, startTime)
+			}
+			return err
 		}
 
 		// Extract subtree from source
 		subtree, err := ExtractSubtree(ws, sourcePath)
 		if err != nil {
-			return fmt.Errorf("failed to extract subtree: %w", err)
+			err := fmt.Errorf("failed to extract subtree: %w", err)
+			if isJSONOutput(cmd) {
+				return outputJSONError(cmd, err, startTime)
+			}
+			return err
 		}
 
-		if verbose {
+		if verbose && !isJSONOutput(cmd) {
 			printVerboseSubtreeInfo(subtree, sourcePath.File)
 		}
 
 		// Resolve destination
 		dest, err := ResolveDestination(ws, destPath, prepend)
 		if err != nil {
-			return fmt.Errorf("failed to resolve destination: %w", err)
+			err := fmt.Errorf("failed to resolve destination: %w", err)
+			if isJSONOutput(cmd) {
+				return outputJSONError(cmd, err, startTime)
+			}
+			return err
 		}
 
-		if verbose {
+		if verbose && !isJSONOutput(cmd) {
 			printVerboseDestinationInfo(dest)
 		}
 
@@ -111,9 +144,19 @@ Examples:
 
 		// Perform the refile operation
 		if err := performRefile(ws, sourcePath, subtree, dest, transformedContent); err != nil {
-			return fmt.Errorf("refile operation failed: %w", err)
+			err := fmt.Errorf("refile operation failed: %w", err)
+			if isJSONOutput(cmd) {
+				return outputJSONError(cmd, err, startTime)
+			}
+			return err
 		}
 
+		// Handle JSON output
+		if isJSONOutput(cmd) {
+			return outputRefileJSON(cmd, sourcePath, destPath, subtree, dest, transformedContent, startTime)
+		}
+
+		// Human-readable output
 		if verbose {
 			fmt.Printf("Refile operation completed successfully!\n")
 		}
@@ -639,4 +682,219 @@ func findHeadingLineEnd(heading *ast.Heading, content []byte) int {
 	}
 	
 	return len(content)
+}
+
+// JSON response structures for refile command
+type RefileResponse struct {
+	Operation   string              `json:"operation"`
+	Source      RefileSource        `json:"source"`
+	Destination RefileDestination   `json:"destination"`
+	Content     RefileContent       `json:"content"`
+	Metadata    JSONMetadata        `json:"metadata"`
+}
+
+type RefileSource struct {
+	Selector     string `json:"selector"`
+	FilePath     string `json:"file_path"`
+	Heading      string `json:"heading"`
+	OriginalLevel int   `json:"original_level"`
+}
+
+type RefileDestination struct {
+	Selector       string   `json:"selector"`
+	FilePath       string   `json:"file_path"`
+	TargetLevel    int      `json:"target_level"`
+	PathExists     bool     `json:"path_exists"`
+	CreatedHeadings []string `json:"created_headings,omitempty"`
+}
+
+type RefileContent struct {
+	Content         string `json:"content"`
+	CharacterCount  int    `json:"character_count"`
+	LineCount       int    `json:"line_count"`
+	TransformedLevel int   `json:"transformed_level"`
+}
+
+// JSON response structures for destination inspection
+type InspectDestinationResponse struct {
+	Operation   string                     `json:"operation"`
+	Destination InspectDestinationInfo     `json:"destination"`
+	Analysis    InspectDestinationAnalysis `json:"analysis"`
+	Metadata    JSONMetadata               `json:"metadata"`
+}
+
+type InspectDestinationInfo struct {
+	Selector string `json:"selector"`
+	FilePath string `json:"file_path"`
+	FileExists bool `json:"file_exists"`
+}
+
+type InspectDestinationAnalysis struct {
+	PathExists      bool     `json:"path_exists"`
+	FoundSegments   []string `json:"found_segments"`
+	MissingSegments []string `json:"missing_segments"`
+	TargetLevel     int      `json:"target_level"`
+	WouldCreate     []InspectHeadingCreation `json:"would_create,omitempty"`
+}
+
+type InspectHeadingCreation struct {
+	Heading string `json:"heading"`
+	Level   int    `json:"level"`
+}
+
+// outputRefileJSON outputs JSON response for refile operation
+func outputRefileJSON(cmd *cobra.Command, sourcePath *markdown.HeadingPath, destPath *markdown.HeadingPath, 
+	subtree *markdown.Subtree, dest *DestinationTarget, transformedContent []byte, startTime time.Time) error {
+	
+	// Get source file path
+	sourceFilePath := sourcePath.File
+	if sourcePath.File == "inbox.md" {
+		// We need the workspace to get the inbox path, but we don't have it here
+		// Let's use the literal name for JSON consistency
+		sourceFilePath = "inbox.md"
+	}
+	
+	// Get destination file path  
+	destFilePath := dest.File
+	
+	// Count lines in transformed content
+	lineCount := strings.Count(string(transformedContent), "\n") + 1
+	if len(transformedContent) == 0 {
+		lineCount = 0
+	}
+	
+	// Build created headings list
+	var createdHeadings []string
+	if len(dest.CreatePath) > 0 {
+		createdHeadings = dest.CreatePath
+	}
+	
+	response := RefileResponse{
+		Operation: "refile",
+		Source: RefileSource{
+			Selector:      sourcePath.File + "#" + strings.Join(sourcePath.Segments, "/"),
+			FilePath:      sourceFilePath,
+			Heading:       subtree.Heading,
+			OriginalLevel: subtree.Level,
+		},
+		Destination: RefileDestination{
+			Selector:        destPath.File + "#" + strings.Join(destPath.Segments, "/"),
+			FilePath:        destFilePath,
+			TargetLevel:     dest.TargetLevel,
+			PathExists:      dest.Exists,
+			CreatedHeadings: createdHeadings,
+		},
+		Content: RefileContent{
+			Content:          string(transformedContent),
+			CharacterCount:   len(transformedContent),
+			LineCount:        lineCount,
+			TransformedLevel: dest.TargetLevel,
+		},
+		Metadata: createJSONMetadata(cmd, true, startTime),
+	}
+	
+	return outputJSON(response)
+}
+
+// inspectDestinationJSON outputs JSON response for destination inspection
+func inspectDestinationJSON(cmd *cobra.Command, ws *workspace.Workspace, destPath *markdown.HeadingPath, startTime time.Time) error {
+	// Check if file exists
+	var filePath string
+	if destPath.File == "inbox.md" {
+		filePath = ws.InboxPath
+	} else if filepath.IsAbs(destPath.File) {
+		filePath = destPath.File
+	} else {
+		filePath = filepath.Join(ws.Root, destPath.File)
+	}
+	
+	fileExists := true
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		fileExists = false
+	}
+	
+	response := InspectDestinationResponse{
+		Operation: "inspect_destination",
+		Destination: InspectDestinationInfo{
+			Selector:   destPath.File + "#" + strings.Join(destPath.Segments, "/"),
+			FilePath:   filePath,
+			FileExists: fileExists,
+		},
+		Analysis: InspectDestinationAnalysis{
+			PathExists:      false,
+			FoundSegments:   []string{},
+			MissingSegments: destPath.Segments,
+			TargetLevel:     destPath.SkipLevels + len(destPath.Segments) + 1,
+		},
+		Metadata: createJSONMetadata(cmd, true, startTime),
+	}
+	
+	// If file doesn't exist, return early with basic analysis
+	if !fileExists {
+		// Fill in what would be created
+		baseLevel := destPath.SkipLevels + 1
+		for i, heading := range destPath.Segments {
+			level := baseLevel + i
+			response.Analysis.WouldCreate = append(response.Analysis.WouldCreate, InspectHeadingCreation{
+				Heading: heading,
+				Level:   level,
+			})
+		}
+		return outputJSON(response)
+	}
+	
+	// Read and parse the file to analyze the path
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		// Return error as JSON
+		return outputJSONError(cmd, fmt.Errorf("error reading file: %w", err), startTime)
+	}
+	
+	doc := markdown.ParseDocument(content)
+	pathResolution, err := navigateHeadingPath(doc, content, destPath)
+	if err != nil {
+		return outputJSONError(cmd, fmt.Errorf("error analyzing path: %w", err), startTime)
+	}
+	
+	if pathResolution.TargetHeading != nil {
+		// Complete path exists
+		response.Analysis.PathExists = true
+		response.Analysis.FoundSegments = destPath.Segments
+		response.Analysis.MissingSegments = []string{}
+		response.Analysis.TargetLevel = pathResolution.TargetHeading.Level + 1
+	} else if len(pathResolution.FoundSegments) > 0 {
+		// Partial path exists
+		response.Analysis.PathExists = false
+		response.Analysis.FoundSegments = pathResolution.FoundSegments
+		response.Analysis.MissingSegments = pathResolution.MissingSegments
+		
+		// Create what would be created
+		baseLevel := pathResolution.ParentHeading.Level + 1
+		for i, heading := range pathResolution.MissingSegments {
+			level := baseLevel + i
+			response.Analysis.WouldCreate = append(response.Analysis.WouldCreate, InspectHeadingCreation{
+				Heading: heading,
+				Level:   level,
+			})
+		}
+		response.Analysis.TargetLevel = baseLevel + len(pathResolution.MissingSegments)
+	} else {
+		// No path exists
+		response.Analysis.PathExists = false
+		response.Analysis.FoundSegments = []string{}
+		response.Analysis.MissingSegments = destPath.Segments
+		
+		// Create what would be created
+		baseLevel := destPath.SkipLevels + 1
+		for i, heading := range destPath.Segments {
+			level := baseLevel + i
+			response.Analysis.WouldCreate = append(response.Analysis.WouldCreate, InspectHeadingCreation{
+				Heading: heading,
+				Level:   level,
+			})
+		}
+		response.Analysis.TargetLevel = baseLevel + len(destPath.Segments)
+	}
+	
+	return outputJSON(response)
 }

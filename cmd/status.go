@@ -27,18 +27,16 @@ Examples:
   jot status                     # Show workspace status
   jot status --verbose           # Show detailed information`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		startTime := time.Now()
 		ws, err := workspace.RequireWorkspace()
 		if err != nil {
+			if isJSONOutput(cmd) {
+				return outputJSONError(cmd, err, startTime)
+			}
 			return err
 		}
 
-		fmt.Println("Jot Workspace Status")
-		fmt.Println("===================")
-		fmt.Println()
-
-		fmt.Printf("Location: %s\n", ws.Root)
-
-		// Check workspace structure
+		// Collect all status data
 		issues := []string{}
 		if !ws.InboxExists() {
 			issues = append(issues, "inbox.md is missing")
@@ -47,25 +45,73 @@ Examples:
 			issues = append(issues, "lib/ directory is missing")
 		}
 
-		// Count notes in inbox
 		inboxNotes := countNotesInFile(ws.InboxPath)
-
-		// Count notes in lib
 		libNotes, libFiles := countNotesInDir(ws.LibDir)
+		totalNotes := inboxNotes + libNotes
+
+		healthStatus := "healthy"
+		if len(issues) > 0 {
+			healthStatus = "issues_found"
+		}
+
+		var lastActivity *time.Time
+		var lastActivityText string
+		if ws.InboxExists() {
+			if info, err := os.Stat(ws.InboxPath); err == nil {
+				modTime := info.ModTime()
+				lastActivity = &modTime
+				lastActivityText = formatRelativeTime(modTime)
+			}
+		}
+
+		// Output JSON if requested
+		if isJSONOutput(cmd) {
+			response := StatusResponse{
+				Workspace: StatusWorkspace{
+					Root:      ws.Root,
+					InboxPath: ws.InboxPath,
+					LibDir:    ws.LibDir,
+					JotDir:    ws.JotDir,
+				},
+				Files: StatusFiles{
+					InboxNotes: inboxNotes,
+					LibFiles:   libFiles,
+					LibNotes:   libNotes,
+					TotalNotes: totalNotes,
+				},
+				Health: StatusHealth{
+					Status: healthStatus,
+					Issues: issues,
+				},
+				Metadata: createJSONMetadata(cmd, true, startTime),
+			}
+
+			if lastActivity != nil {
+				response.Activity = StatusActivity{
+					LastInboxActivity:     lastActivity,
+					LastInboxActivityText: lastActivityText,
+				}
+			}
+
+			return outputJSON(response)
+		}
+
+		// Human-readable output
+		fmt.Println("Jot Workspace Status")
+		fmt.Println("===================")
+		fmt.Println()
+
+		fmt.Printf("Location: %s\n", ws.Root)
 
 		fmt.Println()
 		fmt.Println("Notes Summary:")
 		fmt.Printf("  Inbox:     %d notes\n", inboxNotes)
 		fmt.Printf("  Library:   %d notes (%d files)\n", libNotes, libFiles)
-		fmt.Printf("  Total:     %d notes\n", inboxNotes+libNotes)
+		fmt.Printf("  Total:     %d notes\n", totalNotes)
 		fmt.Println()
 
-		// Check recent activity
-		if ws.InboxExists() {
-			if info, err := os.Stat(ws.InboxPath); err == nil {
-				lastModified := info.ModTime()
-				fmt.Printf("Last inbox activity: %s\n", formatRelativeTime(lastModified))
-			}
+		if lastActivityText != "" {
+			fmt.Printf("Last inbox activity: %s\n", lastActivityText)
 		}
 
 		fmt.Println()
@@ -81,6 +127,39 @@ Examples:
 
 		return nil
 	},
+}
+
+// StatusResponse represents the JSON response for status command
+type StatusResponse struct {
+	Workspace StatusWorkspace `json:"workspace"`
+	Files     StatusFiles     `json:"files"`
+	Health    StatusHealth    `json:"health"`
+	Activity  StatusActivity  `json:"activity,omitempty"`
+	Metadata  JSONMetadata    `json:"metadata"`
+}
+
+type StatusWorkspace struct {
+	Root      string `json:"root"`
+	InboxPath string `json:"inbox_path"`
+	LibDir    string `json:"lib_dir"`
+	JotDir    string `json:"jot_dir"`
+}
+
+type StatusFiles struct {
+	InboxNotes int `json:"inbox_notes"`
+	LibFiles   int `json:"lib_files"`
+	LibNotes   int `json:"lib_notes"`
+	TotalNotes int `json:"total_notes"`
+}
+
+type StatusHealth struct {
+	Status string   `json:"status"`
+	Issues []string `json:"issues"`
+}
+
+type StatusActivity struct {
+	LastInboxActivity     *time.Time `json:"last_inbox_activity,omitempty"`
+	LastInboxActivityText string     `json:"last_inbox_activity_text,omitempty"`
 }
 
 // countNotesInFile counts ## headers in a markdown file

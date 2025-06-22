@@ -1,9 +1,11 @@
 ---
-applyTo: '**'
+applyTo: "**"
 ---
+
 # jot Coding Standards, Domain Knowledge, and Preferences
 
 ## Domain Knowledge
+
 - jot is a git-inspired CLI tool for capturing, refiling, archiving, finding, and maintaining a hub of notes and information.
 - Target users: tech industry knowledge workers who use the terminal and need notes close to their workflow.
 - Core use cases: quick note capture, refiling to topics, archiving, searching, and maintaining a central information hub.
@@ -13,6 +15,7 @@ applyTo: '**'
 - Documentation and roadmap are maintained in `docs/` and `docs/projects/`.
 
 ## Coding Standards
+
 - Use Go as the primary implementation language.
 - Follow idiomatic Go practices: clear naming, error handling, and modular code.
 - Always use `go fmt` to ensure consistent code formatting.
@@ -27,6 +30,7 @@ applyTo: '**'
 - Favor pragmatism, speed, and convenience in all workflows and code.
 
 ## Preferences
+
 - Prioritize minimal setup and fast workflows.
 - Design for extensibility (external subcommands, future plugins).
 - Use Markdown for all user-facing note content.
@@ -35,5 +39,9 @@ applyTo: '**'
 - Document all major features, commands, and configuration options in `docs/`.
 - Always use context from `docs/` directory when working on any tasks to understand requirements and design decisions.
 - Make intelligent guesses about which project documents in `docs/` are most relevant to the task at hand, and ask for confirmation if there is any uncertainty about which documents to reference.
+
+## Running
+
+- Build with `make install` in the root directory.
 
 # End of instructions

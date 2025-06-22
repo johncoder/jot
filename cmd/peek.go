@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/johncoder/jot/internal/markdown"
 	"github.com/johncoder/jot/internal/workspace"
@@ -35,8 +36,12 @@ This is useful for quickly reviewing specific sections without opening full file
 
 	Args: cobra.RangeArgs(0, 1), // Allow 0 or 1 arguments for --toc mode
 	RunE: func(cmd *cobra.Command, args []string) error {
+		startTime := time.Now()
 		ws, err := workspace.RequireWorkspace()
 		if err != nil {
+			if isJSONOutput(cmd) {
+				return outputJSONError(cmd, err, startTime)
+			}
 			return err
 		}
 
@@ -49,26 +54,51 @@ This is useful for quickly reviewing specific sections without opening full file
 		// Handle TOC mode
 		if toc {
 			if len(args) == 0 {
-				return fmt.Errorf("table of contents requires a file or selector (e.g., 'inbox.md' or 'work.md#projects')")
+				err := fmt.Errorf("table of contents requires a file or selector (e.g., 'inbox.md' or 'work.md#projects')")
+				if isJSONOutput(cmd) {
+					return outputJSONError(cmd, err, startTime)
+				}
+				return err
+			}
+			
+			if isJSONOutput(cmd) {
+				return showTableOfContentsJSON(cmd, ws, args[0], short, startTime)
 			}
 			return showTableOfContents(ws, args[0], short)
 		}
 
 		// Regular peek mode requires exactly one argument
 		if len(args) != 1 {
-			return fmt.Errorf("peek requires a selector argument (e.g., 'inbox.md#meeting')")
+			err := fmt.Errorf("peek requires a selector argument (e.g., 'inbox.md#meeting')")
+			if isJSONOutput(cmd) {
+				return outputJSONError(cmd, err, startTime)
+			}
+			return err
 		}
 
 		// Parse the source path selector
 		sourcePath, err := markdown.ParsePath(args[0])
 		if err != nil {
-			return fmt.Errorf("invalid selector: %w", err)
+			err := fmt.Errorf("invalid selector: %w", err)
+			if isJSONOutput(cmd) {
+				return outputJSONError(cmd, err, startTime)
+			}
+			return err
 		}
 
 		// Extract the subtree
 		subtree, err := ExtractSubtree(ws, sourcePath)
 		if err != nil {
-			return fmt.Errorf("failed to extract subtree: %w", err)
+			err := fmt.Errorf("failed to extract subtree: %w", err)
+			if isJSONOutput(cmd) {
+				return outputJSONError(cmd, err, startTime)
+			}
+			return err
+		}
+
+		// Handle JSON output for regular peek
+		if isJSONOutput(cmd) {
+			return outputPeekJSON(cmd, args[0], sourcePath, subtree, ws, startTime)
 		}
 
 		// Display subtree information if requested
@@ -1004,4 +1034,276 @@ func min(a, b int) int {
 		return a
 	}
 	return b
+}
+
+// PeekResponse represents the JSON response for peek command
+type PeekResponse struct {
+	Selector    string          `json:"selector"`
+	Subtree     *PeekSubtree    `json:"subtree,omitempty"`
+	FileInfo    PeekFileInfo    `json:"file_info"`
+	Extraction  *PeekExtraction `json:"extraction,omitempty"`
+	TableOfContents *PeekTOC    `json:"table_of_contents,omitempty"`
+	Metadata    JSONMetadata    `json:"metadata"`
+}
+
+type PeekSubtree struct {
+	Heading         string `json:"heading"`
+	Level           int    `json:"level"`
+	Content         string `json:"content"`
+	NestedHeadings  int    `json:"nested_headings"`
+	LineCount       int    `json:"line_count"`
+}
+
+type PeekFileInfo struct {
+	FilePath     string    `json:"file_path"`
+	FileExists   bool      `json:"file_exists"`
+	LastModified *string   `json:"last_modified,omitempty"`
+}
+
+type PeekExtraction struct {
+	StartLine     int `json:"start_line"`
+	EndLine       int `json:"end_line"`
+	ContentOffset [2]int `json:"content_offset"`
+}
+
+type PeekTOC struct {
+	IsFullFile   bool        `json:"is_full_file"`
+	RootSelector string      `json:"root_selector,omitempty"`
+	Headings     []PeekTOCHeading `json:"headings"`
+}
+
+type PeekTOCHeading struct {
+	Text     string `json:"text"`
+	Level    int    `json:"level"`
+	Selector string `json:"selector"`
+}
+
+// outputPeekJSON outputs JSON response for regular peek mode
+func outputPeekJSON(cmd *cobra.Command, selector string, sourcePath *markdown.HeadingPath, subtree *markdown.Subtree, ws *workspace.Workspace, startTime time.Time) error {
+	// Build file info
+	filePath := filepath.Join(ws.Root, sourcePath.File)
+	if sourcePath.File == "inbox.md" {
+		filePath = ws.InboxPath
+	}
+	
+	fileExists := true
+	var lastModified *string
+	if info, err := os.Stat(filePath); err == nil {
+		modTime := info.ModTime().Format(time.RFC3339)
+		lastModified = &modTime
+	} else {
+		fileExists = false
+	}
+	
+	// Count nested headings and lines
+	content := string(subtree.Content)
+	lineCount := strings.Count(content, "\n") + 1
+	if len(content) == 0 {
+		lineCount = 0
+	}
+	
+	// Count nested headings by parsing content
+	doc := markdown.ParseDocument(subtree.Content)
+	headings := extractHeadingsFromContent(doc, subtree.Content)
+	nestedCount := len(headings)
+	if nestedCount > 0 {
+		nestedCount-- // Don't count the root heading itself
+	}
+	
+	response := PeekResponse{
+		Selector: selector,
+		Subtree: &PeekSubtree{
+			Heading:        subtree.Heading,
+			Level:          subtree.Level,
+			Content:        content,
+			NestedHeadings: nestedCount,
+			LineCount:      lineCount,
+		},
+		FileInfo: PeekFileInfo{
+			FilePath:     filePath,
+			FileExists:   fileExists,
+			LastModified: lastModified,
+		},
+		Extraction: &PeekExtraction{
+			StartLine:     0, // We don't have line info from markdown.Subtree
+			EndLine:       0, // We don't have line info from markdown.Subtree
+			ContentOffset: [2]int{subtree.StartOffset, subtree.EndOffset},
+		},
+		Metadata: createJSONMetadata(cmd, true, startTime),
+	}
+	
+	return outputJSON(response)
+}
+
+// showTableOfContentsJSON outputs JSON response for TOC mode
+func showTableOfContentsJSON(cmd *cobra.Command, ws *workspace.Workspace, selector string, useShortSelectors bool, startTime time.Time) error {
+	// Parse selector to determine if it's file-only or includes path
+	var content []byte
+	var baseFilename string
+	var subtreePath string
+	var filePath string
+	var err error
+	isFullFile := true
+	
+	if strings.Contains(selector, "#") {
+		// This is a path selector - extract the subtree first
+		sourcePath, parseErr := markdown.ParsePath(selector)
+		if parseErr != nil {
+			return outputJSONError(cmd, fmt.Errorf("invalid selector: %w", parseErr), startTime)
+		}
+		
+		subtree, extractErr := ExtractSubtree(ws, sourcePath)
+		if extractErr != nil {
+			return outputJSONError(cmd, fmt.Errorf("failed to extract subtree: %w", extractErr), startTime)
+		}
+		
+		content = subtree.Content
+		baseFilename = sourcePath.File
+		subtreePath = strings.Join(sourcePath.Segments, "/")
+		isFullFile = false
+		
+		filePath = filepath.Join(ws.Root, baseFilename)
+		if baseFilename == "inbox.md" {
+			filePath = ws.InboxPath
+		}
+	} else {
+		// This is just a file name
+		baseFilename = selector
+		
+		if selector == "inbox.md" {
+			filePath = ws.InboxPath
+		} else if filepath.IsAbs(selector) {
+			filePath = selector
+		} else {
+			if !strings.HasSuffix(selector, ".md") {
+				selector += ".md"
+				baseFilename = selector
+			}
+			filePath = filepath.Join(ws.Root, selector)
+		}
+		
+		// Check if file exists
+		if _, err := os.Stat(filePath); os.IsNotExist(err) {
+			return outputJSONError(cmd, fmt.Errorf("file not found: %s", selector), startTime)
+		}
+		
+		// Read file content
+		content, err = os.ReadFile(filePath)
+		if err != nil {
+			return outputJSONError(cmd, fmt.Errorf("failed to read file %s: %w", selector, err), startTime)
+		}
+	}
+	
+	if len(content) == 0 {
+		// Empty file case
+		response := PeekResponse{
+			Selector: selector,
+			FileInfo: PeekFileInfo{
+				FilePath:   filePath,
+				FileExists: true,
+			},
+			TableOfContents: &PeekTOC{
+				IsFullFile:   isFullFile,
+				RootSelector: subtreePath,
+				Headings:     []PeekTOCHeading{},
+			},
+			Metadata: createJSONMetadata(cmd, true, startTime),
+		}
+		return outputJSON(response)
+	}
+	
+	// Parse document and extract headings
+	doc := markdown.ParseDocument(content)
+	headings := extractHeadingsFromContent(doc, content)
+	
+	if len(headings) == 0 {
+		// No headings case
+		response := PeekResponse{
+			Selector: selector,
+			FileInfo: PeekFileInfo{
+				FilePath:   filePath,
+				FileExists: true,
+			},
+			TableOfContents: &PeekTOC{
+				IsFullFile:   isFullFile,
+				RootSelector: subtreePath,
+				Headings:     []PeekTOCHeading{},
+			},
+			Metadata: createJSONMetadata(cmd, true, startTime),
+		}
+		return outputJSON(response)
+	}
+	
+	// Build TOC headings
+	tocHeadings := []PeekTOCHeading{}
+	for _, heading := range headings {
+		var selectorText string
+		if useShortSelectors {
+			selectorText = generateShortSelector(baseFilename, heading, headings)
+		} else {
+			// Build full path
+			pathSegments := buildPathToHeading(heading, headings)
+			if len(pathSegments) > 0 {
+				selectorText = fmt.Sprintf("%s#%s", baseFilename, strings.Join(pathSegments, "/"))
+			} else {
+				selectorText = fmt.Sprintf("%s#%s", baseFilename, strings.ToLower(heading.Text))
+			}
+		}
+		
+		tocHeadings = append(tocHeadings, PeekTOCHeading{
+			Text:     heading.Text,
+			Level:    heading.Level,
+			Selector: selectorText,
+		})
+	}
+	
+	response := PeekResponse{
+		Selector: selector,
+		FileInfo: PeekFileInfo{
+			FilePath:   filePath,
+			FileExists: true,
+		},
+		TableOfContents: &PeekTOC{
+			IsFullFile:   isFullFile,
+			RootSelector: subtreePath,
+			Headings:     tocHeadings,
+		},
+		Metadata: createJSONMetadata(cmd, true, startTime),
+	}
+	
+	return outputJSON(response)
+}
+
+// buildPathToHeading builds a hierarchical path array for a heading based on the document structure
+func buildPathToHeading(target HeadingInfo, allHeadings []HeadingInfo) []string {
+	// Find target index
+	var targetIndex int = -1
+	for i, h := range allHeadings {
+		if h.Text == target.Text && h.Level == target.Level && h.Line == target.Line {
+			targetIndex = i
+			break
+		}
+	}
+	
+	if targetIndex == -1 {
+		return []string{strings.ToLower(target.Text)}
+	}
+	
+	var path []string
+	
+	// Build path by walking backward to find parent headings
+	currentLevel := target.Level
+	for i := targetIndex; i >= 0; i-- {
+		heading := allHeadings[i]
+		if heading.Level < currentLevel {
+			// This is a parent heading
+			path = append([]string{strings.ToLower(heading.Text)}, path...)
+			currentLevel = heading.Level
+		} else if i == targetIndex {
+			// Add the target heading itself
+			path = append(path, strings.ToLower(heading.Text))
+		}
+	}
+	
+	return path
 }

@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/johncoder/jot/internal/editor"
 	"github.com/johncoder/jot/internal/markdown"
@@ -45,8 +46,13 @@ Examples:
   jot capture --content "Quick note"       # Direct append to inbox`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		startTime := time.Now()
+		
 		ws, err := workspace.RequireWorkspace()
 		if err != nil {
+			if isJSONOutput(cmd) {
+				return outputJSONError(cmd, err, startTime)
+			}
 			return err
 		}
 
@@ -91,12 +97,19 @@ Examples:
 			tm := template.NewManager(ws)
 			t, err := tm.Get(captureTemplate)
 			if err != nil {
-				return fmt.Errorf("template error: %w", err)
+				err := fmt.Errorf("template error: %w", err)
+				if isJSONOutput(cmd) {
+					return outputJSONError(cmd, err, startTime)
+				}
+				return err
 			}
 
 			// Render template with shell commands and append content
 			renderedTemplate, err := tm.Render(t, appendContent)
 			if err != nil {
+				if isJSONOutput(cmd) {
+					return outputJSONError(cmd, err, startTime)
+				}
 				return err
 			}
 
@@ -104,20 +117,34 @@ Examples:
 				// Open rendered template in editor
 				tempFile, err := os.CreateTemp("", "jot-capture-*.md")
 				if err != nil {
-					return fmt.Errorf("failed to create temp file: %w", err)
+					err := fmt.Errorf("failed to create temp file: %w", err)
+					if isJSONOutput(cmd) {
+						return outputJSONError(cmd, err, startTime)
+					}
+					return err
 				}
 				defer os.Remove(tempFile.Name())
 
 				if _, err := tempFile.WriteString(renderedTemplate); err != nil {
 					tempFile.Close()
-					return fmt.Errorf("failed to write template to temp file: %w", err)
+					err := fmt.Errorf("failed to write template to temp file: %w", err)
+					if isJSONOutput(cmd) {
+						return outputJSONError(cmd, err, startTime)
+					}
+					return err
 				}
 				tempFile.Close()
 
-				fmt.Printf("Opening template '%s' in editor...\n", captureTemplate)
+				if !isJSONOutput(cmd) {
+					fmt.Printf("Opening template '%s' in editor...\n", captureTemplate)
+				}
 				editedContent, err := editor.OpenEditor(renderedTemplate)
 				if err != nil {
-					return fmt.Errorf("failed to open editor: %w", err)
+					err := fmt.Errorf("failed to open editor: %w", err)
+					if isJSONOutput(cmd) {
+						return outputJSONError(cmd, err, startTime)
+					}
+					return err
 				}
 				finalContent = strings.TrimSpace(editedContent)
 			} else {
@@ -134,7 +161,21 @@ Examples:
 			if strings.Contains(destination, "#") {
 				// Use selector-based refile logic
 				if err := refileContentToDestination(ws, finalContent, destination, t.RefileMode); err != nil {
-					return fmt.Errorf("failed to refile to destination '%s': %w", destination, err)
+					err := fmt.Errorf("failed to refile to destination '%s': %w", destination, err)
+					if isJSONOutput(cmd) {
+						return outputJSONError(cmd, err, startTime)
+					}
+					return err
+				}
+				
+				if isJSONOutput(cmd) {
+					templateInfo := &CaptureTemplate{
+						Name:            captureTemplate,
+						RenderedContent: finalContent,
+						DestinationFile: destination,
+						RefileMode:      t.RefileMode,
+					}
+					return outputCaptureJSON(cmd, "capture_and_refile", finalContent, getContentSource(appendContent, useEditor), destination, false, true, destination, templateInfo, startTime)
 				}
 				fmt.Printf("✓ Captured '%s' and refiled to '%s'\n", captureTemplate, destination)
 			} else {
@@ -148,7 +189,21 @@ Examples:
 				}
 
 				if err := ws.AppendToFile(destinationPath, finalContent); err != nil {
-					return fmt.Errorf("failed to save note: %w", err)
+					err := fmt.Errorf("failed to save note: %w", err)
+					if isJSONOutput(cmd) {
+						return outputJSONError(cmd, err, startTime)
+					}
+					return err
+				}
+				
+				if isJSONOutput(cmd) {
+					templateInfo := &CaptureTemplate{
+						Name:            captureTemplate,
+						RenderedContent: finalContent,
+						DestinationFile: destination,
+						RefileMode:      t.RefileMode,
+					}
+					return outputCaptureJSON(cmd, "capture_to_file", finalContent, getContentSource(appendContent, useEditor), destinationPath, destination == "inbox.md", false, destination, templateInfo, startTime)
 				}
 				fmt.Printf("✓ Captured '%s' to '%s'\n", captureTemplate, destination)
 			}
@@ -158,10 +213,16 @@ Examples:
 			// No template - handle as before
 			if appendContent == "" && useEditor {
 				// Open editor for free-form capture
-				fmt.Println("Opening editor for note capture...")
+				if !isJSONOutput(cmd) {
+					fmt.Println("Opening editor for note capture...")
+				}
 				editedContent, err := editor.OpenEditor("")
 				if err != nil {
-					return fmt.Errorf("failed to open editor: %w", err)
+					err := fmt.Errorf("failed to open editor: %w", err)
+					if isJSONOutput(cmd) {
+						return outputJSONError(cmd, err, startTime)
+					}
+					return err
 				}
 				finalContent = strings.TrimSpace(editedContent)
 			} else {
@@ -170,15 +231,38 @@ Examples:
 		}
 
 		if finalContent == "" {
+			if isJSONOutput(cmd) {
+				// For JSON, we still return success but with empty content
+				return outputCaptureJSON(cmd, "capture_empty", "", getContentSource(appendContent, useEditor), ws.InboxPath, true, false, "inbox.md", nil, startTime)
+			}
 			fmt.Println("No content captured. Note not saved.")
 			return nil
 		}
 
 		// Append to inbox
 		if err := ws.AppendToInbox(finalContent); err != nil {
-			return fmt.Errorf("failed to save note: %w", err)
+			err := fmt.Errorf("failed to save note: %w", err)
+			if isJSONOutput(cmd) {
+				return outputJSONError(cmd, err, startTime)
+			}
+			return err
 		}
 
+		// Handle JSON output
+		if isJSONOutput(cmd) {
+			var templateInfo *CaptureTemplate
+			if captureTemplate != "" {
+				templateInfo = &CaptureTemplate{
+					Name:            captureTemplate,
+					RenderedContent: finalContent,
+					DestinationFile: "inbox.md",
+					RefileMode:      "append",
+				}
+			}
+			return outputCaptureJSON(cmd, "capture", finalContent, getContentSource(appendContent, useEditor), ws.InboxPath, true, false, "inbox.md", templateInfo, startTime)
+		}
+
+		// Human-readable output
 		fmt.Printf("✓ Note captured (%d characters)\n", len(finalContent))
 		if captureTemplate != "" {
 			fmt.Printf("✓ Used template: %s\n", captureTemplate)
@@ -272,4 +356,77 @@ func performDirectInsertion(ws *workspace.Workspace, dest *DestinationTarget, tr
 	}
 
 	return nil
+}
+
+// JSON response structures for capture command
+type CaptureResponse struct {
+	Operation   string         `json:"operation"`
+	ContentInfo CaptureContent `json:"content_info"`
+	FileInfo    CaptureFile    `json:"file_info"`
+	Template    *CaptureTemplate `json:"template,omitempty"`
+	Metadata    JSONMetadata   `json:"metadata"`
+}
+
+type CaptureContent struct {
+	Content       string `json:"content"`
+	CharacterCount int    `json:"character_count"`
+	LineCount      int    `json:"line_count"`
+	Source         string `json:"source"` // "editor", "stdin", "content_flag", "template"
+}
+
+type CaptureFile struct {
+	FilePath     string `json:"file_path"`
+	IsInbox      bool   `json:"is_inbox"`
+	IsSelector   bool   `json:"is_selector"`
+	Destination  string `json:"destination"`
+}
+
+type CaptureTemplate struct {
+	Name            string `json:"name"`
+	RenderedContent string `json:"rendered_content,omitempty"`
+	DestinationFile string `json:"destination_file,omitempty"`
+	RefileMode      string `json:"refile_mode,omitempty"`
+}
+
+// outputCaptureJSON outputs JSON response for capture command
+func outputCaptureJSON(cmd *cobra.Command, operation string, finalContent string, contentSource string, 
+	destinationPath string, isInbox bool, isSelector bool, destination string, 
+	templateInfo *CaptureTemplate, startTime time.Time) error {
+	
+	lineCount := strings.Count(finalContent, "\n") + 1
+	if len(finalContent) == 0 {
+		lineCount = 0
+	}
+	
+	response := CaptureResponse{
+		Operation: operation,
+		ContentInfo: CaptureContent{
+			Content:        finalContent,
+			CharacterCount: len(finalContent),
+			LineCount:      lineCount,
+			Source:         contentSource,
+		},
+		FileInfo: CaptureFile{
+			FilePath:    destinationPath,
+			IsInbox:     isInbox,
+			IsSelector:  isSelector,
+			Destination: destination,
+		},
+		Template: templateInfo,
+		Metadata: createJSONMetadata(cmd, true, startTime),
+	}
+	
+	return outputJSON(response)
+}
+
+// getContentSource determines the source of content for JSON output
+func getContentSource(appendContent string, useEditor bool) string {
+	if appendContent != "" && !useEditor {
+		return "content_flag"
+	} else if appendContent != "" && useEditor {
+		return "template"  // Template with piped/flag content
+	} else if useEditor {
+		return "editor"
+	}
+	return "stdin"
 }

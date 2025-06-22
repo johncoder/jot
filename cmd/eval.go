@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/johncoder/jot/internal/eval"
 	"github.com/spf13/cobra"
@@ -33,36 +34,61 @@ Examples:
   jot eval example.md --approve-document --mode always    # Approve entire document
   jot eval --list-approved               # List all approved blocks`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		startTime := time.Now()
+		
 		// Handle global operations
 		if evalListApproved {
+			if isJSONOutput(cmd) {
+				return listApprovedBlocksJSON(cmd, startTime)
+			}
 			return listApprovedBlocks()
 		}
 		
 		if len(args) == 0 {
-			return fmt.Errorf("please specify a markdown file")
+			err := fmt.Errorf("please specify a markdown file")
+			if isJSONOutput(cmd) {
+				return outputJSONError(cmd, err, startTime)
+			}
+			return err
 		}
 		
 		filename := args[0]
 		
 		// Handle revoke operations
 		if evalRevokeDocument {
+			if isJSONOutput(cmd) {
+				return revokeDocumentApprovalJSON(cmd, filename, startTime)
+			}
 			return revokeDocumentApproval(filename)
 		}
 		
 		if evalRevoke {
 			if len(args) < 2 {
-				return fmt.Errorf("please specify a block name to revoke")
+				err := fmt.Errorf("please specify a block name to revoke")
+				if isJSONOutput(cmd) {
+					return outputJSONError(cmd, err, startTime)
+				}
+				return err
+			}
+			if isJSONOutput(cmd) {
+				return revokeApprovalJSON(cmd, filename, args[1], startTime)
 			}
 			return revokeApproval(filename, args[1])
 		}
 		
 		// Handle approve operations
 		if evalApproveDocument {
+			if isJSONOutput(cmd) {
+				return approveDocumentJSON(cmd, filename, evalMode, startTime)
+			}
 			return approveDocument(filename, evalMode)
 		}
 		
 		// If no block name specified, list blocks (unless --all is used)
 		if len(args) == 1 && !evalAll {
+			if isJSONOutput(cmd) {
+				return listBlocksJSON(cmd, filename, startTime)
+			}
 			return listBlocks(filename)
 		}
 		
@@ -74,7 +100,14 @@ Examples:
 		// Handle approval workflow
 		if evalApprove {
 			if blockName == "" {
-				return fmt.Errorf("please specify a block name to approve")
+				err := fmt.Errorf("please specify a block name to approve")
+				if isJSONOutput(cmd) {
+					return outputJSONError(cmd, err, startTime)
+				}
+				return err
+			}
+			if isJSONOutput(cmd) {
+				return approveBlockJSON(cmd, filename, blockName, evalMode, startTime)
 			}
 			return approveBlock(filename, blockName, evalMode)
 		}
@@ -90,13 +123,27 @@ Examples:
 			// Execute all blocks
 			results, err = eval.ExecuteEvaluableBlocks(filename)
 		} else {
-			return fmt.Errorf("please specify a block name or use --all to execute all blocks")
+			err := fmt.Errorf("please specify a block name or use --all to execute all blocks")
+			if isJSONOutput(cmd) {
+				return outputJSONError(cmd, err, startTime)
+			}
+			return err
 		}
 		
 		if err != nil {
-			return fmt.Errorf("error executing blocks in %s: %w", filename, err)
+			err := fmt.Errorf("error executing blocks in %s: %w", filename, err)
+			if isJSONOutput(cmd) {
+				return outputJSONError(cmd, err, startTime)
+			}
+			return err
 		}
 		
+		// Handle JSON output for execution results
+		if isJSONOutput(cmd) {
+			return outputExecutionResultsJSON(cmd, filename, blockName, results, startTime)
+		}
+		
+		// Human-readable output for execution results
 		// Check for approval errors
 		hasApprovalErrors := false
 		for _, result := range results {
@@ -368,6 +415,50 @@ func revokeDocumentApproval(filename string) error {
 	return nil
 }
 
+// JSON response structures for eval command
+type EvalResponse struct {
+	Operation string        `json:"operation"`
+	Results   []EvalResult  `json:"results,omitempty"`
+	Blocks    []EvalBlock   `json:"blocks,omitempty"`
+	Approvals []EvalApproval `json:"approvals,omitempty"`
+	Summary   EvalSummary   `json:"summary"`
+	Metadata  JSONMetadata  `json:"metadata"`
+}
+
+type EvalResult struct {
+	BlockName   string `json:"block_name"`
+	Language    string `json:"language"`
+	Code        string `json:"code"`
+	Output      string `json:"output,omitempty"`
+	Error       string `json:"error,omitempty"`
+	Success     bool   `json:"success"`
+	StartLine   int    `json:"start_line"`
+	EndLine     int    `json:"end_line"`
+}
+
+type EvalBlock struct {
+	Name      string `json:"name"`
+	Language  string `json:"language"`
+	StartLine int    `json:"start_line"`
+	EndLine   int    `json:"end_line"`
+	IsApproved bool  `json:"is_approved"`
+	ApprovalMode string `json:"approval_mode,omitempty"`
+}
+
+type EvalApproval struct {
+	Type         string `json:"type"` // "block" or "document"
+	FilePath     string `json:"file_path"`
+	BlockName    string `json:"block_name,omitempty"`
+	Mode         string `json:"mode"`
+}
+
+type EvalSummary struct {
+	TotalBlocks    int `json:"total_blocks"`
+	ExecutedBlocks int `json:"executed_blocks"`
+	FailedBlocks   int `json:"failed_blocks"`
+	ApprovedBlocks int `json:"approved_blocks,omitempty"`
+}
+
 func init() {
 	evalCmd.Flags().BoolVarP(&evalList, "list", "l", false, "List evaluable code blocks (deprecated, use without arguments)")
 	evalCmd.Flags().BoolVarP(&evalAll, "all", "a", false, "Execute all approved evaluable code blocks")
@@ -377,4 +468,254 @@ func init() {
 	evalCmd.Flags().BoolVar(&evalListApproved, "list-approved", false, "List all approved blocks")
 	evalCmd.Flags().BoolVar(&evalApproveDocument, "approve-document", false, "Approve the entire document")
 	evalCmd.Flags().BoolVar(&evalRevokeDocument, "revoke-document", false, "Revoke document approval")
+}
+
+// JSON output functions for eval command
+
+// listBlocksJSON outputs JSON response for listing blocks
+func listBlocksJSON(cmd *cobra.Command, filename string, startTime time.Time) error {
+	blocks, err := eval.ParseMarkdownForEvalBlocks(filename)
+	if err != nil {
+		return outputJSONError(cmd, fmt.Errorf("error parsing %s: %w", filename, err), startTime)
+	}
+	
+	// Get security manager to check approvals
+	sm, err := eval.NewSecurityManager()
+	if err != nil {
+		return outputJSONError(cmd, fmt.Errorf("failed to initialize security manager: %w", err), startTime)
+	}
+	
+	absPath, err := filepath.Abs(filename)
+	if err != nil {
+		return outputJSONError(cmd, err, startTime)
+	}
+	
+	var evalBlocks []EvalBlock
+	approvedCount := 0
+	
+	for _, block := range blocks {
+		if block.Eval != nil && block.Eval.Params["name"] != "" {
+			blockName := block.Eval.Params["name"]
+			
+			// Check if block is approved
+			isApproved, err := sm.CheckApproval(absPath, block)
+			if err != nil {
+				// If error checking approval, assume not approved
+				isApproved = false
+			}
+			
+			var approvalMode string
+			if isApproved {
+				approvedCount++
+				// Try to find the approval record to get the mode
+				approvals := sm.ListApprovals()
+				key := filepath.Base(absPath) + ":" + blockName
+				for _, approval := range approvals {
+					approvalKey := filepath.Base(approval.FilePath) + ":" + approval.BlockName
+					if approvalKey == key {
+						approvalMode = string(approval.Mode)
+						break
+					}
+				}
+			}
+			
+			evalBlocks = append(evalBlocks, EvalBlock{
+				Name:         blockName,
+				Language:     block.Lang,
+				StartLine:    block.StartLine,
+				EndLine:      block.EndLine,
+				IsApproved:   isApproved,
+				ApprovalMode: approvalMode,
+			})
+		}
+	}
+	
+	response := EvalResponse{
+		Operation: "list_blocks",
+		Blocks:    evalBlocks,
+		Summary: EvalSummary{
+			TotalBlocks:    len(evalBlocks),
+			ApprovedBlocks: approvedCount,
+		},
+		Metadata: createJSONMetadata(cmd, true, startTime),
+	}
+	
+	return outputJSON(response)
+}
+
+// listApprovedBlocksJSON outputs JSON response for listing approved blocks
+func listApprovedBlocksJSON(cmd *cobra.Command, startTime time.Time) error {
+	sm, err := eval.NewSecurityManager()
+	if err != nil {
+		return outputJSONError(cmd, fmt.Errorf("failed to initialize security manager: %w", err), startTime)
+	}
+	
+	approvals := sm.ListApprovals()
+	docApprovals := sm.ListDocumentApprovals()
+	
+	var evalApprovals []EvalApproval
+	
+	// Add document approvals
+	for _, approval := range docApprovals {
+		evalApprovals = append(evalApprovals, EvalApproval{
+			Type:     "document",
+			FilePath: approval.FilePath,
+			Mode:     string(approval.Mode),
+		})
+	}
+	
+	// Add individual block approvals
+	for _, approval := range approvals {
+		evalApprovals = append(evalApprovals, EvalApproval{
+			Type:      "block",
+			FilePath:  approval.FilePath,
+			BlockName: approval.BlockName,
+			Mode:      string(approval.Mode),
+		})
+	}
+	
+	response := EvalResponse{
+		Operation: "list_approved",
+		Approvals: evalApprovals,
+		Summary: EvalSummary{
+			ApprovedBlocks: len(evalApprovals),
+		},
+		Metadata: createJSONMetadata(cmd, true, startTime),
+	}
+	
+	return outputJSON(response)
+}
+
+// outputExecutionResultsJSON outputs JSON response for execution results
+func outputExecutionResultsJSON(cmd *cobra.Command, filename, blockName string, results []*eval.EvalResult, startTime time.Time) error {
+	var evalResults []EvalResult
+	executed := 0
+	failed := 0
+	
+	for _, result := range results {
+		var output, errorMsg string
+		var blockName, language, code string
+		var startLine, endLine int
+		success := result.Err == nil
+		
+		if result.Block != nil {
+			if result.Block.Eval != nil && result.Block.Eval.Params["name"] != "" {
+				blockName = result.Block.Eval.Params["name"]
+			}
+			language = result.Block.Lang
+			code = strings.Join(result.Block.Code, "\n")
+			startLine = result.Block.StartLine
+			endLine = result.Block.EndLine
+		}
+		
+		if result.Err != nil {
+			errorMsg = result.Err.Error()
+			failed++
+		} else {
+			executed++
+		}
+		
+		if result.Output != "" {
+			output = result.Output
+		}
+		
+		evalResults = append(evalResults, EvalResult{
+			BlockName: blockName,
+			Language:  language,
+			Code:      code,
+			Output:    output,
+			Error:     errorMsg,
+			Success:   success,
+			StartLine: startLine,
+			EndLine:   endLine,
+		})
+	}
+	
+	operation := "execute_all"
+	if blockName != "" {
+		operation = "execute_block"
+	}
+	
+	response := EvalResponse{
+		Operation: operation,
+		Results:   evalResults,
+		Summary: EvalSummary{
+			TotalBlocks:    len(evalResults),
+			ExecutedBlocks: executed,
+			FailedBlocks:   failed,
+		},
+		Metadata: createJSONMetadata(cmd, true, startTime),
+	}
+	
+	return outputJSON(response)
+}
+
+// approveBlockJSON outputs JSON response for block approval (non-interactive for JSON)
+func approveBlockJSON(cmd *cobra.Command, filename, blockName, mode string, startTime time.Time) error {
+	// For JSON output, we cannot do interactive approval, so we return an error
+	err := fmt.Errorf("interactive approval not supported in JSON mode - use non-JSON mode for approval operations")
+	return outputJSONError(cmd, err, startTime)
+}
+
+// approveDocumentJSON outputs JSON response for document approval (non-interactive for JSON)
+func approveDocumentJSON(cmd *cobra.Command, filename, mode string, startTime time.Time) error {
+	// For JSON output, we cannot do interactive approval, so we return an error
+	err := fmt.Errorf("interactive approval not supported in JSON mode - use non-JSON mode for approval operations")
+	return outputJSONError(cmd, err, startTime)
+}
+
+// revokeApprovalJSON outputs JSON response for revoking block approval
+func revokeApprovalJSON(cmd *cobra.Command, filename, blockName string, startTime time.Time) error {
+	sm, err := eval.NewSecurityManager()
+	if err != nil {
+		return outputJSONError(cmd, fmt.Errorf("failed to initialize security manager: %w", err), startTime)
+	}
+	
+	absPath, err := filepath.Abs(filename)
+	if err != nil {
+		return outputJSONError(cmd, err, startTime)
+	}
+	
+	err = sm.RevokeApproval(absPath, blockName)
+	if err != nil {
+		return outputJSONError(cmd, fmt.Errorf("failed to revoke approval: %w", err), startTime)
+	}
+	
+	response := EvalResponse{
+		Operation: "revoke_approval",
+		Summary: EvalSummary{
+			TotalBlocks: 1,
+		},
+		Metadata: createJSONMetadata(cmd, true, startTime),
+	}
+	
+	return outputJSON(response)
+}
+
+// revokeDocumentApprovalJSON outputs JSON response for revoking document approval
+func revokeDocumentApprovalJSON(cmd *cobra.Command, filename string, startTime time.Time) error {
+	sm, err := eval.NewSecurityManager()
+	if err != nil {
+		return outputJSONError(cmd, fmt.Errorf("failed to initialize security manager: %w", err), startTime)
+	}
+	
+	absPath, err := filepath.Abs(filename)
+	if err != nil {
+		return outputJSONError(cmd, err, startTime)
+	}
+	
+	err = sm.RevokeDocumentApproval(absPath)
+	if err != nil {
+		return outputJSONError(cmd, fmt.Errorf("failed to revoke document approval: %w", err), startTime)
+	}
+	
+	response := EvalResponse{
+		Operation: "revoke_document_approval",
+		Summary: EvalSummary{
+			TotalBlocks: 1,
+		},
+		Metadata: createJSONMetadata(cmd, true, startTime),
+	}
+	
+	return outputJSON(response)
 }
