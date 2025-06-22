@@ -28,9 +28,9 @@ func UpdateMarkdownWithResults(filename string, results []*EvalResult) error {
 		}
 
 		// Find the eval element for this specific block using line numbers
-		// The eval element should be right after the code block ends
+		// The eval element should be right before the code block starts
 		evalElementLineIndex := -1
-		for i := r.Block.EndLine - 1; i < len(lines) && i < r.Block.EndLine + 4; i++ { // search within 5 lines after code block (0-indexed)
+		for i := r.Block.StartLine - 2; i >= 0 && i >= r.Block.StartLine - 6; i-- { // search within 5 lines before code block (0-indexed)
 			if i < 0 || i >= len(lines) {
 				continue
 			}
@@ -66,16 +66,18 @@ func UpdateMarkdownWithResults(filename string, results []*EvalResult) error {
 		}
 
 		// Handle different result insertion modes
+		// With new pattern (eval before code), results go after the code block
 		handling := getResultsHandling(r.Block.Eval.Params)
+		codeBlockEndIndex := r.Block.EndLine - 1 // Convert to 0-based index
 		switch handling {
 		case "replace":
-			lines = replaceResultBlock(lines, evalElementLineIndex, formattedResult)
+			lines = replaceResultBlockAfterCode(lines, codeBlockEndIndex, formattedResult)
 		case "append":
-			lines = appendResultBlock(lines, evalElementLineIndex, formattedResult)
+			lines = appendResultBlockAfterCode(lines, codeBlockEndIndex, formattedResult)
 		case "prepend":
-			lines = prependResultBlock(lines, evalElementLineIndex, formattedResult)
+			lines = prependResultBlockAfterCode(lines, codeBlockEndIndex, formattedResult)
 		default:
-			lines = replaceResultBlock(lines, evalElementLineIndex, formattedResult) // default to replace
+			lines = replaceResultBlockAfterCode(lines, codeBlockEndIndex, formattedResult) // default to replace
 		}
 	}
 
@@ -285,7 +287,7 @@ func formatAsFile(output string, params map[string]string, baseFilename string) 
 
 // replaceResultBlock replaces any existing result block after the eval element
 func replaceResultBlock(lines []string, evalElementIndex int, result string) []string {
-	// Remove any existing result blocks after this eval element
+	// Remove any existing result blocks after the eval element
 	j := evalElementIndex + 1
 	for j < len(lines) {
 		line := strings.TrimSpace(lines[j])
@@ -417,6 +419,128 @@ func prependResultBlock(lines []string, evalElementIndex int, result string) []s
 	// Always add a blank line before the result for proper Markdown parsing
 	newContent := append([]string{""}, resultLines...)
 	lines = append(lines[:evalElementIndex+1], append(newContent, lines[evalElementIndex+1:]...)...)
+	
+	return lines
+}
+
+// replaceResultBlockAfterCode replaces any existing result block after the code block
+func replaceResultBlockAfterCode(lines []string, codeBlockEndIndex int, result string) []string {
+	// Remove any existing result blocks after the code block
+	j := codeBlockEndIndex + 1
+	for j < len(lines) {
+		line := strings.TrimSpace(lines[j])
+		if strings.HasPrefix(line, "```") {
+			// Found start of another code block, find its end
+			k := j + 1
+			for k < len(lines) && !strings.HasPrefix(strings.TrimSpace(lines[k]), "```") {
+				k++
+			}
+			if k < len(lines) {
+				k++ // include closing ```
+			}
+			// Remove this code block
+			lines = append(lines[:j], lines[k:]...)
+		} else if isTableLine(line) {
+			// Found start of a markdown table, find its end
+			k := j
+			for k < len(lines) {
+				if isTableLine(strings.TrimSpace(lines[k])) {
+					k++
+				} else if strings.TrimSpace(lines[k]) == "" {
+					// Skip empty lines after table
+					k++
+				} else {
+					// Hit non-table, non-empty content
+					break
+				}
+			}
+			// Remove the table
+			lines = append(lines[:j], lines[k:]...)
+		} else if line == "" {
+			// Skip empty lines
+			j++
+		} else {
+			// Hit non-empty, non-result content, stop removing
+			break
+		}
+	}
+	
+	// Insert new result with proper blank line separation
+	resultLines := strings.Split(result, "\n")
+	
+	// Add blank line before result if needed
+	insertIndex := codeBlockEndIndex + 1
+	if insertIndex < len(lines) && strings.TrimSpace(lines[insertIndex]) != "" {
+		resultLines = append([]string{""}, resultLines...)
+	}
+	
+	// Add blank line after result if needed
+	if insertIndex < len(lines) && strings.TrimSpace(lines[insertIndex]) != "" {
+		resultLines = append(resultLines, "")
+	}
+	
+	lines = append(lines[:insertIndex], append(resultLines, lines[insertIndex:]...)...)
+	
+	return lines
+}
+
+// appendResultBlockAfterCode adds result after any existing results after the code block
+func appendResultBlockAfterCode(lines []string, codeBlockEndIndex int, result string) []string {
+	// Find the end of existing results after code block
+	j := codeBlockEndIndex + 1
+	for j < len(lines) {
+		line := strings.TrimSpace(lines[j])
+		if strings.HasPrefix(line, "```") {
+			// Found start of a code block, find its end
+			k := j + 1
+			for k < len(lines) && !strings.HasPrefix(strings.TrimSpace(lines[k]), "```") {
+				k++
+			}
+			if k < len(lines) {
+				k++ // include closing ```
+			}
+			j = k
+		} else if isTableLine(line) {
+			// Found start of a markdown table, find its end
+			for j < len(lines) {
+				if isTableLine(strings.TrimSpace(lines[j])) {
+					j++
+				} else if strings.TrimSpace(lines[j]) == "" {
+					// Skip empty lines after table
+					j++
+				} else {
+					// Hit non-table, non-empty content, break
+					break
+				}
+			}
+		} else if line == "" {
+			// Skip empty lines
+			j++
+		} else {
+			// Hit non-empty, non-result content, stop
+			break
+		}
+	}
+	
+	// Insert result at position j with proper blank line separation
+	resultLines := strings.Split(result, "\n")
+	
+	// Always add a blank line before the result for proper Markdown parsing
+	newContent := append([]string{""}, resultLines...)
+	lines = append(lines[:j], append(newContent, lines[j:]...)...)
+	
+	return lines
+}
+
+// prependResultBlockAfterCode adds result before existing results after the code block
+func prependResultBlockAfterCode(lines []string, codeBlockEndIndex int, result string) []string {
+	// Insert right after code block with proper blank line separation
+	resultLines := strings.Split(result, "\n")
+	insertIndex := codeBlockEndIndex + 1
+	
+	// Always add a blank line before the result for proper Markdown parsing
+	newContent := append([]string{""}, resultLines...)
+	lines = append(lines[:insertIndex], append(newContent, lines[insertIndex:]...)...)
 	
 	return lines
 }
