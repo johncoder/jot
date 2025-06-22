@@ -26,6 +26,37 @@ var evalCmd = &cobra.Command{
 	Short: "Evaluate code blocks in markdown files",
 	Long: `Evaluate code blocks in markdown files using standards-compliant metadata.
 
+EVAL ELEMENT PLACEMENT AND CONFIGURATION:
+
+Eval elements are HTML-style self-closing tags that precede code blocks:
+
+  <eval name="hello" />
+  ` + "```" + `python
+  print("Hello, world!")
+  ` + "```" + `
+
+Core Parameters:
+  name="block_name"     Unique identifier for the code block
+  shell="python3"       Shell/interpreter (default: inferred from language)
+  timeout="30s"         Execution timeout (default: 30s)
+  cwd="/tmp"            Working directory for execution
+  env="VAR=value"       Environment variables (comma-separated)
+  args="--verbose"      Additional arguments to interpreter
+
+Result Parameters:
+  results="output"      Capture stdout/stderr (default)
+  results="value"       Return function/expression value
+  results="code"        Wrap in code block (default)
+  results="table"       Format as markdown table
+  results="raw"         Insert directly as markdown
+  results="replace"     Replace previous results (default)
+  results="append"      Add after previous results
+  results="silent"      Execute but don't show results
+
+Security:
+All eval blocks require explicit approval before execution. Approval is tied
+to the block's content hash - changes require re-approval.
+
 Examples:
   jot eval example.md                    # List blocks with approval status
   jot eval example.md hello_python       # Execute specific block (if approved)

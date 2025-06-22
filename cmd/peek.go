@@ -15,15 +15,21 @@ import (
 
 var peekCmd = &cobra.Command{
 	Use:   "peek SELECTOR",
-	Short: "View a specific markdown subtree without opening the entire file",
-	Long: `View a specific markdown subtree (heading with all nested content) without opening the entire file.
+	Short: "View a specific markdown subtree or entire file without opening it",
+	Long: `View a specific markdown subtree (heading with all nested content) or entire file without opening it.
 
-The peek command uses the same path-based selector syntax as refile:
+The peek command supports two modes:
+1. Whole file: "filename.md" - displays entire file content
+2. Subtree: "file.md#path/to/heading" - displays specific subtree
+
+The subtree selector uses path-based syntax:
 - Each segment uses case-insensitive contains matching
 - Must match exactly one subtree
 - Leading slashes handle unusual document structures
 
 Examples:
+  jot peek "inbox.md"                            # View entire inbox file
+  jot peek "work.md" --info                      # Show file info and content
   jot peek "inbox.md#meeting"                    # View meeting notes subtree
   jot peek "work.md#projects/frontend"          # View frontend project section
   jot peek "notes.md#research/database"         # View database research
@@ -32,7 +38,7 @@ Examples:
   jot peek "work.md#projects" --toc             # Show TOC for projects subtree
   jot peek "work.md" --toc --short              # Show TOC with shortest selectors
 
-This is useful for quickly reviewing specific sections without opening full files in an editor.`,
+This is useful for quickly reviewing files or specific sections without opening them in an editor.`,
 
 	Args: cobra.RangeArgs(0, 1), // Allow 0 or 1 arguments for --toc mode
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -69,15 +75,26 @@ This is useful for quickly reviewing specific sections without opening full file
 
 		// Regular peek mode requires exactly one argument
 		if len(args) != 1 {
-			err := fmt.Errorf("peek requires a selector argument (e.g., 'inbox.md#meeting')")
+			err := fmt.Errorf("peek requires a selector argument (e.g., 'inbox.md#meeting' or 'filename.md' for whole file)")
 			if isJSONOutput(cmd) {
 				return outputJSONError(cmd, err, startTime)
 			}
 			return err
 		}
 
-		// Parse the source path selector
-		sourcePath, err := markdown.ParsePath(args[0])
+		selector := args[0]
+
+		// Check if this is a whole file request (no # selector) or a subtree request
+		if !strings.Contains(selector, "#") {
+			// Handle whole file display
+			if isJSONOutput(cmd) {
+				return showWholeFileJSON(cmd, ws, selector, startTime)
+			}
+			return showWholeFile(ws, selector, raw, info)
+		}
+
+		// Parse the source path selector for subtree extraction
+		sourcePath, err := markdown.ParsePath(selector)
 		if err != nil {
 			err := fmt.Errorf("invalid selector: %w", err)
 			if isJSONOutput(cmd) {
@@ -112,10 +129,7 @@ This is useful for quickly reviewing specific sections without opening full file
 			// Raw mode: output just the content without any formatting
 			os.Stdout.Write(subtree.Content)
 		} else {
-			// Formatted mode: show with nice header
-			fmt.Printf("# Subtree: %s#%s\n\n", sourcePath.File, 
-				strings.Join(sourcePath.Segments, "/"))
-			
+			// Formatted mode: clean content output without header
 			// Remove trailing newlines for cleaner output
 			content := subtree.Content
 			for len(content) > 0 && content[len(content)-1] == '\n' {
@@ -127,6 +141,90 @@ This is useful for quickly reviewing specific sections without opening full file
 
 		return nil
 	},
+}
+
+// showWholeFile displays the entire content of a file
+func showWholeFile(ws *workspace.Workspace, filename string, raw bool, info bool) error {
+	// Construct full file path
+	var filePath string
+	if filename == "inbox.md" {
+		filePath = ws.InboxPath
+	} else if filepath.IsAbs(filename) {
+		filePath = filename
+	} else {
+		// Use workspace root for relative paths
+		filePath = filepath.Join(ws.Root, filename)
+	}
+
+	// Read file content
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to read file %s: %w", filename, err)
+	}
+
+	// Display file information if requested
+	if info {
+		fmt.Printf("File Information:\n")
+		fmt.Printf("  File: %s\n", filename)
+		fmt.Printf("  Path: %s\n", filePath)
+		fmt.Printf("  Content length: %d bytes\n", len(content))
+		fmt.Printf("  Lines: %d\n", strings.Count(string(content), "\n")+1)
+		fmt.Println()
+	}
+
+	// Display the file content
+	if raw {
+		// Raw mode: output just the content without any formatting
+		os.Stdout.Write(content)
+	} else {
+		// Formatted mode: show with nice header
+		fmt.Printf("# File: %s\n\n", filename)
+		
+		// Remove trailing newlines for cleaner output
+		for len(content) > 0 && content[len(content)-1] == '\n' {
+			content = content[:len(content)-1]
+		}
+		
+		fmt.Println(string(content))
+	}
+
+	return nil
+}
+
+// showWholeFileJSON outputs the whole file content in JSON format
+func showWholeFileJSON(cmd *cobra.Command, ws *workspace.Workspace, filename string, startTime time.Time) error {
+	// Construct full file path
+	var filePath string
+	if filename == "inbox.md" {
+		filePath = ws.InboxPath
+	} else if filepath.IsAbs(filename) {
+		filePath = filename
+	} else {
+		// Use workspace root for relative paths
+		filePath = filepath.Join(ws.Root, filename)
+	}
+
+	// Read file content
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		err := fmt.Errorf("failed to read file %s: %w", filename, err)
+		return outputJSONError(cmd, err, startTime)
+	}
+
+	response := map[string]interface{}{
+		"operation": "peek_file",
+		"selector":  filename,
+		"file": map[string]interface{}{
+			"name":           filename,
+			"path":           filePath,
+			"content":        string(content),
+			"content_length": len(content),
+			"line_count":     strings.Count(string(content), "\n") + 1,
+		},
+		"metadata": createJSONMetadata(cmd, true, startTime),
+	}
+
+	return outputJSON(response)
 }
 
 // printSubtreeInfo displays metadata about the subtree
