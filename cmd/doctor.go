@@ -32,7 +32,7 @@ Examples:
   jot doctor --fix               # Diagnose and fix issues`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		startTime := time.Now()
-		
+
 		if !isJSONOutput(cmd) {
 			fmt.Println("Running jot workspace diagnostics...")
 			fmt.Println()
@@ -53,11 +53,11 @@ Examples:
 				Severity:    "critical",
 			})
 			checks = append(checks, DoctorCheck{
-				Name:   "workspace_detection",
-				Status: "failed",
+				Name:    "workspace_detection",
+				Status:  "failed",
 				Message: "Not in a jot workspace",
 			})
-			
+
 			if !isJSONOutput(cmd) {
 				fmt.Println("✗ Not in a jot workspace")
 				fmt.Println("  Run 'jot init' to initialize a workspace")
@@ -65,21 +65,21 @@ Examples:
 				fmt.Printf("Workspace health: ✗ Critical (%d issues)\n", len(issues))
 			} else {
 				response := DoctorResponse{
-					Operation:       "doctor",
-					WorkspaceFound:  false,
-					HealthStatus:    "critical",
-					Checks:          checks,
-					Issues:          issues,
-					Warnings:        warnings,
-					FixesApplied:    fixes,
+					Operation:      "doctor",
+					WorkspaceFound: false,
+					HealthStatus:   "critical",
+					Checks:         checks,
+					Issues:         issues,
+					Warnings:       warnings,
+					FixesApplied:   fixes,
 					Summary: DoctorSummary{
-						TotalChecks:     len(checks),
-						PassedChecks:    0,
-						FailedChecks:    len(checks),
-						IssuesFound:     len(issues),
-						WarningsFound:   len(warnings),
-						FixesApplied:    len(fixes),
-						OverallHealth:   "critical",
+						TotalChecks:   len(checks),
+						PassedChecks:  0,
+						FailedChecks:  len(checks),
+						IssuesFound:   len(issues),
+						WarningsFound: len(warnings),
+						FixesApplied:  len(fixes),
+						OverallHealth: "critical",
 					},
 					Metadata: createJSONMetadata(cmd, true, startTime),
 				}
@@ -92,8 +92,8 @@ Examples:
 			fmt.Printf("✓ Found workspace at: %s\n", ws.Root)
 		}
 		checks = append(checks, DoctorCheck{
-			Name:   "workspace_detection",
-			Status: "passed",
+			Name:    "workspace_detection",
+			Status:  "passed",
 			Message: fmt.Sprintf("Found workspace at: %s", ws.Root),
 		})
 
@@ -107,8 +107,8 @@ Examples:
 				Fixable:     true,
 			})
 			checks = append(checks, DoctorCheck{
-				Name:   "inbox_exists",
-				Status: "failed",
+				Name:    "inbox_exists",
+				Status:  "failed",
 				Message: "inbox.md is missing",
 			})
 			if !isJSONOutput(cmd) {
@@ -116,8 +116,8 @@ Examples:
 			}
 		} else {
 			checks = append(checks, DoctorCheck{
-				Name:   "inbox_exists",
-				Status: "passed",
+				Name:    "inbox_exists",
+				Status:  "passed",
 				Message: "inbox.md exists",
 			})
 			if !isJSONOutput(cmd) {
@@ -134,8 +134,8 @@ Examples:
 				Fixable:     true,
 			})
 			checks = append(checks, DoctorCheck{
-				Name:   "lib_exists",
-				Status: "failed",
+				Name:    "lib_exists",
+				Status:  "failed",
 				Message: "lib/ directory is missing",
 			})
 			if !isJSONOutput(cmd) {
@@ -143,8 +143,8 @@ Examples:
 			}
 		} else {
 			checks = append(checks, DoctorCheck{
-				Name:   "lib_exists",
-				Status: "passed",
+				Name:    "lib_exists",
+				Status:  "passed",
 				Message: "lib/ directory exists",
 			})
 			if !isJSONOutput(cmd) {
@@ -162,8 +162,8 @@ Examples:
 				Fixable:     true,
 			})
 			checks = append(checks, DoctorCheck{
-				Name:   "jot_dir_exists",
-				Status: "failed",
+				Name:    "jot_dir_exists",
+				Status:  "failed",
 				Message: ".jot/ directory is missing",
 			})
 			if !isJSONOutput(cmd) {
@@ -171,8 +171,8 @@ Examples:
 			}
 		} else {
 			checks = append(checks, DoctorCheck{
-				Name:   "jot_dir_exists",
-				Status: "passed",
+				Name:    "jot_dir_exists",
+				Status:  "passed",
 				Message: ".jot/ directory exists",
 			})
 			if !isJSONOutput(cmd) {
@@ -191,8 +191,8 @@ Examples:
 					Fixable:     false,
 				})
 				checks = append(checks, DoctorCheck{
-					Name:   "inbox_writable",
-					Status: "failed",
+					Name:    "inbox_writable",
+					Status:  "failed",
 					Message: "inbox.md is not writable",
 				})
 				if !isJSONOutput(cmd) {
@@ -201,8 +201,8 @@ Examples:
 			} else {
 				file.Close()
 				checks = append(checks, DoctorCheck{
-					Name:   "inbox_writable",
-					Status: "passed",
+					Name:    "inbox_writable",
+					Status:  "passed",
 					Message: "inbox.md is writable",
 				})
 				if !isJSONOutput(cmd) {
@@ -222,11 +222,11 @@ Examples:
 				break
 			}
 		}
-		
+
 		if editorFound {
 			checks = append(checks, DoctorCheck{
-				Name:   "editor_available",
-				Status: "passed",
+				Name:    "editor_available",
+				Status:  "passed",
 				Message: fmt.Sprintf("Editor '%s' is available", foundEditor),
 			})
 			if !isJSONOutput(cmd) {
@@ -241,8 +241,8 @@ Examples:
 				Fixable:     false,
 			})
 			checks = append(checks, DoctorCheck{
-				Name:   "editor_available",
-				Status: "warning",
+				Name:    "editor_available",
+				Status:  "warning",
 				Message: "No common editor found in PATH",
 			})
 			if !isJSONOutput(cmd) {
@@ -257,11 +257,11 @@ Examples:
 		} else if _, err := exec.LookPath("more"); err == nil {
 			foundPager = "more"
 		}
-		
+
 		if foundPager != "" {
 			checks = append(checks, DoctorCheck{
-				Name:   "pager_available",
-				Status: "passed",
+				Name:    "pager_available",
+				Status:  "passed",
 				Message: fmt.Sprintf("Pager '%s' is available", foundPager),
 			})
 			if !isJSONOutput(cmd) {
@@ -276,8 +276,8 @@ Examples:
 				Fixable:     false,
 			})
 			checks = append(checks, DoctorCheck{
-				Name:   "pager_available",
-				Status: "warning",
+				Name:    "pager_available",
+				Status:  "warning",
 				Message: "No pager found in PATH",
 			})
 			if !isJSONOutput(cmd) {
@@ -421,22 +421,22 @@ Use 'jot refile' to move notes from your inbox to organized files here.
 		// Output results
 		if isJSONOutput(cmd) {
 			response := DoctorResponse{
-				Operation:       "doctor",
-				WorkspaceFound:  true,
-				WorkspaceRoot:   ws.Root,
-				HealthStatus:    healthStatus,
-				Checks:          checks,
-				Issues:          issues,
-				Warnings:        warnings,
-				FixesApplied:    fixes,
+				Operation:      "doctor",
+				WorkspaceFound: true,
+				WorkspaceRoot:  ws.Root,
+				HealthStatus:   healthStatus,
+				Checks:         checks,
+				Issues:         issues,
+				Warnings:       warnings,
+				FixesApplied:   fixes,
 				Summary: DoctorSummary{
-					TotalChecks:     len(checks),
-					PassedChecks:    passedChecks,
-					FailedChecks:    failedChecks,
-					IssuesFound:     len(issues),
-					WarningsFound:   len(warnings),
-					FixesApplied:    len(fixes),
-					OverallHealth:   healthStatus,
+					TotalChecks:   len(checks),
+					PassedChecks:  passedChecks,
+					FailedChecks:  failedChecks,
+					IssuesFound:   len(issues),
+					WarningsFound: len(warnings),
+					FixesApplied:  len(fixes),
+					OverallHealth: healthStatus,
 				},
 				Metadata: createJSONMetadata(cmd, true, startTime),
 			}
@@ -482,16 +482,16 @@ func init() {
 
 // JSON response structures for doctor command
 type DoctorResponse struct {
-	Operation       string         `json:"operation"`
-	WorkspaceFound  bool           `json:"workspace_found"`
-	WorkspaceRoot   string         `json:"workspace_root,omitempty"`
-	HealthStatus    string         `json:"health_status"` // "excellent", "good", "issues", "critical"
-	Checks          []DoctorCheck  `json:"checks"`
-	Issues          []DoctorIssue  `json:"issues"`
-	Warnings        []DoctorIssue  `json:"warnings"`
-	FixesApplied    []DoctorFix    `json:"fixes_applied"`
-	Summary         DoctorSummary  `json:"summary"`
-	Metadata        JSONMetadata   `json:"metadata"`
+	Operation      string        `json:"operation"`
+	WorkspaceFound bool          `json:"workspace_found"`
+	WorkspaceRoot  string        `json:"workspace_root,omitempty"`
+	HealthStatus   string        `json:"health_status"` // "excellent", "good", "issues", "critical"
+	Checks         []DoctorCheck `json:"checks"`
+	Issues         []DoctorIssue `json:"issues"`
+	Warnings       []DoctorIssue `json:"warnings"`
+	FixesApplied   []DoctorFix   `json:"fixes_applied"`
+	Summary        DoctorSummary `json:"summary"`
+	Metadata       JSONMetadata  `json:"metadata"`
 }
 
 type DoctorCheck struct {
@@ -501,10 +501,10 @@ type DoctorCheck struct {
 }
 
 type DoctorIssue struct {
-	Type        string `json:"type"`        // "workspace", "structure", "permissions", "external_tools"
+	Type        string `json:"type"` // "workspace", "structure", "permissions", "external_tools"
 	Message     string `json:"message"`
 	Description string `json:"description"`
-	Severity    string `json:"severity"`    // "critical", "high", "medium", "low"
+	Severity    string `json:"severity"` // "critical", "high", "medium", "low"
 	Fixable     bool   `json:"fixable"`
 }
 
@@ -516,11 +516,11 @@ type DoctorFix struct {
 }
 
 type DoctorSummary struct {
-	TotalChecks     int    `json:"total_checks"`
-	PassedChecks    int    `json:"passed_checks"`
-	FailedChecks    int    `json:"failed_checks"`
-	IssuesFound     int    `json:"issues_found"`
-	WarningsFound   int    `json:"warnings_found"`
-	FixesApplied    int    `json:"fixes_applied"`
-	OverallHealth   string `json:"overall_health"`
+	TotalChecks   int    `json:"total_checks"`
+	PassedChecks  int    `json:"passed_checks"`
+	FailedChecks  int    `json:"failed_checks"`
+	IssuesFound   int    `json:"issues_found"`
+	WarningsFound int    `json:"warnings_found"`
+	FixesApplied  int    `json:"fixes_applied"`
+	OverallHealth string `json:"overall_health"`
 }

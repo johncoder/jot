@@ -24,10 +24,10 @@ type DestinationTarget struct {
 
 // PathResolution represents the result of path navigation
 type PathResolution struct {
-	TargetHeading    *ast.Heading // The final target heading if found
-	ParentHeading    *ast.Heading // The deepest parent heading found
-	FoundSegments    []string     // Successfully matched segments
-	MissingSegments  []string     // Segments that need to be created
+	TargetHeading   *ast.Heading // The final target heading if found
+	ParentHeading   *ast.Heading // The deepest parent heading found
+	FoundSegments   []string     // Successfully matched segments
+	MissingSegments []string     // Segments that need to be created
 }
 
 var refileCmd = &cobra.Command{
@@ -48,7 +48,7 @@ Examples:
 
 	RunE: func(cmd *cobra.Command, args []string) error {
 		startTime := time.Now()
-		
+
 		ws, err := workspace.RequireWorkspace()
 		if err != nil {
 			if isJSONOutput(cmd) {
@@ -161,7 +161,7 @@ Examples:
 			fmt.Printf("Refile operation completed successfully!\n")
 		}
 
-		fmt.Printf("Successfully refiled '%s' to '%s'\n", 
+		fmt.Printf("Successfully refiled '%s' to '%s'\n",
 			subtree.Heading, destPath.File+"#"+strings.Join(destPath.Segments, "/"))
 
 		return nil
@@ -170,7 +170,7 @@ Examples:
 
 // inspectDestination analyzes destination path without performing refile
 func inspectDestination(ws *workspace.Workspace, destPath *markdown.HeadingPath) error {
-	fmt.Printf("Destination analysis for \"%s#%s\":\n", 
+	fmt.Printf("Destination analysis for \"%s#%s\":\n",
 		destPath.File, strings.Join(destPath.Segments, "/"))
 
 	// Check if file exists
@@ -183,7 +183,7 @@ func inspectDestination(ws *workspace.Workspace, destPath *markdown.HeadingPath)
 		// Use workspace root for relative paths, not lib/ directory
 		filePath = filepath.Join(ws.Root, destPath.File)
 	}
-	
+
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
 		fmt.Printf("✗ File not found: %s\n", destPath.File)
 		return nil
@@ -213,12 +213,12 @@ func inspectDestination(ws *workspace.Workspace, destPath *markdown.HeadingPath)
 		// Partial path exists
 		fmt.Printf("✓ Partial path exists: %s\n", strings.Join(pathResolution.FoundSegments, " > "))
 		fmt.Printf("✗ Missing path: %s\n", strings.Join(pathResolution.MissingSegments, " > "))
-		
+
 		// Show what would be created
 		baseLevel := pathResolution.ParentHeading.Level + 1
 		for i, heading := range pathResolution.MissingSegments {
 			level := baseLevel + i
-			fmt.Printf("Would create: %s %s (level %d)\n", 
+			fmt.Printf("Would create: %s %s (level %d)\n",
 				strings.Repeat("#", level), heading, level)
 		}
 		finalLevel := baseLevel + len(pathResolution.MissingSegments)
@@ -226,12 +226,12 @@ func inspectDestination(ws *workspace.Workspace, destPath *markdown.HeadingPath)
 	} else {
 		// No path exists
 		fmt.Printf("✗ Missing path: %s\n", strings.Join(destPath.Segments, " > "))
-		
-		// Show what would be created  
+
+		// Show what would be created
 		baseLevel := destPath.SkipLevels + 1
 		for i, heading := range destPath.Segments {
 			level := baseLevel + i
-			fmt.Printf("Would create: %s %s (level %d)\n", 
+			fmt.Printf("Would create: %s %s (level %d)\n",
 				strings.Repeat("#", level), heading, level)
 		}
 		finalLevel := baseLevel + len(destPath.Segments)
@@ -311,7 +311,7 @@ func resolveDestinationPath(doc ast.Node, content []byte, destPath *markdown.Hea
 
 	var insertOffset int
 	var targetLevel int
-	
+
 	if pathResolution.TargetHeading != nil {
 		// Found existing target heading - insert content under it
 		insertOffset = calculateInsertionPoint(pathResolution.TargetHeading, content, prepend)
@@ -359,7 +359,7 @@ func performRefile(ws *workspace.Workspace, sourcePath *markdown.HeadingPath, su
 		// Use workspace root for relative paths, not lib/ directory
 		sourceFilePath = filepath.Join(ws.Root, sourcePath.File)
 	}
-	
+
 	sourceContent, err := os.ReadFile(sourceFilePath)
 	if err != nil {
 		return fmt.Errorf("failed to read source file: %w", err)
@@ -375,7 +375,7 @@ func performRefile(ws *workspace.Workspace, sourcePath *markdown.HeadingPath, su
 		// Use workspace root for relative paths, not lib/ directory
 		destFilePath = filepath.Join(ws.Root, dest.File)
 	}
-	
+
 	destContent, err := os.ReadFile(destFilePath)
 	if err != nil {
 		return fmt.Errorf("failed to read destination file: %w", err)
@@ -383,25 +383,25 @@ func performRefile(ws *workspace.Workspace, sourcePath *markdown.HeadingPath, su
 
 	// Remove from source
 	newSourceContent := append(sourceContent[:subtree.StartOffset], sourceContent[subtree.EndOffset:]...)
-	
+
 	// Insert into destination
 	var newDestContent []byte
 	insertContent := transformedContent
-	
+
 	// Add missing headings if needed
 	if len(dest.CreatePath) > 0 {
 		// Calculate the base level for missing headings
 		baseLevel := dest.TargetLevel - len(dest.CreatePath)
 		pathContent := markdown.CreateHeadingStructure(dest.CreatePath, baseLevel)
-		
+
 		// Ensure proper spacing
 		if dest.InsertOffset > 0 && destContent[dest.InsertOffset-1] != '\n' {
 			pathContent = append([]byte("\n"), pathContent...)
 		}
-		
+
 		insertContent = append(pathContent, insertContent...)
 	}
-	
+
 	// Insert at the specified offset
 	newDestContent = append(destContent[:dest.InsertOffset], insertContent...)
 	newDestContent = append(newDestContent, destContent[dest.InsertOffset:]...)
@@ -410,7 +410,7 @@ func performRefile(ws *workspace.Workspace, sourcePath *markdown.HeadingPath, su
 	if err := os.WriteFile(sourceFilePath, newSourceContent, 0644); err != nil {
 		return fmt.Errorf("failed to write source file: %w", err)
 	}
-	
+
 	if err := os.WriteFile(destFilePath, newDestContent, 0644); err != nil {
 		return fmt.Errorf("failed to write destination file: %w", err)
 	}
@@ -427,7 +427,7 @@ func printVerboseSubtreeInfo(subtree *markdown.Subtree, filename string) {
 	fmt.Printf("  Start offset: %d\n", subtree.StartOffset)
 	fmt.Printf("  End offset: %d\n", subtree.EndOffset)
 	fmt.Printf("  Total length: %d bytes\n", len(subtree.Content))
-	
+
 	// Show head and tail summary
 	content := subtree.Content
 	if len(content) > 100 {
@@ -504,7 +504,7 @@ func showSelectorsForFile(ws *workspace.Workspace, filename string) error {
 
 	// Display selectors
 	fmt.Printf("Available selectors in %s:\n", filename)
-	
+
 	for _, heading := range headings {
 		if strings.TrimSpace(heading.Text) == "" {
 			continue // Skip empty headings
@@ -541,15 +541,15 @@ func navigateHeadingPath(doc ast.Node, content []byte, destPath *markdown.Headin
 
 	// Find all headings in the document
 	allHeadings := markdown.FindAllHeadings(doc, content)
-	
+
 	// Try to find matches for the path segments
 	var bestMatch *markdown.HeadingInfo
 	var bestMatchDepth int
-	
+
 	for _, heading := range allHeadings {
 		// Check if this heading's path contains our target segments
 		matchDepth := calculatePathMatch(heading.Path, destPath.Segments, destPath.SkipLevels)
-		
+
 		if matchDepth == len(destPath.Segments) {
 			// Found a complete match
 			targetHeading := findHeadingByOffset(doc, heading.Offset)
@@ -559,7 +559,7 @@ func navigateHeadingPath(doc ast.Node, content []byte, destPath *markdown.Headin
 				return result, nil
 			}
 		}
-		
+
 		// Track the best partial match
 		if matchDepth > bestMatchDepth {
 			bestMatchDepth = matchDepth
@@ -588,24 +588,24 @@ func calculatePathMatch(headingPath []string, targetSegments []string, skipLevel
 	if len(headingPath) < skipLevels {
 		return 0
 	}
-	
+
 	// Adjust the heading path based on skip levels
 	adjustedPath := headingPath[skipLevels:]
-	
+
 	// Find the best consecutive match of targetSegments within adjustedPath
 	bestMatch := 0
-	
+
 	// Try starting from each position in the adjusted path
 	for startPos := 0; startPos <= len(adjustedPath)-1; startPos++ {
 		matchCount := 0
-		
+
 		// Try to match as many consecutive segments as possible from this position
 		for i, targetSeg := range targetSegments {
 			pathIndex := startPos + i
 			if pathIndex >= len(adjustedPath) {
 				break
 			}
-			
+
 			headingSeg := adjustedPath[pathIndex]
 			if strings.Contains(strings.ToLower(headingSeg), strings.ToLower(targetSeg)) {
 				matchCount++
@@ -613,29 +613,29 @@ func calculatePathMatch(headingPath []string, targetSegments []string, skipLevel
 				break // Stop on first non-match for consecutive matching
 			}
 		}
-		
+
 		if matchCount > bestMatch {
 			bestMatch = matchCount
 		}
-		
+
 		// If we found a complete match, we can stop
 		if matchCount == len(targetSegments) {
 			break
 		}
 	}
-	
+
 	return bestMatch
 }
 
 // findHeadingByOffset finds a heading node by its byte offset
 func findHeadingByOffset(doc ast.Node, targetOffset int) *ast.Heading {
 	var result *ast.Heading
-	
+
 	ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
 		if !entering {
 			return ast.WalkContinue, nil
 		}
-		
+
 		if heading, ok := n.(*ast.Heading); ok {
 			offset := markdown.GetNodeOffset(heading, nil) // We don't need content for offset comparison
 			if offset == targetOffset {
@@ -643,10 +643,10 @@ func findHeadingByOffset(doc ast.Node, targetOffset int) *ast.Heading {
 				return ast.WalkStop, nil
 			}
 		}
-		
+
 		return ast.WalkContinue, nil
 	})
-	
+
 	return result
 }
 
@@ -657,62 +657,62 @@ func calculateInsertionPoint(heading *ast.Heading, content []byte, prepend bool)
 		headingEnd := findHeadingLineEnd(heading, content)
 		return headingEnd
 	}
-	
+
 	// Find the end of this heading's subtree
 	subtreeEnd := markdown.FindSubtreeEnd(heading, content)
-	
+
 	// Back up to find a good insertion point (before the next heading)
 	insertPoint := subtreeEnd
 	for insertPoint > 0 && content[insertPoint-1] == '\n' {
 		insertPoint--
 	}
-	
+
 	return insertPoint
 }
 
 // findHeadingLineEnd finds the end of the heading line (after the newline)
 func findHeadingLineEnd(heading *ast.Heading, content []byte) int {
 	startOffset := markdown.GetNodeOffset(heading, content)
-	
+
 	// Find the end of the heading line
 	for i := startOffset; i < len(content); i++ {
 		if content[i] == '\n' {
 			return i + 1 // Return position after the newline
 		}
 	}
-	
+
 	return len(content)
 }
 
 // JSON response structures for refile command
 type RefileResponse struct {
-	Operation   string              `json:"operation"`
-	Source      RefileSource        `json:"source"`
-	Destination RefileDestination   `json:"destination"`
-	Content     RefileContent       `json:"content"`
-	Metadata    JSONMetadata        `json:"metadata"`
+	Operation   string            `json:"operation"`
+	Source      RefileSource      `json:"source"`
+	Destination RefileDestination `json:"destination"`
+	Content     RefileContent     `json:"content"`
+	Metadata    JSONMetadata      `json:"metadata"`
 }
 
 type RefileSource struct {
-	Selector     string `json:"selector"`
-	FilePath     string `json:"file_path"`
-	Heading      string `json:"heading"`
-	OriginalLevel int   `json:"original_level"`
+	Selector      string `json:"selector"`
+	FilePath      string `json:"file_path"`
+	Heading       string `json:"heading"`
+	OriginalLevel int    `json:"original_level"`
 }
 
 type RefileDestination struct {
-	Selector       string   `json:"selector"`
-	FilePath       string   `json:"file_path"`
-	TargetLevel    int      `json:"target_level"`
-	PathExists     bool     `json:"path_exists"`
+	Selector        string   `json:"selector"`
+	FilePath        string   `json:"file_path"`
+	TargetLevel     int      `json:"target_level"`
+	PathExists      bool     `json:"path_exists"`
 	CreatedHeadings []string `json:"created_headings,omitempty"`
 }
 
 type RefileContent struct {
-	Content         string `json:"content"`
-	CharacterCount  int    `json:"character_count"`
-	LineCount       int    `json:"line_count"`
-	TransformedLevel int   `json:"transformed_level"`
+	Content          string `json:"content"`
+	CharacterCount   int    `json:"character_count"`
+	LineCount        int    `json:"line_count"`
+	TransformedLevel int    `json:"transformed_level"`
 }
 
 // JSON response structures for destination inspection
@@ -724,16 +724,16 @@ type InspectDestinationResponse struct {
 }
 
 type InspectDestinationInfo struct {
-	Selector string `json:"selector"`
-	FilePath string `json:"file_path"`
-	FileExists bool `json:"file_exists"`
+	Selector   string `json:"selector"`
+	FilePath   string `json:"file_path"`
+	FileExists bool   `json:"file_exists"`
 }
 
 type InspectDestinationAnalysis struct {
-	PathExists      bool     `json:"path_exists"`
-	FoundSegments   []string `json:"found_segments"`
-	MissingSegments []string `json:"missing_segments"`
-	TargetLevel     int      `json:"target_level"`
+	PathExists      bool                     `json:"path_exists"`
+	FoundSegments   []string                 `json:"found_segments"`
+	MissingSegments []string                 `json:"missing_segments"`
+	TargetLevel     int                      `json:"target_level"`
 	WouldCreate     []InspectHeadingCreation `json:"would_create,omitempty"`
 }
 
@@ -743,9 +743,9 @@ type InspectHeadingCreation struct {
 }
 
 // outputRefileJSON outputs JSON response for refile operation
-func outputRefileJSON(cmd *cobra.Command, sourcePath *markdown.HeadingPath, destPath *markdown.HeadingPath, 
+func outputRefileJSON(cmd *cobra.Command, sourcePath *markdown.HeadingPath, destPath *markdown.HeadingPath,
 	subtree *markdown.Subtree, dest *DestinationTarget, transformedContent []byte, startTime time.Time) error {
-	
+
 	// Get source file path
 	sourceFilePath := sourcePath.File
 	if sourcePath.File == "inbox.md" {
@@ -753,22 +753,22 @@ func outputRefileJSON(cmd *cobra.Command, sourcePath *markdown.HeadingPath, dest
 		// Let's use the literal name for JSON consistency
 		sourceFilePath = "inbox.md"
 	}
-	
-	// Get destination file path  
+
+	// Get destination file path
 	destFilePath := dest.File
-	
+
 	// Count lines in transformed content
 	lineCount := strings.Count(string(transformedContent), "\n") + 1
 	if len(transformedContent) == 0 {
 		lineCount = 0
 	}
-	
+
 	// Build created headings list
 	var createdHeadings []string
 	if len(dest.CreatePath) > 0 {
 		createdHeadings = dest.CreatePath
 	}
-	
+
 	response := RefileResponse{
 		Operation: "refile",
 		Source: RefileSource{
@@ -792,7 +792,7 @@ func outputRefileJSON(cmd *cobra.Command, sourcePath *markdown.HeadingPath, dest
 		},
 		Metadata: createJSONMetadata(cmd, true, startTime),
 	}
-	
+
 	return outputJSON(response)
 }
 
@@ -807,12 +807,12 @@ func inspectDestinationJSON(cmd *cobra.Command, ws *workspace.Workspace, destPat
 	} else {
 		filePath = filepath.Join(ws.Root, destPath.File)
 	}
-	
+
 	fileExists := true
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
 		fileExists = false
 	}
-	
+
 	response := InspectDestinationResponse{
 		Operation: "inspect_destination",
 		Destination: InspectDestinationInfo{
@@ -828,7 +828,7 @@ func inspectDestinationJSON(cmd *cobra.Command, ws *workspace.Workspace, destPat
 		},
 		Metadata: createJSONMetadata(cmd, true, startTime),
 	}
-	
+
 	// If file doesn't exist, return early with basic analysis
 	if !fileExists {
 		// Fill in what would be created
@@ -842,20 +842,20 @@ func inspectDestinationJSON(cmd *cobra.Command, ws *workspace.Workspace, destPat
 		}
 		return outputJSON(response)
 	}
-	
+
 	// Read and parse the file to analyze the path
 	content, err := os.ReadFile(filePath)
 	if err != nil {
 		// Return error as JSON
 		return outputJSONError(cmd, fmt.Errorf("error reading file: %w", err), startTime)
 	}
-	
+
 	doc := markdown.ParseDocument(content)
 	pathResolution, err := navigateHeadingPath(doc, content, destPath)
 	if err != nil {
 		return outputJSONError(cmd, fmt.Errorf("error analyzing path: %w", err), startTime)
 	}
-	
+
 	if pathResolution.TargetHeading != nil {
 		// Complete path exists
 		response.Analysis.PathExists = true
@@ -867,7 +867,7 @@ func inspectDestinationJSON(cmd *cobra.Command, ws *workspace.Workspace, destPat
 		response.Analysis.PathExists = false
 		response.Analysis.FoundSegments = pathResolution.FoundSegments
 		response.Analysis.MissingSegments = pathResolution.MissingSegments
-		
+
 		// Create what would be created
 		baseLevel := pathResolution.ParentHeading.Level + 1
 		for i, heading := range pathResolution.MissingSegments {
@@ -883,7 +883,7 @@ func inspectDestinationJSON(cmd *cobra.Command, ws *workspace.Workspace, destPat
 		response.Analysis.PathExists = false
 		response.Analysis.FoundSegments = []string{}
 		response.Analysis.MissingSegments = destPath.Segments
-		
+
 		// Create what would be created
 		baseLevel := destPath.SkipLevels + 1
 		for i, heading := range destPath.Segments {
@@ -895,6 +895,6 @@ func inspectDestinationJSON(cmd *cobra.Command, ws *workspace.Workspace, destPat
 		}
 		response.Analysis.TargetLevel = baseLevel + len(destPath.Segments)
 	}
-	
+
 	return outputJSON(response)
 }

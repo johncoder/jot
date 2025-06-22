@@ -24,25 +24,25 @@ func ExecuteEvaluableBlocks(filename string) ([]*EvalResult, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Initialize security manager
 	sm, err := NewSecurityManager()
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize security manager: %w", err)
 	}
-	
+
 	// Get absolute path for consistent checking
 	absPath, err := filepath.Abs(filename)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	var results []*EvalResult
 	for _, b := range blocks {
 		if b.Eval == nil {
 			continue
 		}
-		
+
 		// Check security approval
 		approved, err := sm.CheckApproval(absPath, b)
 		if err != nil {
@@ -53,7 +53,7 @@ func ExecuteEvaluableBlocks(filename string) ([]*EvalResult, error) {
 			})
 			continue
 		}
-		
+
 		if !approved {
 			blockName := "unnamed"
 			if b.Eval.Params["name"] != "" {
@@ -66,7 +66,7 @@ func ExecuteEvaluableBlocks(filename string) ([]*EvalResult, error) {
 			})
 			continue
 		}
-		
+
 		output, err := executeBlock(b)
 		results = append(results, &EvalResult{Block: b, Output: output, Err: err})
 	}
@@ -79,19 +79,19 @@ func ExecuteEvaluableBlockByName(filename, name string) ([]*EvalResult, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Initialize security manager
 	sm, err := NewSecurityManager()
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize security manager: %w", err)
 	}
-	
+
 	// Get absolute path for consistent checking
 	absPath, err := filepath.Abs(filename)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	var results []*EvalResult
 	for _, b := range blocks {
 		if b.Eval == nil {
@@ -101,7 +101,7 @@ func ExecuteEvaluableBlockByName(filename, name string) ([]*EvalResult, error) {
 		if !ok || blockName != name {
 			continue
 		}
-		
+
 		// Check security approval
 		approved, err := sm.CheckApproval(absPath, b)
 		if err != nil {
@@ -112,7 +112,7 @@ func ExecuteEvaluableBlockByName(filename, name string) ([]*EvalResult, error) {
 			})
 			break
 		}
-		
+
 		if !approved {
 			results = append(results, &EvalResult{
 				Block:  b,
@@ -121,7 +121,7 @@ func ExecuteEvaluableBlockByName(filename, name string) ([]*EvalResult, error) {
 			})
 			break
 		}
-		
+
 		output, err := executeBlock(b)
 		results = append(results, &EvalResult{Block: b, Output: output, Err: err})
 	}
@@ -137,22 +137,22 @@ func executeBlock(b *CodeBlock) (string, error) {
 	if shell, ok := b.Eval.Params["shell"]; ok && shell != "" {
 		lang = shell
 	}
-	
+
 	cmd, args := getInterpreter(lang)
 	if cmd == "" {
 		return "", fmt.Errorf("unsupported language/shell: %s", lang)
 	}
-	
+
 	// Add additional args if specified
 	if extraArgs, ok := b.Eval.Params["args"]; ok && extraArgs != "" {
 		// Parse quoted arguments
 		args = append(args, parseArgs(extraArgs)...)
 	}
-	
+
 	// Create command with context for timeout support
 	ctx := context.Background()
 	var cancel context.CancelFunc
-	
+
 	// Set timeout if specified
 	if timeoutStr, ok := b.Eval.Params["timeout"]; ok && timeoutStr != "" {
 		timeout, err := time.ParseDuration(timeoutStr)
@@ -162,15 +162,15 @@ func executeBlock(b *CodeBlock) (string, error) {
 		ctx, cancel = context.WithTimeout(ctx, timeout)
 		defer cancel()
 	}
-	
+
 	c := exec.CommandContext(ctx, cmd, args...)
 	c.Stdin = strings.NewReader(strings.Join(b.Code, "\n"))
-	
+
 	// Set working directory if specified
 	if cwd, ok := b.Eval.Params["cwd"]; ok && cwd != "" {
 		c.Dir = cwd
 	}
-	
+
 	// Set environment variables if specified
 	if envStr, ok := b.Eval.Params["env"]; ok && envStr != "" {
 		c.Env = os.Environ() // Start with current environment
@@ -179,14 +179,14 @@ func executeBlock(b *CodeBlock) (string, error) {
 			c.Env = append(c.Env, fmt.Sprintf("%s=%s", key, value))
 		}
 	}
-	
+
 	out, err := c.CombinedOutput()
-	
+
 	// Handle timeout errors more gracefully
 	if ctx.Err() == context.DeadlineExceeded {
 		return string(out), fmt.Errorf("command timed out")
 	}
-	
+
 	return string(out), err
 }
 
@@ -212,7 +212,7 @@ func parseArgs(argsStr string) []string {
 	var current strings.Builder
 	inQuote := false
 	var quote rune
-	
+
 	for _, r := range argsStr {
 		switch {
 		case !inQuote && (r == '"' || r == '\''):
@@ -230,11 +230,11 @@ func parseArgs(argsStr string) []string {
 			current.WriteRune(r)
 		}
 	}
-	
+
 	if current.Len() > 0 {
 		args = append(args, current.String())
 	}
-	
+
 	return args
 }
 
@@ -242,13 +242,13 @@ func parseArgs(argsStr string) []string {
 func parseEnvVars(envStr string) map[string]string {
 	envVars := make(map[string]string)
 	pairs := strings.Split(envStr, ",")
-	
+
 	for _, pair := range pairs {
 		pair = strings.TrimSpace(pair)
 		if pair == "" {
 			continue
 		}
-		
+
 		parts := strings.SplitN(pair, "=", 2)
 		if len(parts) == 2 {
 			key := strings.TrimSpace(parts[0])
@@ -256,6 +256,6 @@ func parseEnvVars(envStr string) map[string]string {
 			envVars[key] = value
 		}
 	}
-	
+
 	return envVars
 }

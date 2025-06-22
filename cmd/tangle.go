@@ -70,7 +70,7 @@ func tangleMarkdown(filePath string) error {
 	if err := ast.Walk(node, walker); err != nil {
 		return fmt.Errorf("failed to walk AST: %w", err)
 	}
-	
+
 	return nil
 }
 

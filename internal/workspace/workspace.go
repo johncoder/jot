@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/johncoder/jot/internal/config"
 )
 
 // Workspace represents a jot workspace
@@ -15,14 +17,21 @@ type Workspace struct {
 	LibDir    string
 }
 
-// FindWorkspace searches upward from the current directory for a jot workspace
+// FindWorkspace searches for a jot workspace using the enhanced discovery algorithm:
+// 1. Walk up parent directories looking for .jot/ directory or .jotrc file
+// 2. If .jot/ found: Use that workspace
+// 3. If .jotrc found first: Use the default workspace defined in that config
+// 4. If neither found: Check ~/.jotrc for global default workspace
+// 5. If no workspace available: Error with clear guidance
 func FindWorkspace() (*Workspace, error) {
 	dir, err := os.Getwd()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get current directory: %w", err)
 	}
 
+	// Step 1 & 2: Walk up directories looking for .jot/ or .jotrc
 	for {
+		// Check for .jot/ directory (local workspace)
 		jotDir := filepath.Join(dir, ".jot")
 		if info, err := os.Stat(jotDir); err == nil && info.IsDir() {
 			return &Workspace{
@@ -33,6 +42,13 @@ func FindWorkspace() (*Workspace, error) {
 			}, nil
 		}
 
+		// Check for .jotrc file (stops the search)
+		jotrcPath := filepath.Join(dir, ".jotrc")
+		if _, err := os.Stat(jotrcPath); err == nil {
+			// Step 3: Use default workspace from this config
+			return findWorkspaceFromConfig(jotrcPath)
+		}
+
 		parent := filepath.Dir(dir)
 		if parent == dir {
 			// Reached the root directory
@@ -41,7 +57,36 @@ func FindWorkspace() (*Workspace, error) {
 		dir = parent
 	}
 
-	return nil, fmt.Errorf("not in a jot workspace (or any parent directory)")
+	// Step 4: Check ~/.jotrc for global default workspace
+	return findWorkspaceFromGlobalConfig()
+}
+
+// findWorkspaceFromConfig loads a config file and returns the default workspace
+func findWorkspaceFromConfig(configPath string) (*Workspace, error) {
+	// For now, load global config since we don't have local config support yet
+	// This is a placeholder for future local config support
+	return findWorkspaceFromGlobalConfig()
+}
+
+// findWorkspaceFromGlobalConfig finds the default workspace from global config
+func findWorkspaceFromGlobalConfig() (*Workspace, error) {
+	defaultName, defaultPath, err := config.GetDefaultWorkspace()
+	if err != nil {
+		return nil, fmt.Errorf("no workspace found. Run 'jot init' from the directory you wish to store your notes")
+	}
+
+	// Verify the workspace directory exists and has .jot/
+	jotDir := filepath.Join(defaultPath, ".jot")
+	if info, err := os.Stat(jotDir); err != nil || !info.IsDir() {
+		return nil, fmt.Errorf("default workspace %q (%s) is not valid - missing .jot/ directory. Run 'jot init' in %s or set a different default workspace", defaultName, defaultPath, defaultPath)
+	}
+
+	return &Workspace{
+		Root:      defaultPath,
+		JotDir:    jotDir,
+		InboxPath: filepath.Join(defaultPath, "inbox.md"),
+		LibDir:    filepath.Join(defaultPath, "lib"),
+	}, nil
 }
 
 // RequireWorkspace finds a workspace or returns an error

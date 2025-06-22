@@ -47,7 +47,7 @@ Examples:
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		startTime := time.Now()
-		
+
 		ws, err := workspace.RequireWorkspace()
 		if err != nil {
 			if isJSONOutput(cmd) {
@@ -167,7 +167,7 @@ Examples:
 					}
 					return err
 				}
-				
+
 				if isJSONOutput(cmd) {
 					templateInfo := &CaptureTemplate{
 						Name:            captureTemplate,
@@ -195,7 +195,7 @@ Examples:
 					}
 					return err
 				}
-				
+
 				if isJSONOutput(cmd) {
 					templateInfo := &CaptureTemplate{
 						Name:            captureTemplate,
@@ -331,18 +331,18 @@ func performDirectInsertion(ws *workspace.Workspace, dest *DestinationTarget, tr
 
 	// Prepare content to insert
 	var insertContent []byte = transformedContent
-	
+
 	// Add missing headings if needed
 	if len(dest.CreatePath) > 0 {
 		// Calculate the base level for missing headings
 		baseLevel := dest.TargetLevel - len(dest.CreatePath)
 		pathContent := markdown.CreateHeadingStructure(dest.CreatePath, baseLevel)
-		
+
 		// Ensure proper spacing
 		if dest.InsertOffset > 0 && destContent[dest.InsertOffset-1] != '\n' {
 			pathContent = append([]byte("\n"), pathContent...)
 		}
-		
+
 		insertContent = append(pathContent, insertContent...)
 	}
 
@@ -360,25 +360,25 @@ func performDirectInsertion(ws *workspace.Workspace, dest *DestinationTarget, tr
 
 // JSON response structures for capture command
 type CaptureResponse struct {
-	Operation   string         `json:"operation"`
-	ContentInfo CaptureContent `json:"content_info"`
-	FileInfo    CaptureFile    `json:"file_info"`
+	Operation   string           `json:"operation"`
+	ContentInfo CaptureContent   `json:"content_info"`
+	FileInfo    CaptureFile      `json:"file_info"`
 	Template    *CaptureTemplate `json:"template,omitempty"`
-	Metadata    JSONMetadata   `json:"metadata"`
+	Metadata    JSONMetadata     `json:"metadata"`
 }
 
 type CaptureContent struct {
-	Content       string `json:"content"`
+	Content        string `json:"content"`
 	CharacterCount int    `json:"character_count"`
 	LineCount      int    `json:"line_count"`
 	Source         string `json:"source"` // "editor", "stdin", "content_flag", "template"
 }
 
 type CaptureFile struct {
-	FilePath     string `json:"file_path"`
-	IsInbox      bool   `json:"is_inbox"`
-	IsSelector   bool   `json:"is_selector"`
-	Destination  string `json:"destination"`
+	FilePath    string `json:"file_path"`
+	IsInbox     bool   `json:"is_inbox"`
+	IsSelector  bool   `json:"is_selector"`
+	Destination string `json:"destination"`
 }
 
 type CaptureTemplate struct {
@@ -389,15 +389,15 @@ type CaptureTemplate struct {
 }
 
 // outputCaptureJSON outputs JSON response for capture command
-func outputCaptureJSON(cmd *cobra.Command, operation string, finalContent string, contentSource string, 
-	destinationPath string, isInbox bool, isSelector bool, destination string, 
+func outputCaptureJSON(cmd *cobra.Command, operation string, finalContent string, contentSource string,
+	destinationPath string, isInbox bool, isSelector bool, destination string,
 	templateInfo *CaptureTemplate, startTime time.Time) error {
-	
+
 	lineCount := strings.Count(finalContent, "\n") + 1
 	if len(finalContent) == 0 {
 		lineCount = 0
 	}
-	
+
 	response := CaptureResponse{
 		Operation: operation,
 		ContentInfo: CaptureContent{
@@ -415,7 +415,7 @@ func outputCaptureJSON(cmd *cobra.Command, operation string, finalContent string
 		Template: templateInfo,
 		Metadata: createJSONMetadata(cmd, true, startTime),
 	}
-	
+
 	return outputJSON(response)
 }
 
@@ -424,7 +424,7 @@ func getContentSource(appendContent string, useEditor bool) string {
 	if appendContent != "" && !useEditor {
 		return "content_flag"
 	} else if appendContent != "" && useEditor {
-		return "template"  // Template with piped/flag content
+		return "template" // Template with piped/flag content
 	} else if useEditor {
 		return "editor"
 	}

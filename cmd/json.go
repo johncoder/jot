@@ -71,7 +71,7 @@ func StartTiming() {
 // BuildJSONResponse creates a JSON response with metadata
 func BuildJSONResponse(data interface{}, commandName string) JSONResponse {
 	executionTime := time.Since(commandStartTime).Milliseconds()
-	
+
 	return JSONResponse{
 		Data: data,
 		Metadata: JSONMetadata{
@@ -86,7 +86,7 @@ func BuildJSONResponse(data interface{}, commandName string) JSONResponse {
 // BuildJSONError creates a JSON error response
 func BuildJSONError(message, code string, details map[string]interface{}, commandName string) JSONResponse {
 	executionTime := time.Since(commandStartTime).Milliseconds()
-	
+
 	return JSONResponse{
 		Error: &JSONError{
 			Message: message,
@@ -109,9 +109,9 @@ func OutputJSON(response JSONResponse) {
 		fmt.Fprintf(os.Stderr, "Error marshaling JSON: %v\n", err)
 		os.Exit(1)
 	}
-	
+
 	fmt.Println(string(jsonBytes))
-	
+
 	// Exit with appropriate code
 	if response.Error != nil {
 		os.Exit(1)
@@ -134,7 +134,7 @@ func BuildOperationFailure(operation string, errorMsg string, details map[string
 		details = make(map[string]interface{})
 	}
 	details["error"] = errorMsg
-	
+
 	return JSONOperation{
 		Operation: operation,
 		Result:    "failure",
@@ -147,7 +147,7 @@ func BuildOperationsSummary(operations []JSONOperation) JSONOperationSummary {
 	summary := JSONOperationSummary{
 		TotalOperations: len(operations),
 	}
-	
+
 	for _, op := range operations {
 		if op.Result == "success" {
 			summary.Successful++
@@ -155,7 +155,7 @@ func BuildOperationsSummary(operations []JSONOperation) JSONOperationSummary {
 			summary.Failed++
 		}
 	}
-	
+
 	return summary
 }
 
@@ -188,14 +188,14 @@ func outputJSON(data interface{}) error {
 func outputJSONError(cmd *cobra.Command, err error, startTime time.Time) error {
 	errorCode := "unknown_error"
 	details := map[string]interface{}{}
-	
+
 	// Extract error details based on error type
 	if strings.Contains(err.Error(), "not found") {
 		errorCode = "not_found"
 	} else if strings.Contains(err.Error(), "workspace") {
 		errorCode = "workspace_error"
 	}
-	
+
 	response := map[string]interface{}{
 		"error": JSONError{
 			Message: err.Error(),
@@ -204,6 +204,6 @@ func outputJSONError(cmd *cobra.Command, err error, startTime time.Time) error {
 		},
 		"metadata": createJSONMetadata(cmd, false, startTime),
 	}
-	
+
 	return outputJSON(response)
 }

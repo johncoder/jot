@@ -222,13 +222,13 @@ func TestResolveDestinationPath(t *testing.T) {
 	content := []byte(testMarkdownContent)
 
 	tests := []struct {
-		name             string
-		pathSegments     []string
-		skipLevels       int
-		prepend          bool
-		expectExists     bool
-		expectedLevel    int
-		expectedCreate   []string
+		name           string
+		pathSegments   []string
+		skipLevels     int
+		prepend        bool
+		expectExists   bool
+		expectedLevel  int
+		expectedCreate []string
 	}{
 		{
 			name:           "resolve existing path",
@@ -416,7 +416,7 @@ func TestFindHeadingByOffset(t *testing.T) {
 func TestRefileIntegration(t *testing.T) {
 	// Create a temporary workspace for testing
 	tempDir := t.TempDir()
-	
+
 	// Create workspace structure
 	jotDir := filepath.Join(tempDir, ".jot")
 	libDir := filepath.Join(tempDir, "lib")

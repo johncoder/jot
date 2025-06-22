@@ -7,12 +7,12 @@ import (
 
 func TestParsePathAdvanced(t *testing.T) {
 	tests := []struct {
-		name           string
-		pathStr        string
-		expectedFile   string
-		expectedSegs   []string
-		expectedSkip   int
-		expectError    bool
+		name         string
+		pathStr      string
+		expectedFile string
+		expectedSegs []string
+		expectedSkip int
+		expectError  bool
 	}{
 		{
 			name:         "basic path",
@@ -77,14 +77,14 @@ func TestParsePathAdvanced(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result, err := ParsePath(tt.pathStr)
-			
+
 			if tt.expectError {
 				if err == nil {
 					t.Errorf("ParsePath() expected error but got none")
 				}
 				return
 			}
-			
+
 			if err != nil {
 				t.Fatalf("ParsePath() unexpected error = %v", err)
 			}
@@ -402,15 +402,15 @@ Final nested content.
 
 	for i, heading := range headings {
 		expected := expectedHeadings[i]
-		
+
 		if heading.Text != expected.text {
 			t.Errorf("Heading[%d] text = %q, want %q", i, heading.Text, expected.text)
 		}
-		
+
 		if heading.Level != expected.level {
 			t.Errorf("Heading[%d] level = %d, want %d", i, heading.Level, expected.level)
 		}
-		
+
 		if len(heading.Path) != len(expected.path) {
 			t.Errorf("Heading[%d] path length = %d, want %d", i, len(heading.Path), len(expected.path))
 		} else {
@@ -420,7 +420,7 @@ Final nested content.
 				}
 			}
 		}
-		
+
 		// Verify offset is reasonable
 		if heading.Offset < 0 || heading.Offset >= len(content) {
 			t.Errorf("Heading[%d] offset %d out of range [0, %d)", i, heading.Offset, len(content))
@@ -461,9 +461,9 @@ Team updates.
 	doc := ParseDocument([]byte(content))
 
 	tests := []struct {
-		name        string
-		pathStr     string
-		expectError bool
+		name         string
+		pathStr      string
+		expectError  bool
 		expectedText string
 		checkContent func(t *testing.T, subtree *Subtree, content []byte)
 	}{
@@ -544,14 +544,14 @@ Team updates.
 			}
 
 			subtree, err := FindSubtree(doc, []byte(content), path)
-			
+
 			if tt.expectError {
 				if err == nil {
 					t.Errorf("FindSubtree() expected error but got none")
 				}
 				return
 			}
-			
+
 			if err != nil {
 				t.Fatalf("FindSubtree() unexpected error = %v", err)
 			}
@@ -570,14 +570,14 @@ Team updates.
 				t.Errorf("StartOffset %d out of range", subtree.StartOffset)
 			}
 			if subtree.EndOffset <= subtree.StartOffset || subtree.EndOffset > len(content) {
-				t.Errorf("EndOffset %d invalid (start: %d, content length: %d)", 
+				t.Errorf("EndOffset %d invalid (start: %d, content length: %d)",
 					subtree.EndOffset, subtree.StartOffset, len(content))
 			}
 
 			// Verify content length matches offset difference
 			expectedLength := subtree.EndOffset - subtree.StartOffset
 			if len(subtree.Content) != expectedLength {
-				t.Errorf("Content length %d doesn't match offset difference %d", 
+				t.Errorf("Content length %d doesn't match offset difference %d",
 					len(subtree.Content), expectedLength)
 			}
 		})

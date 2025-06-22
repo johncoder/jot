@@ -31,11 +31,11 @@ const (
 
 // ApprovalRecord represents an approved code block
 type ApprovalRecord struct {
-	Hash      string       `json:"hash"`
-	Mode      ApprovalMode `json:"mode"`
-	FilePath  string       `json:"file_path"`
-	BlockName string       `json:"block_name"`
-	ApprovedAt string      `json:"approved_at"`
+	Hash       string       `json:"hash"`
+	Mode       ApprovalMode `json:"mode"`
+	FilePath   string       `json:"file_path"`
+	BlockName  string       `json:"block_name"`
+	ApprovedAt string       `json:"approved_at"`
 }
 
 // DocumentApprovalRecord represents an approved document
@@ -47,10 +47,10 @@ type DocumentApprovalRecord struct {
 
 // SecurityManager manages code block approvals and security policies
 type SecurityManager struct {
-	configPath     string
-	approvals      map[string]*ApprovalRecord
-	docApprovals   map[string]*DocumentApprovalRecord
-	docConfigPath  string
+	configPath    string
+	approvals     map[string]*ApprovalRecord
+	docApprovals  map[string]*DocumentApprovalRecord
+	docConfigPath string
 }
 
 // NewSecurityManager creates a new security manager
@@ -59,25 +59,25 @@ func NewSecurityManager() (*SecurityManager, error) {
 		approvals:    make(map[string]*ApprovalRecord),
 		docApprovals: make(map[string]*DocumentApprovalRecord),
 	}
-	
+
 	// Find .jot directory
 	jotDir, err := findJotDirectory()
 	if err != nil {
 		return nil, fmt.Errorf("could not find .jot directory: %w", err)
 	}
-	
+
 	sm.configPath = filepath.Join(jotDir, "eval_permissions")
 	sm.docConfigPath = filepath.Join(jotDir, "eval_document_permissions")
-	
+
 	// Load existing approvals
 	if err := sm.loadApprovals(); err != nil {
 		return nil, fmt.Errorf("failed to load approvals: %w", err)
 	}
-	
+
 	if err := sm.loadDocumentApprovals(); err != nil {
 		return nil, fmt.Errorf("failed to load document approvals: %w", err)
 	}
-	
+
 	return sm, nil
 }
 
@@ -87,20 +87,20 @@ func findJotDirectory() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	
+
 	for {
 		jotDir := filepath.Join(dir, ".jot")
 		if info, err := os.Stat(jotDir); err == nil && info.IsDir() {
 			return jotDir, nil
 		}
-		
+
 		parent := filepath.Dir(dir)
 		if parent == dir {
 			break // reached root
 		}
 		dir = parent
 	}
-	
+
 	return "", fmt.Errorf(".jot directory not found")
 }
 
@@ -109,22 +109,22 @@ func (sm *SecurityManager) loadApprovals() error {
 	if _, err := os.Stat(sm.configPath); os.IsNotExist(err) {
 		return nil // No approvals file yet, that's OK
 	}
-	
+
 	data, err := os.ReadFile(sm.configPath)
 	if err != nil {
 		return err
 	}
-	
+
 	var approvals []*ApprovalRecord
 	if err := json.Unmarshal(data, &approvals); err != nil {
 		return err
 	}
-	
+
 	for _, approval := range approvals {
 		key := sm.makeApprovalKey(approval.FilePath, approval.BlockName)
 		sm.approvals[key] = approval
 	}
-	
+
 	return nil
 }
 
@@ -134,17 +134,17 @@ func (sm *SecurityManager) saveApprovals() error {
 	for _, approval := range sm.approvals {
 		approvals = append(approvals, approval)
 	}
-	
+
 	data, err := json.MarshalIndent(approvals, "", "  ")
 	if err != nil {
 		return err
 	}
-	
+
 	// Ensure .jot directory exists
 	if err := os.MkdirAll(filepath.Dir(sm.configPath), 0755); err != nil {
 		return err
 	}
-	
+
 	return os.WriteFile(sm.configPath, data, 0644)
 }
 
@@ -166,11 +166,11 @@ func (sm *SecurityManager) getSecurityConfig(filePath string) (*SecurityConfig, 
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Find the most specific matching configuration
 	var bestMatch *SecurityConfig
 	var bestMatchLen int
-	
+
 	for _, config := range configs {
 		if matched, err := filepath.Match(config.Path, filePath); err == nil && matched {
 			if len(config.Path) > bestMatchLen {
@@ -179,7 +179,7 @@ func (sm *SecurityManager) getSecurityConfig(filePath string) (*SecurityConfig, 
 			}
 		}
 	}
-	
+
 	// Return default config if no match found
 	if bestMatch == nil {
 		return &SecurityConfig{
@@ -188,20 +188,20 @@ func (sm *SecurityManager) getSecurityConfig(filePath string) (*SecurityConfig, 
 			DefaultMode:     string(ApprovalModeHash),
 		}, nil
 	}
-	
+
 	return bestMatch, nil
 }
 
 // loadSecurityConfigs loads security configurations from the directory hierarchy
 func (sm *SecurityManager) loadSecurityConfigs(filePath string) ([]*SecurityConfig, error) {
 	var configs []*SecurityConfig
-	
+
 	// Get absolute path
 	absPath, err := filepath.Abs(filePath)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Walk up the directory tree looking for .jotrc files
 	dir := filepath.Dir(absPath)
 	for {
@@ -213,14 +213,14 @@ func (sm *SecurityManager) loadSecurityConfigs(filePath string) ([]*SecurityConf
 				configs = append(dirConfigs, configs...)
 			}
 		}
-		
+
 		parent := filepath.Dir(dir)
 		if parent == dir {
 			break // reached root
 		}
 		dir = parent
 	}
-	
+
 	return configs, nil
 }
 
@@ -228,23 +228,23 @@ func (sm *SecurityManager) loadSecurityConfigs(filePath string) ([]*SecurityConf
 func (sm *SecurityManager) loadSecurityConfigFromFile(configPath string) ([]*SecurityConfig, error) {
 	v := viper.New()
 	v.SetConfigFile(configPath)
-	
+
 	if err := v.ReadInConfig(); err != nil {
 		return nil, err
 	}
-	
+
 	var configs []*SecurityConfig
 	if err := v.UnmarshalKey("eval.security", &configs); err != nil {
 		return nil, err
 	}
-	
+
 	// Set defaults for any missing fields
 	for _, config := range configs {
 		if config.DefaultMode == "" {
 			config.DefaultMode = string(ApprovalModeHash)
 		}
 	}
-	
+
 	return configs, nil
 }
 
@@ -253,15 +253,15 @@ func (sm *SecurityManager) CheckApproval(filePath string, block *CodeBlock) (boo
 	if block.Eval == nil || block.Eval.Params["name"] == "" {
 		return false, fmt.Errorf("code block has no name")
 	}
-	
+
 	blockName := block.Eval.Params["name"]
-	
+
 	// First check if the entire document is approved
 	docApproved, docMode, err := sm.CheckDocumentApproval(filePath)
 	if err != nil {
 		return false, err
 	}
-	
+
 	if docApproved {
 		// For document approval, we bypass individual block checks
 		// but still respect the document's approval mode
@@ -271,30 +271,30 @@ func (sm *SecurityManager) CheckApproval(filePath string, block *CodeBlock) (boo
 		// For hash and prompt modes at document level, we still check individual blocks
 		// but they are auto-approved if the document is approved
 	}
-	
+
 	// Get security configuration
 	secConfig, err := sm.getSecurityConfig(filePath)
 	if err != nil {
 		return false, err
 	}
-	
+
 	// If approval is not required, allow execution
 	if !secConfig.RequireApproval {
 		return true, nil
 	}
-	
+
 	// If document is approved, individual blocks are automatically approved
 	if docApproved {
 		return true, nil
 	}
-	
+
 	// Check if block is approved
 	key := sm.makeApprovalKey(filePath, blockName)
 	approval, exists := sm.approvals[key]
 	if !exists {
 		return false, nil
 	}
-	
+
 	// For hash mode, verify the content hasn't changed
 	if approval.Mode == ApprovalModeHash {
 		currentHash := sm.hashCodeBlock(block)
@@ -302,7 +302,7 @@ func (sm *SecurityManager) CheckApproval(filePath string, block *CodeBlock) (boo
 			return false, nil // Content changed, re-approval needed
 		}
 	}
-	
+
 	return true, nil
 }
 
@@ -311,10 +311,10 @@ func (sm *SecurityManager) ApproveBlock(filePath string, block *CodeBlock, mode 
 	if block.Eval == nil || block.Eval.Params["name"] == "" {
 		return fmt.Errorf("code block has no name")
 	}
-	
+
 	blockName := block.Eval.Params["name"]
 	hash := sm.hashCodeBlock(block)
-	
+
 	approval := &ApprovalRecord{
 		Hash:       hash,
 		Mode:       mode,
@@ -322,10 +322,10 @@ func (sm *SecurityManager) ApproveBlock(filePath string, block *CodeBlock, mode 
 		BlockName:  blockName,
 		ApprovedAt: time.Now().Format(time.RFC3339),
 	}
-	
+
 	key := sm.makeApprovalKey(filePath, blockName)
 	sm.approvals[key] = approval
-	
+
 	return sm.saveApprovals()
 }
 
@@ -350,21 +350,21 @@ func (sm *SecurityManager) loadDocumentApprovals() error {
 	if _, err := os.Stat(sm.docConfigPath); os.IsNotExist(err) {
 		return nil // No document approvals file yet, that's OK
 	}
-	
+
 	data, err := os.ReadFile(sm.docConfigPath)
 	if err != nil {
 		return err
 	}
-	
+
 	var docApprovals []*DocumentApprovalRecord
 	if err := json.Unmarshal(data, &docApprovals); err != nil {
 		return err
 	}
-	
+
 	for _, approval := range docApprovals {
 		sm.docApprovals[approval.FilePath] = approval
 	}
-	
+
 	return nil
 }
 
@@ -374,17 +374,17 @@ func (sm *SecurityManager) saveDocumentApprovals() error {
 	for _, approval := range sm.docApprovals {
 		docApprovals = append(docApprovals, approval)
 	}
-	
+
 	data, err := json.MarshalIndent(docApprovals, "", "  ")
 	if err != nil {
 		return err
 	}
-	
+
 	// Ensure .jot directory exists
 	if err := os.MkdirAll(filepath.Dir(sm.docConfigPath), 0755); err != nil {
 		return err
 	}
-	
+
 	return os.WriteFile(sm.docConfigPath, data, 0644)
 }
 
@@ -394,7 +394,7 @@ func (sm *SecurityManager) CheckDocumentApproval(filePath string) (bool, Approva
 	if !exists {
 		return false, ApprovalModeHash, nil
 	}
-	
+
 	return true, approval.Mode, nil
 }
 
@@ -405,7 +405,7 @@ func (sm *SecurityManager) ApproveDocument(filePath string, mode ApprovalMode) e
 		Mode:       mode,
 		ApprovedAt: time.Now().Format(time.RFC3339),
 	}
-	
+
 	sm.docApprovals[filePath] = approval
 	return sm.saveDocumentApprovals()
 }

@@ -66,7 +66,7 @@ Examples:
   jot eval --list-approved               # List all approved blocks`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		startTime := time.Now()
-		
+
 		// Handle global operations
 		if evalListApproved {
 			if isJSONOutput(cmd) {
@@ -74,7 +74,7 @@ Examples:
 			}
 			return listApprovedBlocks()
 		}
-		
+
 		if len(args) == 0 {
 			err := fmt.Errorf("please specify a markdown file")
 			if isJSONOutput(cmd) {
@@ -82,9 +82,9 @@ Examples:
 			}
 			return err
 		}
-		
+
 		filename := args[0]
-		
+
 		// Handle revoke operations
 		if evalRevokeDocument {
 			if isJSONOutput(cmd) {
@@ -92,7 +92,7 @@ Examples:
 			}
 			return revokeDocumentApproval(filename)
 		}
-		
+
 		if evalRevoke {
 			if len(args) < 2 {
 				err := fmt.Errorf("please specify a block name to revoke")
@@ -106,7 +106,7 @@ Examples:
 			}
 			return revokeApproval(filename, args[1])
 		}
-		
+
 		// Handle approve operations
 		if evalApproveDocument {
 			if isJSONOutput(cmd) {
@@ -114,7 +114,7 @@ Examples:
 			}
 			return approveDocument(filename, evalMode)
 		}
-		
+
 		// If no block name specified, list blocks (unless --all is used)
 		if len(args) == 1 && !evalAll {
 			if isJSONOutput(cmd) {
@@ -122,12 +122,12 @@ Examples:
 			}
 			return listBlocks(filename)
 		}
-		
+
 		var blockName string
 		if len(args) > 1 {
 			blockName = args[1]
 		}
-		
+
 		// Handle approval workflow
 		if evalApprove {
 			if blockName == "" {
@@ -142,11 +142,11 @@ Examples:
 			}
 			return approveBlock(filename, blockName, evalMode)
 		}
-		
+
 		// Execute blocks
 		var results []*eval.EvalResult
 		var err error
-		
+
 		if blockName != "" {
 			// Execute specific block by name
 			results, err = eval.ExecuteEvaluableBlockByName(filename, blockName)
@@ -160,7 +160,7 @@ Examples:
 			}
 			return err
 		}
-		
+
 		if err != nil {
 			err := fmt.Errorf("error executing blocks in %s: %w", filename, err)
 			if isJSONOutput(cmd) {
@@ -168,12 +168,12 @@ Examples:
 			}
 			return err
 		}
-		
+
 		// Handle JSON output for execution results
 		if isJSONOutput(cmd) {
 			return outputExecutionResultsJSON(cmd, filename, blockName, results, startTime)
 		}
-		
+
 		// Human-readable output for execution results
 		// Check for approval errors
 		hasApprovalErrors := false
@@ -183,17 +183,17 @@ Examples:
 				fmt.Printf("⚠ %s\n", result.Err.Error())
 			}
 		}
-		
+
 		if hasApprovalErrors {
 			fmt.Printf("\nTo approve blocks, use: jot eval %s <block_name> --approve --mode <hash|prompt|always>\n", filename)
 		}
-		
+
 		// Update results in markdown
 		err = eval.UpdateMarkdownWithResults(filename, results)
 		if err != nil {
 			return fmt.Errorf("error updating results in %s: %w", filename, err)
 		}
-		
+
 		// Report success
 		executed := 0
 		for _, result := range results {
@@ -201,7 +201,7 @@ Examples:
 				executed++
 			}
 		}
-		
+
 		if blockName != "" {
 			if executed > 0 {
 				fmt.Printf("✓ Executed block '%s' in %s\n", blockName, filename)
@@ -209,7 +209,7 @@ Examples:
 		} else if evalAll {
 			fmt.Printf("✓ Executed %d approved blocks in %s\n", executed, filename)
 		}
-		
+
 		return nil
 	},
 }
@@ -224,32 +224,32 @@ func listApprovedBlocks() error {
 	if err != nil {
 		return fmt.Errorf("failed to initialize security manager: %w", err)
 	}
-	
+
 	approvals := sm.ListApprovals()
 	docApprovals := sm.ListDocumentApprovals()
-	
+
 	if len(approvals) == 0 && len(docApprovals) == 0 {
 		fmt.Println("No approved blocks or documents found.")
 		return nil
 	}
-	
+
 	if len(docApprovals) > 0 {
 		fmt.Println("Approved documents:")
 		for _, approval := range docApprovals {
-			fmt.Printf("  ✓ %s (%s mode)\n", 
+			fmt.Printf("  ✓ %s (%s mode)\n",
 				approval.FilePath, approval.Mode)
 		}
 		fmt.Println()
 	}
-	
+
 	if len(approvals) > 0 {
 		fmt.Println("Approved individual blocks:")
 		for _, approval := range approvals {
-			fmt.Printf("  ✓ %s:%s (%s mode)\n", 
+			fmt.Printf("  ✓ %s:%s (%s mode)\n",
 				approval.FilePath, approval.BlockName, approval.Mode)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -258,17 +258,17 @@ func revokeApproval(filename, blockName string) error {
 	if err != nil {
 		return fmt.Errorf("failed to initialize security manager: %w", err)
 	}
-	
+
 	absPath, err := filepath.Abs(filename)
 	if err != nil {
 		return err
 	}
-	
+
 	err = sm.RevokeApproval(absPath, blockName)
 	if err != nil {
 		return fmt.Errorf("failed to revoke approval: %w", err)
 	}
-	
+
 	fmt.Printf("✓ Revoked approval for block '%s' in %s\n", blockName, filename)
 	return nil
 }
@@ -286,13 +286,13 @@ func approveBlock(filename, blockName, mode string) error {
 	default:
 		return fmt.Errorf("invalid approval mode: %s (must be hash, prompt, or always)", mode)
 	}
-	
+
 	// Find the block
 	blocks, err := eval.ParseMarkdownForEvalBlocks(filename)
 	if err != nil {
 		return err
 	}
-	
+
 	var targetBlock *eval.CodeBlock
 	for _, block := range blocks {
 		if block.Eval != nil && block.Eval.Params["name"] == blockName {
@@ -300,11 +300,11 @@ func approveBlock(filename, blockName, mode string) error {
 			break
 		}
 	}
-	
+
 	if targetBlock == nil {
 		return fmt.Errorf("no block named '%s' found in %s", blockName, filename)
 	}
-	
+
 	// Show the code block for approval
 	fmt.Printf("Approving code block '%s':\n", blockName)
 	fmt.Println("────────────────────────────────────────")
@@ -312,7 +312,7 @@ func approveBlock(filename, blockName, mode string) error {
 		fmt.Println(line)
 	}
 	fmt.Println("────────────────────────────────────────")
-	
+
 	// Confirm approval
 	fmt.Printf("Approve this block with %s mode? [y/N]: ", approvalMode)
 	reader := bufio.NewReader(os.Stdin)
@@ -320,32 +320,32 @@ func approveBlock(filename, blockName, mode string) error {
 	if err != nil {
 		return err
 	}
-	
+
 	response = strings.TrimSpace(strings.ToLower(response))
 	if response != "y" && response != "yes" {
 		fmt.Println("Approval cancelled.")
 		return nil
 	}
-	
+
 	// Approve the block
 	sm, err := eval.NewSecurityManager()
 	if err != nil {
 		return fmt.Errorf("failed to initialize security manager: %w", err)
 	}
-	
+
 	absPath, err := filepath.Abs(filename)
 	if err != nil {
 		return err
 	}
-	
+
 	err = sm.ApproveBlock(absPath, targetBlock, approvalMode)
 	if err != nil {
 		return fmt.Errorf("failed to approve block: %w", err)
 	}
-	
+
 	fmt.Printf("✓ Block '%s' approved with %s mode.\n", blockName, approvalMode)
 	fmt.Println("Use 'jot eval' to execute the approved block.")
-	
+
 	return nil
 }
 
@@ -362,13 +362,13 @@ func approveDocument(filename, mode string) error {
 	default:
 		return fmt.Errorf("invalid approval mode: %s (must be hash, prompt, or always)", mode)
 	}
-	
+
 	// Get all blocks in the document
 	blocks, err := eval.ParseMarkdownForEvalBlocks(filename)
 	if err != nil {
 		return err
 	}
-	
+
 	// Count evaluable blocks
 	evalBlocks := 0
 	for _, block := range blocks {
@@ -376,11 +376,11 @@ func approveDocument(filename, mode string) error {
 			evalBlocks++
 		}
 	}
-	
+
 	if evalBlocks == 0 {
 		return fmt.Errorf("no evaluable blocks found in %s", filename)
 	}
-	
+
 	// Show the blocks for approval
 	fmt.Printf("Approving entire document '%s' (%d blocks):\n", filename, evalBlocks)
 	fmt.Println("────────────────────────────────────────")
@@ -391,7 +391,7 @@ func approveDocument(filename, mode string) error {
 		}
 	}
 	fmt.Println("────────────────────────────────────────")
-	
+
 	// Confirm approval
 	fmt.Printf("Approve entire document with %s mode? [y/N]: ", approvalMode)
 	reader := bufio.NewReader(os.Stdin)
@@ -399,29 +399,29 @@ func approveDocument(filename, mode string) error {
 	if err != nil {
 		return err
 	}
-	
+
 	response = strings.TrimSpace(strings.ToLower(response))
 	if response != "y" && response != "yes" {
 		fmt.Println("Document approval cancelled.")
 		return nil
 	}
-	
+
 	// Approve the document
 	sm, err := eval.NewSecurityManager()
 	if err != nil {
 		return fmt.Errorf("failed to initialize security manager: %w", err)
 	}
-	
+
 	absPath, err := filepath.Abs(filename)
 	if err != nil {
 		return err
 	}
-	
+
 	err = sm.ApproveDocument(absPath, approvalMode)
 	if err != nil {
 		return fmt.Errorf("failed to approve document: %w", err)
 	}
-	
+
 	fmt.Printf("✓ Document '%s' approved with %s mode (%d blocks).\n", filename, approvalMode, evalBlocks)
 	return nil
 }
@@ -431,56 +431,56 @@ func revokeDocumentApproval(filename string) error {
 	if err != nil {
 		return fmt.Errorf("failed to initialize security manager: %w", err)
 	}
-	
+
 	absPath, err := filepath.Abs(filename)
 	if err != nil {
 		return err
 	}
-	
+
 	err = sm.RevokeDocumentApproval(absPath)
 	if err != nil {
 		return fmt.Errorf("failed to revoke document approval: %w", err)
 	}
-	
+
 	fmt.Printf("✓ Revoked document approval for %s\n", filename)
 	return nil
 }
 
 // JSON response structures for eval command
 type EvalResponse struct {
-	Operation string        `json:"operation"`
-	Results   []EvalResult  `json:"results,omitempty"`
-	Blocks    []EvalBlock   `json:"blocks,omitempty"`
+	Operation string         `json:"operation"`
+	Results   []EvalResult   `json:"results,omitempty"`
+	Blocks    []EvalBlock    `json:"blocks,omitempty"`
 	Approvals []EvalApproval `json:"approvals,omitempty"`
-	Summary   EvalSummary   `json:"summary"`
-	Metadata  JSONMetadata  `json:"metadata"`
+	Summary   EvalSummary    `json:"summary"`
+	Metadata  JSONMetadata   `json:"metadata"`
 }
 
 type EvalResult struct {
-	BlockName   string `json:"block_name"`
-	Language    string `json:"language"`
-	Code        string `json:"code"`
-	Output      string `json:"output,omitempty"`
-	Error       string `json:"error,omitempty"`
-	Success     bool   `json:"success"`
-	StartLine   int    `json:"start_line"`
-	EndLine     int    `json:"end_line"`
+	BlockName string `json:"block_name"`
+	Language  string `json:"language"`
+	Code      string `json:"code"`
+	Output    string `json:"output,omitempty"`
+	Error     string `json:"error,omitempty"`
+	Success   bool   `json:"success"`
+	StartLine int    `json:"start_line"`
+	EndLine   int    `json:"end_line"`
 }
 
 type EvalBlock struct {
-	Name      string `json:"name"`
-	Language  string `json:"language"`
-	StartLine int    `json:"start_line"`
-	EndLine   int    `json:"end_line"`
-	IsApproved bool  `json:"is_approved"`
+	Name         string `json:"name"`
+	Language     string `json:"language"`
+	StartLine    int    `json:"start_line"`
+	EndLine      int    `json:"end_line"`
+	IsApproved   bool   `json:"is_approved"`
 	ApprovalMode string `json:"approval_mode,omitempty"`
 }
 
 type EvalApproval struct {
-	Type         string `json:"type"` // "block" or "document"
-	FilePath     string `json:"file_path"`
-	BlockName    string `json:"block_name,omitempty"`
-	Mode         string `json:"mode"`
+	Type      string `json:"type"` // "block" or "document"
+	FilePath  string `json:"file_path"`
+	BlockName string `json:"block_name,omitempty"`
+	Mode      string `json:"mode"`
 }
 
 type EvalSummary struct {
@@ -509,32 +509,32 @@ func listBlocksJSON(cmd *cobra.Command, filename string, startTime time.Time) er
 	if err != nil {
 		return outputJSONError(cmd, fmt.Errorf("error parsing %s: %w", filename, err), startTime)
 	}
-	
+
 	// Get security manager to check approvals
 	sm, err := eval.NewSecurityManager()
 	if err != nil {
 		return outputJSONError(cmd, fmt.Errorf("failed to initialize security manager: %w", err), startTime)
 	}
-	
+
 	absPath, err := filepath.Abs(filename)
 	if err != nil {
 		return outputJSONError(cmd, err, startTime)
 	}
-	
+
 	var evalBlocks []EvalBlock
 	approvedCount := 0
-	
+
 	for _, block := range blocks {
 		if block.Eval != nil && block.Eval.Params["name"] != "" {
 			blockName := block.Eval.Params["name"]
-			
+
 			// Check if block is approved
 			isApproved, err := sm.CheckApproval(absPath, block)
 			if err != nil {
 				// If error checking approval, assume not approved
 				isApproved = false
 			}
-			
+
 			var approvalMode string
 			if isApproved {
 				approvedCount++
@@ -549,7 +549,7 @@ func listBlocksJSON(cmd *cobra.Command, filename string, startTime time.Time) er
 					}
 				}
 			}
-			
+
 			evalBlocks = append(evalBlocks, EvalBlock{
 				Name:         blockName,
 				Language:     block.Lang,
@@ -560,7 +560,7 @@ func listBlocksJSON(cmd *cobra.Command, filename string, startTime time.Time) er
 			})
 		}
 	}
-	
+
 	response := EvalResponse{
 		Operation: "list_blocks",
 		Blocks:    evalBlocks,
@@ -570,7 +570,7 @@ func listBlocksJSON(cmd *cobra.Command, filename string, startTime time.Time) er
 		},
 		Metadata: createJSONMetadata(cmd, true, startTime),
 	}
-	
+
 	return outputJSON(response)
 }
 
@@ -580,12 +580,12 @@ func listApprovedBlocksJSON(cmd *cobra.Command, startTime time.Time) error {
 	if err != nil {
 		return outputJSONError(cmd, fmt.Errorf("failed to initialize security manager: %w", err), startTime)
 	}
-	
+
 	approvals := sm.ListApprovals()
 	docApprovals := sm.ListDocumentApprovals()
-	
+
 	var evalApprovals []EvalApproval
-	
+
 	// Add document approvals
 	for _, approval := range docApprovals {
 		evalApprovals = append(evalApprovals, EvalApproval{
@@ -594,7 +594,7 @@ func listApprovedBlocksJSON(cmd *cobra.Command, startTime time.Time) error {
 			Mode:     string(approval.Mode),
 		})
 	}
-	
+
 	// Add individual block approvals
 	for _, approval := range approvals {
 		evalApprovals = append(evalApprovals, EvalApproval{
@@ -604,7 +604,7 @@ func listApprovedBlocksJSON(cmd *cobra.Command, startTime time.Time) error {
 			Mode:      string(approval.Mode),
 		})
 	}
-	
+
 	response := EvalResponse{
 		Operation: "list_approved",
 		Approvals: evalApprovals,
@@ -613,7 +613,7 @@ func listApprovedBlocksJSON(cmd *cobra.Command, startTime time.Time) error {
 		},
 		Metadata: createJSONMetadata(cmd, true, startTime),
 	}
-	
+
 	return outputJSON(response)
 }
 
@@ -622,13 +622,13 @@ func outputExecutionResultsJSON(cmd *cobra.Command, filename, blockName string, 
 	var evalResults []EvalResult
 	executed := 0
 	failed := 0
-	
+
 	for _, result := range results {
 		var output, errorMsg string
 		var blockName, language, code string
 		var startLine, endLine int
 		success := result.Err == nil
-		
+
 		if result.Block != nil {
 			if result.Block.Eval != nil && result.Block.Eval.Params["name"] != "" {
 				blockName = result.Block.Eval.Params["name"]
@@ -638,18 +638,18 @@ func outputExecutionResultsJSON(cmd *cobra.Command, filename, blockName string, 
 			startLine = result.Block.StartLine
 			endLine = result.Block.EndLine
 		}
-		
+
 		if result.Err != nil {
 			errorMsg = result.Err.Error()
 			failed++
 		} else {
 			executed++
 		}
-		
+
 		if result.Output != "" {
 			output = result.Output
 		}
-		
+
 		evalResults = append(evalResults, EvalResult{
 			BlockName: blockName,
 			Language:  language,
@@ -661,12 +661,12 @@ func outputExecutionResultsJSON(cmd *cobra.Command, filename, blockName string, 
 			EndLine:   endLine,
 		})
 	}
-	
+
 	operation := "execute_all"
 	if blockName != "" {
 		operation = "execute_block"
 	}
-	
+
 	response := EvalResponse{
 		Operation: operation,
 		Results:   evalResults,
@@ -677,7 +677,7 @@ func outputExecutionResultsJSON(cmd *cobra.Command, filename, blockName string, 
 		},
 		Metadata: createJSONMetadata(cmd, true, startTime),
 	}
-	
+
 	return outputJSON(response)
 }
 
@@ -701,17 +701,17 @@ func revokeApprovalJSON(cmd *cobra.Command, filename, blockName string, startTim
 	if err != nil {
 		return outputJSONError(cmd, fmt.Errorf("failed to initialize security manager: %w", err), startTime)
 	}
-	
+
 	absPath, err := filepath.Abs(filename)
 	if err != nil {
 		return outputJSONError(cmd, err, startTime)
 	}
-	
+
 	err = sm.RevokeApproval(absPath, blockName)
 	if err != nil {
 		return outputJSONError(cmd, fmt.Errorf("failed to revoke approval: %w", err), startTime)
 	}
-	
+
 	response := EvalResponse{
 		Operation: "revoke_approval",
 		Summary: EvalSummary{
@@ -719,7 +719,7 @@ func revokeApprovalJSON(cmd *cobra.Command, filename, blockName string, startTim
 		},
 		Metadata: createJSONMetadata(cmd, true, startTime),
 	}
-	
+
 	return outputJSON(response)
 }
 
@@ -729,17 +729,17 @@ func revokeDocumentApprovalJSON(cmd *cobra.Command, filename string, startTime t
 	if err != nil {
 		return outputJSONError(cmd, fmt.Errorf("failed to initialize security manager: %w", err), startTime)
 	}
-	
+
 	absPath, err := filepath.Abs(filename)
 	if err != nil {
 		return outputJSONError(cmd, err, startTime)
 	}
-	
+
 	err = sm.RevokeDocumentApproval(absPath)
 	if err != nil {
 		return outputJSONError(cmd, fmt.Errorf("failed to revoke document approval: %w", err), startTime)
 	}
-	
+
 	response := EvalResponse{
 		Operation: "revoke_document_approval",
 		Summary: EvalSummary{
@@ -747,6 +747,6 @@ func revokeDocumentApprovalJSON(cmd *cobra.Command, filename string, startTime t
 		},
 		Metadata: createJSONMetadata(cmd, true, startTime),
 	}
-	
+
 	return outputJSON(response)
 }

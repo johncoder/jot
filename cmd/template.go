@@ -36,7 +36,7 @@ var templateListCmd = &cobra.Command{
 	Long:  `List all available templates and their approval status.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		startTime := time.Now()
-		
+
 		ws, err := workspace.RequireWorkspace()
 		if err != nil {
 			if isJSONOutput(cmd) {
@@ -109,7 +109,7 @@ Templates require approval before shell commands can execute.`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		startTime := time.Now()
-		
+
 		ws, err := workspace.RequireWorkspace()
 		if err != nil {
 			if isJSONOutput(cmd) {
@@ -222,7 +222,7 @@ var templateEditCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		startTime := time.Now()
-		
+
 		ws, err := workspace.RequireWorkspace()
 		if err != nil {
 			if isJSONOutput(cmd) {
@@ -302,7 +302,7 @@ current content hash - any changes will require re-approval.`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		startTime := time.Now()
-		
+
 		ws, err := workspace.RequireWorkspace()
 		if err != nil {
 			if isJSONOutput(cmd) {
@@ -366,7 +366,7 @@ var templateViewCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		startTime := time.Now()
-		
+
 		ws, err := workspace.RequireWorkspace()
 		if err != nil {
 			if isJSONOutput(cmd) {
@@ -420,7 +420,7 @@ Examples:
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		startTime := time.Now()
-		
+
 		ws, err := workspace.RequireWorkspace()
 		if err != nil {
 			if isJSONOutput(cmd) {
@@ -482,10 +482,10 @@ func countApproved(templates []template.Template) int {
 
 // JSON response structures for template commands
 type TemplateListResponse struct {
-	Operation string               `json:"operation"`
-	Templates []TemplateItem       `json:"templates"`
-	Summary   TemplateListSummary  `json:"summary"`
-	Metadata  JSONMetadata         `json:"metadata"`
+	Operation string              `json:"operation"`
+	Templates []TemplateItem      `json:"templates"`
+	Summary   TemplateListSummary `json:"summary"`
+	Metadata  JSONMetadata        `json:"metadata"`
 }
 
 type TemplateItem struct {

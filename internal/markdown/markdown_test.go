@@ -122,7 +122,7 @@ func TestCalculateLineColumn(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			line, column := CalculateLineColumn([]byte(tt.content), tt.offset)
 			if line != tt.expectedLine || column != tt.expectedColumn {
-				t.Errorf("CalculateLineColumn() = (%d, %d), expected (%d, %d)", 
+				t.Errorf("CalculateLineColumn() = (%d, %d), expected (%d, %d)",
 					line, column, tt.expectedLine, tt.expectedColumn)
 			}
 		})
@@ -131,7 +131,7 @@ func TestCalculateLineColumn(t *testing.T) {
 
 func TestValidateOffset(t *testing.T) {
 	content := []byte("Hello, World!")
-	
+
 	tests := []struct {
 		name     string
 		offset   int
@@ -171,7 +171,7 @@ func TestValidateOffset(t *testing.T) {
 
 func TestFindInsertionPoint(t *testing.T) {
 	content := []byte("Line 1\nLine 2\nLine 3")
-	
+
 	tests := []struct {
 		name     string
 		offset   int
@@ -222,53 +222,53 @@ func TestFindInsertionPoint(t *testing.T) {
 
 func TestOffsetRange(t *testing.T) {
 	content := []byte("Hello, World!")
-	
+
 	t.Run("valid range", func(t *testing.T) {
 		r := OffsetRange{Start: 0, End: 5}
-		
+
 		if !r.IsValid(content) {
 			t.Error("Expected range to be valid")
 		}
-		
+
 		if r.Length() != 5 {
 			t.Errorf("Expected length 5, got %d", r.Length())
 		}
-		
+
 		extracted := r.Extract(content)
 		expected := "Hello"
 		if string(extracted) != expected {
 			t.Errorf("Expected %q, got %q", expected, string(extracted))
 		}
 	})
-	
+
 	t.Run("invalid range - negative start", func(t *testing.T) {
 		r := OffsetRange{Start: -1, End: 5}
-		
+
 		if r.IsValid(content) {
 			t.Error("Expected range to be invalid")
 		}
-		
+
 		extracted := r.Extract(content)
 		if extracted != nil {
 			t.Error("Expected nil extraction from invalid range")
 		}
 	})
-	
+
 	t.Run("invalid range - end before start", func(t *testing.T) {
 		r := OffsetRange{Start: 10, End: 5}
-		
+
 		if r.IsValid(content) {
 			t.Error("Expected range to be invalid")
 		}
-		
+
 		if r.Length() != 0 {
 			t.Errorf("Expected length 0 for invalid range, got %d", r.Length())
 		}
 	})
-	
+
 	t.Run("invalid range - end beyond content", func(t *testing.T) {
 		r := OffsetRange{Start: 0, End: 100}
-		
+
 		if r.IsValid(content) {
 			t.Error("Expected range to be invalid")
 		}
@@ -319,7 +319,7 @@ Team standup meeting.
 			if offset == -1 {
 				t.Fatalf("Could not find text %q in content", tt.text)
 			}
-			
+
 			line := CalculateLineNumber([]byte(content), offset)
 			if line != tt.expected {
 				t.Errorf("Expected line %d for %q, got %d", tt.expected, tt.text, line)

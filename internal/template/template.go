@@ -96,7 +96,7 @@ func (m *Manager) Get(name string) (*Template, error) {
 	approved := m.isApproved(hash)
 
 	metadata := parseMetadata(string(content))
-	
+
 	// Handle both old 'destination_file' and new 'destination' fields for backward compatibility
 	destinationField := metadata["destination"]
 	if destinationField == "" {
@@ -105,7 +105,7 @@ func (m *Manager) Get(name string) (*Template, error) {
 	if destinationField == "" {
 		destinationField = "inbox.md"
 	}
-	
+
 	refileMode := metadata["refile_mode"]
 	if refileMode == "" {
 		refileMode = "append"
@@ -277,13 +277,13 @@ func calculateHash(content string) string {
 // Enhanced to support YAML frontmatter for destination selectors and refile modes
 func parseMetadata(content string) map[string]string {
 	metadata := make(map[string]string)
-	
+
 	// Check if content has YAML frontmatter
 	if strings.HasPrefix(content, "---\n") {
 		parts := strings.SplitN(content, "\n---\n", 2)
 		if len(parts) >= 2 {
 			yamlContent := parts[0][4:] // Remove the initial "---\n"
-			
+
 			var yamlData map[string]interface{}
 			if err := yaml.Unmarshal([]byte(yamlContent), &yamlData); err == nil {
 				// Convert YAML data to string map
@@ -299,7 +299,7 @@ func parseMetadata(content string) map[string]string {
 			}
 		}
 	}
-	
+
 	// Fallback to simple key:value parsing for backward compatibility
 	lines := strings.Split(content, "\n")
 	for _, line := range lines {
@@ -340,7 +340,7 @@ func (m *Manager) ParseDestination(destination, mode string) (*DestinationInfo, 
 		if err != nil {
 			return nil, fmt.Errorf("invalid destination selector '%s': %w", destination, err)
 		}
-		
+
 		return &DestinationInfo{
 			File:       headingPath.File,
 			Selector:   destination,
@@ -391,7 +391,7 @@ func (m *Manager) ValidateDestination(destination string) error {
 // stripFrontmatter removes YAML frontmatter from content
 func stripFrontmatter(content string) string {
 	lines := strings.Split(content, "\n")
-	
+
 	// Check if content starts with frontmatter delimiter
 	if len(lines) > 0 && strings.TrimSpace(lines[0]) == "---" {
 		// Find the closing delimiter
@@ -405,7 +405,7 @@ func stripFrontmatter(content string) string {
 			}
 		}
 	}
-	
+
 	// No frontmatter found, return original content
 	return content
 }

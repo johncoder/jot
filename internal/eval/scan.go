@@ -40,12 +40,12 @@ func ParseMarkdownForEvalBlocks(filename string) ([]*CodeBlock, error) {
 	var codeBlock *CodeBlock
 	var lineNum int
 	var pendingEval *EvalMetadata // Store eval element waiting for code block
-	
+
 	for scanner.Scan() {
 		line := scanner.Text()
 		lineNum++
 		trim := strings.TrimSpace(line)
-		
+
 		// Check for eval element first (new pattern: eval before code)
 		if !inCode && IsEvalElement(trim) {
 			meta, err := ParseEvalElement(trim)
@@ -54,16 +54,16 @@ func ParseMarkdownForEvalBlocks(filename string) ([]*CodeBlock, error) {
 			}
 			continue
 		}
-		
+
 		if strings.HasPrefix(trim, "```") {
 			if !inCode {
 				// Start of code block
 				inCode = true
 				lang := strings.TrimSpace(trim[3:])
 				codeBlock = &CodeBlock{
-					StartLine: lineNum, 
-					Lang: lang,
-					Eval: pendingEval, // Associate with preceding eval element
+					StartLine: lineNum,
+					Lang:      lang,
+					Eval:      pendingEval, // Associate with preceding eval element
 				}
 				pendingEval = nil // Clear pending eval
 			} else {
@@ -75,7 +75,7 @@ func ParseMarkdownForEvalBlocks(filename string) ([]*CodeBlock, error) {
 			}
 			continue
 		}
-		
+
 		if inCode {
 			codeBlock.Code = append(codeBlock.Code, line)
 			continue

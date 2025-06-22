@@ -13,11 +13,11 @@ import (
 func TestPeekCommand(t *testing.T) {
 	// Create temporary directory for testing
 	tempDir := t.TempDir()
-	
+
 	// Create workspace structure
 	jotDir := filepath.Join(tempDir, ".jot")
 	libDir := filepath.Join(tempDir, "lib")
-	
+
 	if err := os.MkdirAll(jotDir, 0755); err != nil {
 		t.Fatalf("Failed to create jot directory: %v", err)
 	}
@@ -67,43 +67,43 @@ Helper functions and utilities.
 	}
 
 	tests := []struct {
-		name           string
-		selector       string
+		name            string
+		selector        string
 		expectedHeading string
 		expectedLevel   int
 		expectError     bool
 	}{
 		{
-			name:           "peek user guide section",
-			selector:       "lib/test_peek.md#doc/user",
+			name:            "peek user guide section",
+			selector:        "lib/test_peek.md#doc/user",
 			expectedHeading: "User Guide",
 			expectedLevel:   2,
 			expectError:     false,
 		},
 		{
-			name:           "peek getting started subsection",
-			selector:       "lib/test_peek.md#doc/user/getting",
+			name:            "peek getting started subsection",
+			selector:        "lib/test_peek.md#doc/user/getting",
 			expectedHeading: "Getting Started",
 			expectedLevel:   3,
 			expectError:     false,
 		},
 		{
-			name:           "peek installation with skip levels",
-			selector:       "lib/test_peek.md#///install",
+			name:            "peek installation with skip levels",
+			selector:        "lib/test_peek.md#///install",
 			expectedHeading: "Installation",
 			expectedLevel:   4,
 			expectError:     false,
 		},
 		{
-			name:           "peek non-existent section",
-			selector:       "lib/test_peek.md#nonexistent",
+			name:            "peek non-existent section",
+			selector:        "lib/test_peek.md#nonexistent",
 			expectedHeading: "",
 			expectedLevel:   0,
 			expectError:     true,
 		},
 		{
-			name:           "peek with contains matching",
-			selector:       "lib/test_peek.md#doc/api",
+			name:            "peek with contains matching",
+			selector:        "lib/test_peek.md#doc/api",
 			expectedHeading: "API Reference",
 			expectedLevel:   2,
 			expectError:     false,
@@ -304,11 +304,11 @@ Some content here.
 func TestShowTableOfContents(t *testing.T) {
 	// Create temporary directory for testing
 	tempDir := t.TempDir()
-	
+
 	// Create workspace structure
 	jotDir := filepath.Join(tempDir, ".jot")
 	libDir := filepath.Join(tempDir, "lib")
-	
+
 	if err := os.MkdirAll(jotDir, 0755); err != nil {
 		t.Fatalf("Failed to create jot directory: %v", err)
 	}
@@ -394,7 +394,7 @@ How to get help.
 				if !strings.Contains(output, "Table of Contents: lib/toc_test.md") {
 					t.Error("Expected TOC header not found")
 				}
-				
+
 				// Should contain major headings
 				if !strings.Contains(output, "# Project Documentation") {
 					t.Error("Expected top-level heading not found")
@@ -408,7 +408,7 @@ How to get help.
 				if !strings.Contains(output, "#### From Source") {
 					t.Error("Expected fourth-level heading not found")
 				}
-				
+
 				// Should contain selector hints
 				if !strings.Contains(output, "jot peek") {
 					t.Error("Expected selector hints not found")
@@ -424,7 +424,7 @@ How to get help.
 				if !strings.Contains(output, "Table of Contents: lib/toc_test.md#doc/getting") {
 					t.Error("Expected subtree TOC header not found")
 				}
-				
+
 				// Should contain subtree headings but not others
 				if !strings.Contains(output, "### Prerequisites") {
 					t.Error("Expected subtree heading not found")
@@ -460,18 +460,18 @@ How to get help.
 			// For this test, we'll check that the function doesn't panic
 			// and returns appropriate errors
 			err := showTableOfContents(ws, tt.selector, false) // Use default (non-short) selectors for tests
-			
+
 			if tt.expectError {
 				if err == nil {
 					t.Errorf("Expected error but got none")
 				}
 				return
 			}
-			
+
 			if err != nil {
 				t.Errorf("Unexpected error: %v", err)
 			}
-			
+
 			// Note: For a more comprehensive test, we would need to capture
 			// the actual output. For now, we're just testing that the function
 			// executes without errors and handles edge cases properly.
@@ -482,11 +482,11 @@ How to get help.
 func TestTableOfContentsEdgeCases(t *testing.T) {
 	// Create temporary directory for testing
 	tempDir := t.TempDir()
-	
+
 	// Create workspace structure
 	jotDir := filepath.Join(tempDir, ".jot")
 	libDir := filepath.Join(tempDir, "lib")
-	
+
 	if err := os.MkdirAll(jotDir, 0755); err != nil {
 		t.Fatalf("Failed to create jot directory: %v", err)
 	}
@@ -542,7 +542,7 @@ func TestTableOfContentsEdgeCases(t *testing.T) {
 
 			// Test TOC function
 			err := showTableOfContents(ws, tt.filename, false) // Use default (non-short) selectors for tests
-			
+
 			if tt.expectError {
 				if err == nil {
 					t.Errorf("Expected error but got none")

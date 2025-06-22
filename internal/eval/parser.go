@@ -18,32 +18,32 @@ func ParseEvalElement(element string) (*EvalMetadata, error) {
 	if !strings.HasPrefix(element, "<eval") || !strings.HasSuffix(element, "/>") {
 		return nil, fmt.Errorf("not a valid eval element")
 	}
-	
+
 	// Extract the attributes portion between <eval and />
 	content := element[5 : len(element)-2] // Remove "<eval" and "/>"
 	content = strings.TrimSpace(content)
-	
+
 	params, err := parseHTMLAttributes(content)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return &EvalMetadata{Params: params}, nil
 }
 
 // parseHTMLAttributes parses HTML-style attributes: name="value" key="value with spaces"
 func parseHTMLAttributes(s string) (map[string]string, error) {
 	params := make(map[string]string)
-	// Regex: key="value" or key='value' 
+	// Regex: key="value" or key='value'
 	re := regexp.MustCompile(`([a-zA-Z0-9_-]+)=["']([^"']*)["']`)
 	matches := re.FindAllStringSubmatch(s, -1)
-	
+
 	for _, m := range matches {
 		key := m[1]
 		value := m[2]
 		params[key] = value
 	}
-	
+
 	return params, nil
 }
 

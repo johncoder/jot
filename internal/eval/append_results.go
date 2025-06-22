@@ -30,7 +30,7 @@ func UpdateMarkdownWithResults(filename string, results []*EvalResult) error {
 		// Find the eval element for this specific block using line numbers
 		// The eval element should be right before the code block starts
 		evalElementLineIndex := -1
-		for i := r.Block.StartLine - 2; i >= 0 && i >= r.Block.StartLine - 6; i-- { // search within 5 lines before code block (0-indexed)
+		for i := r.Block.StartLine - 2; i >= 0 && i >= r.Block.StartLine-6; i-- { // search within 5 lines before code block (0-indexed)
 			if i < 0 || i >= len(lines) {
 				continue
 			}
@@ -95,7 +95,7 @@ func getResultsParam(params map[string]string) string {
 // getResultsHandling extracts the results handling mode, defaulting to "replace"
 func getResultsHandling(params map[string]string) string {
 	resultsParam := getResultsParam(params)
-	
+
 	// Check if results param contains handling mode
 	if strings.Contains(resultsParam, "append") {
 		return "append"
@@ -109,7 +109,7 @@ func getResultsHandling(params map[string]string) string {
 	if strings.Contains(resultsParam, "none") {
 		return "none"
 	}
-	
+
 	return "replace" // default
 }
 
@@ -125,10 +125,10 @@ func formatResult(result *EvalResult, params map[string]string, filename string)
 	}
 
 	resultsParam := getResultsParam(params)
-	
+
 	// Parse compound results parameters (e.g., "table", "output", "code")
 	resultType := parseResultType(resultsParam)
-	
+
 	switch resultType {
 	case "code":
 		return formatAsCodeBlock(output), nil
@@ -176,13 +176,13 @@ func formatAsTable(output string) string {
 
 	// Try to detect if this is already table-like data (CSV, TSV, etc.)
 	var table strings.Builder
-	
+
 	for i, line := range lines {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
 		}
-		
+
 		// Split by common delimiters
 		var cells []string
 		if strings.Contains(line, "\t") {
@@ -195,17 +195,17 @@ func formatAsTable(output string) string {
 			// Single column
 			cells = []string{line}
 		}
-		
+
 		// Clean up cells
 		for j, cell := range cells {
 			cells[j] = strings.TrimSpace(cell)
 		}
-		
+
 		// Format as markdown table row
 		table.WriteString("| ")
 		table.WriteString(strings.Join(cells, " | "))
 		table.WriteString(" |\n")
-		
+
 		// Add header separator for first row
 		if i == 0 {
 			table.WriteString("|")
@@ -215,7 +215,7 @@ func formatAsTable(output string) string {
 			table.WriteString("\n")
 		}
 	}
-	
+
 	return table.String()
 }
 
@@ -223,7 +223,7 @@ func formatAsTable(output string) string {
 func formatAsList(output string) string {
 	lines := strings.Split(strings.TrimSpace(output), "\n")
 	var list strings.Builder
-	
+
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
 		if line == "" {
@@ -233,7 +233,7 @@ func formatAsList(output string) string {
 		list.WriteString(line)
 		list.WriteString("\n")
 	}
-	
+
 	return list.String()
 }
 
@@ -257,25 +257,25 @@ func formatAsFile(output string, params map[string]string, baseFilename string) 
 		}
 		outputPath = fmt.Sprintf("%s_%s.txt", baseName, blockName)
 	}
-	
+
 	// Make path absolute if relative
 	if !filepath.IsAbs(outputPath) {
 		dir := filepath.Dir(baseFilename)
 		outputPath = filepath.Join(dir, outputPath)
 	}
-	
+
 	// Write output to file
 	err := os.WriteFile(outputPath, []byte(output), 0644)
 	if err != nil {
 		return "", fmt.Errorf("failed to write output file: %v", err)
 	}
-	
+
 	// Return markdown link
 	relPath, err := filepath.Rel(filepath.Dir(baseFilename), outputPath)
 	if err != nil {
 		relPath = outputPath
 	}
-	
+
 	// Determine if it's an image or regular file
 	ext := strings.ToLower(filepath.Ext(outputPath))
 	if ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".gif" || ext == ".svg" {
@@ -326,10 +326,10 @@ func replaceResultBlock(lines []string, evalElementIndex int, result string) []s
 			break
 		}
 	}
-	
+
 	// Insert new result with proper blank line separation
 	resultLines := strings.Split(result, "\n")
-	
+
 	// After removing existing results, j points to where we should insert
 	// Check if there's already a blank line at the insertion point or just before it
 	needsBlankLine := true
@@ -343,16 +343,16 @@ func replaceResultBlock(lines []string, evalElementIndex int, result string) []s
 			needsBlankLine = false
 		}
 	}
-	
+
 	var newContent []string
 	if needsBlankLine {
 		newContent = append([]string{""}, resultLines...)
 	} else {
 		newContent = resultLines
 	}
-	
+
 	lines = append(lines[:j], append(newContent, lines[j:]...)...)
-	
+
 	return lines
 }
 
@@ -362,8 +362,8 @@ func isTableLine(line string) bool {
 		return false
 	}
 	// A table line contains pipes and typically starts/ends with |
-	return strings.Contains(line, "|") && 
-		   (strings.HasPrefix(line, "|") || strings.HasSuffix(line, "|") || strings.Count(line, "|") >= 2)
+	return strings.Contains(line, "|") &&
+		(strings.HasPrefix(line, "|") || strings.HasSuffix(line, "|") || strings.Count(line, "|") >= 2)
 }
 
 // appendResultBlock adds result after existing results
@@ -400,14 +400,14 @@ func appendResultBlock(lines []string, evalElementIndex int, result string) []st
 			break
 		}
 	}
-	
+
 	// Insert result at position j with proper blank line separation
 	resultLines := strings.Split(result, "\n")
-	
+
 	// Add a blank line before the result for proper Markdown parsing
 	newContent := append([]string{""}, resultLines...)
 	lines = append(lines[:j], append(newContent, lines[j:]...)...)
-	
+
 	return lines
 }
 
@@ -415,11 +415,11 @@ func appendResultBlock(lines []string, evalElementIndex int, result string) []st
 func prependResultBlock(lines []string, evalElementIndex int, result string) []string {
 	// Insert right after eval element with proper blank line separation
 	resultLines := strings.Split(result, "\n")
-	
+
 	// Always add a blank line before the result for proper Markdown parsing
 	newContent := append([]string{""}, resultLines...)
 	lines = append(lines[:evalElementIndex+1], append(newContent, lines[evalElementIndex+1:]...)...)
-	
+
 	return lines
 }
 
@@ -464,23 +464,23 @@ func replaceResultBlockAfterCode(lines []string, codeBlockEndIndex int, result s
 			break
 		}
 	}
-	
+
 	// Insert new result with proper blank line separation
 	resultLines := strings.Split(result, "\n")
-	
+
 	// Add blank line before result if needed
 	insertIndex := codeBlockEndIndex + 1
 	if insertIndex < len(lines) && strings.TrimSpace(lines[insertIndex]) != "" {
 		resultLines = append([]string{""}, resultLines...)
 	}
-	
+
 	// Add blank line after result if needed
 	if insertIndex < len(lines) && strings.TrimSpace(lines[insertIndex]) != "" {
 		resultLines = append(resultLines, "")
 	}
-	
+
 	lines = append(lines[:insertIndex], append(resultLines, lines[insertIndex:]...)...)
-	
+
 	return lines
 }
 
@@ -521,14 +521,14 @@ func appendResultBlockAfterCode(lines []string, codeBlockEndIndex int, result st
 			break
 		}
 	}
-	
+
 	// Insert result at position j with proper blank line separation
 	resultLines := strings.Split(result, "\n")
-	
+
 	// Always add a blank line before the result for proper Markdown parsing
 	newContent := append([]string{""}, resultLines...)
 	lines = append(lines[:j], append(newContent, lines[j:]...)...)
-	
+
 	return lines
 }
 
@@ -537,10 +537,10 @@ func prependResultBlockAfterCode(lines []string, codeBlockEndIndex int, result s
 	// Insert right after code block with proper blank line separation
 	resultLines := strings.Split(result, "\n")
 	insertIndex := codeBlockEndIndex + 1
-	
+
 	// Always add a blank line before the result for proper Markdown parsing
 	newContent := append([]string{""}, resultLines...)
 	lines = append(lines[:insertIndex], append(newContent, lines[insertIndex:]...)...)
-	
+
 	return lines
 }

@@ -22,7 +22,7 @@ Examples:
   jot archive                    # Initialize archive structure`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		startTime := time.Now()
-		
+
 		ws, err := workspace.RequireWorkspace()
 		if err != nil {
 			if isJSONOutput(cmd) {
@@ -122,10 +122,10 @@ Examples:
 			}
 
 			response := ArchiveResponse{
-				Operation:     "archive",
-				ArchiveDir:    archiveDir,
-				CreatedItems:  createdItems,
-				Operations:    operations,
+				Operation:    "archive",
+				ArchiveDir:   archiveDir,
+				CreatedItems: createdItems,
+				Operations:   operations,
 				Summary: ArchiveSummary{
 					TotalItems:     len(createdItems),
 					ItemsCreated:   totalCreated,
@@ -156,19 +156,19 @@ Examples:
 
 // JSON response structures for archive command
 type ArchiveResponse struct {
-	Operation    string          `json:"operation"`
-	ArchiveDir   string          `json:"archive_dir"`
-	CreatedItems []ArchiveItem   `json:"created_items"`
-	Operations   []string        `json:"operations"`
-	Summary      ArchiveSummary  `json:"summary"`
-	Metadata     JSONMetadata    `json:"metadata"`
+	Operation    string         `json:"operation"`
+	ArchiveDir   string         `json:"archive_dir"`
+	CreatedItems []ArchiveItem  `json:"created_items"`
+	Operations   []string       `json:"operations"`
+	Summary      ArchiveSummary `json:"summary"`
+	Metadata     JSONMetadata   `json:"metadata"`
 }
 
 type ArchiveItem struct {
 	Path        string `json:"path"`
 	Type        string `json:"type"` // "file" or "directory"
 	Description string `json:"description"`
-	Created     bool   `json:"created"` // Whether this item was created in this operation
+	Created     bool   `json:"created"`        // Whether this item was created in this operation
 	Size        int64  `json:"size,omitempty"` // For files only
 }
 

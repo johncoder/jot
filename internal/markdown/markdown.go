@@ -75,7 +75,7 @@ func ParseDocument(content []byte) ast.Node {
 // FindSubtree finds a subtree matching the given path selector
 func FindSubtree(doc ast.Node, content []byte, path *HeadingPath) (*Subtree, error) {
 	var matches []*Subtree
-	
+
 	// Walk the AST to find matching headings
 	ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
 		if !entering {
@@ -88,12 +88,12 @@ func FindSubtree(doc ast.Node, content []byte, path *HeadingPath) (*Subtree, err
 				matches = append(matches, subtree)
 			}
 		}
-		
+
 		return ast.WalkContinue, nil
 	})
 
 	if len(matches) == 0 {
-		return nil, fmt.Errorf("no headings found matching path \"%s\" in %s", 
+		return nil, fmt.Errorf("no headings found matching path \"%s\" in %s",
 			strings.Join(path.Segments, "/"), path.File)
 	}
 
@@ -103,7 +103,7 @@ func FindSubtree(doc ast.Node, content []byte, path *HeadingPath) (*Subtree, err
 			line := CalculateLineNumber(content, match.StartOffset)
 			matchDetails = append(matchDetails, fmt.Sprintf("  - \"%s\" at line %d", match.Heading, line))
 		}
-		return nil, fmt.Errorf("multiple headings match \"%s\" in %s:\n%s\nUse a more specific path", 
+		return nil, fmt.Errorf("multiple headings match \"%s\" in %s:\n%s\nUse a more specific path",
 			strings.Join(path.Segments, "/"), path.File, strings.Join(matchDetails, "\n"))
 	}
 
@@ -123,7 +123,7 @@ func FindAllHeadings(doc ast.Node, content []byte) []HeadingInfo {
 
 		if heading, ok := n.(*ast.Heading); ok {
 			headingText := ExtractHeadingText(heading, content)
-			
+
 			// Adjust path stack based on heading level
 			for len(levelStack) > 0 && levelStack[len(levelStack)-1] >= heading.Level {
 				levelStack = levelStack[:len(levelStack)-1]
@@ -131,15 +131,15 @@ func FindAllHeadings(doc ast.Node, content []byte) []HeadingInfo {
 					currentPath = currentPath[:len(currentPath)-1]
 				}
 			}
-			
+
 			// Add current heading to path
 			levelStack = append(levelStack, heading.Level)
 			currentPath = append(currentPath, headingText)
-			
+
 			// Create heading info
 			pathCopy := make([]string, len(currentPath))
 			copy(pathCopy, currentPath)
-			
+
 			headings = append(headings, HeadingInfo{
 				Text:   headingText,
 				Level:  heading.Level,
@@ -147,7 +147,7 @@ func FindAllHeadings(doc ast.Node, content []byte) []HeadingInfo {
 				Offset: GetNodeOffset(heading, content),
 			})
 		}
-		
+
 		return ast.WalkContinue, nil
 	})
 
@@ -166,12 +166,12 @@ type HeadingInfo struct {
 func tryMatchPath(heading *ast.Heading, content []byte, path *HeadingPath, segmentIndex int) *Subtree {
 	// Get heading text for matching
 	headingText := ExtractHeadingText(heading, content)
-	
+
 	// Check if current segment matches (case-insensitive contains)
 	if segmentIndex >= len(path.Segments) {
 		return nil
 	}
-	
+
 	segment := path.Segments[segmentIndex]
 	if !strings.Contains(strings.ToLower(headingText), strings.ToLower(segment)) {
 		return nil
@@ -214,20 +214,20 @@ func tryMatchPath(heading *ast.Heading, content []byte, path *HeadingPath, segme
 func extractSubtreeFromHeading(heading *ast.Heading, content []byte) *Subtree {
 	headingText := ExtractHeadingText(heading, content)
 	textOffset := GetNodeOffset(heading, content)
-	
+
 	// Find the actual start of the heading line (including ### markers)
 	// Walk backwards from the text offset to find the beginning of the line
 	startOffset := textOffset
 	for startOffset > 0 && content[startOffset-1] != '\n' {
 		startOffset--
 	}
-	
+
 	// Find the end of this subtree
 	endOffset := findSubtreeEnd(heading, content)
-	
+
 	// Extract content
 	subtreeContent := content[startOffset:endOffset]
-	
+
 	return &Subtree{
 		Heading:     headingText,
 		Level:       heading.Level,
@@ -251,7 +251,7 @@ func ExtractHeadingText(heading *ast.Heading, content []byte) string {
 	return strings.TrimSpace(text.String())
 }
 
-// GetNodeOffset gets the byte offset of a node in the content  
+// GetNodeOffset gets the byte offset of a node in the content
 func GetNodeOffset(node ast.Node, content []byte) int {
 	// Try to get segment information
 	if hasSegment, ok := node.(interface{ Segment() *text.Segment }); ok {
@@ -260,7 +260,7 @@ func GetNodeOffset(node ast.Node, content []byte) int {
 			return seg.Start
 		}
 	}
-	
+
 	// Fallback: try to get segment from Lines() method for headings
 	if heading, ok := node.(*ast.Heading); ok {
 		if heading.Lines().Len() > 0 {
@@ -268,7 +268,7 @@ func GetNodeOffset(node ast.Node, content []byte) int {
 			return segment.Start
 		}
 	}
-	
+
 	return 0
 }
 
@@ -286,24 +286,24 @@ func findSubtreeEnd(heading *ast.Heading, content []byte) int {
 		if h, ok := current.(*ast.Heading); ok && h.Level <= heading.Level {
 			// Found next same-level or higher heading
 			nextHeadingOffset := GetNodeOffset(h, content)
-			
+
 			// Find the actual start of the heading line by looking backwards for newline
 			lineStart := nextHeadingOffset
 			for lineStart > 0 && content[lineStart-1] != '\n' {
 				lineStart--
 			}
-			
+
 			// If we found a newline, the line starts after it
 			// Otherwise, we're at the beginning of the content
 			if lineStart > 0 && content[lineStart-1] == '\n' {
 				return lineStart
 			}
-			
+
 			return lineStart
 		}
 		current = current.NextSibling()
 	}
-	
+
 	// No next heading found, go to end of content
 	return len(content)
 }
@@ -322,7 +322,7 @@ func ValidateOffset(content []byte, offset int) int {
 // CalculateLineNumber calculates line number from byte offset
 func CalculateLineNumber(content []byte, offset int) int {
 	offset = ValidateOffset(content, offset)
-	
+
 	lineNumber := 1
 	for i := 0; i < offset; i++ {
 		if content[i] == '\n' {
@@ -335,10 +335,10 @@ func CalculateLineNumber(content []byte, offset int) int {
 // CalculateLineColumn calculates both line and column number from byte offset
 func CalculateLineColumn(content []byte, offset int) (line int, column int) {
 	offset = ValidateOffset(content, offset)
-	
+
 	line = 1
 	column = 1
-	
+
 	for i := 0; i < offset; i++ {
 		if content[i] == '\n' {
 			line++
@@ -347,14 +347,14 @@ func CalculateLineColumn(content []byte, offset int) (line int, column int) {
 			column++
 		}
 	}
-	
+
 	return line, column
 }
 
 // FindInsertionPoint finds the best byte offset for inserting content at a specific location
 func FindInsertionPoint(content []byte, targetOffset int, prepend bool) int {
 	targetOffset = ValidateOffset(content, targetOffset)
-	
+
 	if prepend {
 		// Find the end of the current line to insert after
 		for i := targetOffset; i < len(content); i++ {
@@ -365,7 +365,7 @@ func FindInsertionPoint(content []byte, targetOffset int, prepend bool) int {
 		// If no newline found, append at end
 		return len(content)
 	}
-	
+
 	// For append mode, find end of content section
 	return len(content)
 }
@@ -401,12 +401,12 @@ func (r OffsetRange) Extract(content []byte) []byte {
 func TransformHeadingLevels(content []byte, levelDiff int) []byte {
 	lines := bytes.Split(content, []byte("\n"))
 	var result []byte
-	
+
 	for i, line := range lines {
 		if i > 0 {
 			result = append(result, '\n')
 		}
-		
+
 		// Check if line is a heading
 		if bytes.HasPrefix(line, []byte("#")) {
 			// Count current level
@@ -414,7 +414,7 @@ func TransformHeadingLevels(content []byte, levelDiff int) []byte {
 			for j := 0; j < len(line) && line[j] == '#'; j++ {
 				currentLevel++
 			}
-			
+
 			if currentLevel > 0 && currentLevel < len(line) && line[currentLevel] == ' ' {
 				// This is a valid heading, transform it
 				newLevel := currentLevel + levelDiff
@@ -424,7 +424,7 @@ func TransformHeadingLevels(content []byte, levelDiff int) []byte {
 				if newLevel < 1 {
 					newLevel = 1
 				}
-				
+
 				// Build new heading
 				newHeading := bytes.Repeat([]byte("#"), newLevel)
 				newHeading = append(newHeading, line[currentLevel:]...)
@@ -436,20 +436,20 @@ func TransformHeadingLevels(content []byte, levelDiff int) []byte {
 			result = append(result, line...)
 		}
 	}
-	
+
 	return result
 }
 
 // CreateHeadingStructure creates missing heading hierarchy
 func CreateHeadingStructure(headings []string, baseLevel int) []byte {
 	var result []byte
-	
+
 	for i, heading := range headings {
 		level := baseLevel + i
 		if i > 0 {
 			result = append(result, '\n')
 		}
-		
+
 		// Create heading line
 		levelMarker := bytes.Repeat([]byte("#"), level)
 		result = append(result, levelMarker...)
@@ -457,7 +457,7 @@ func CreateHeadingStructure(headings []string, baseLevel int) []byte {
 		result = append(result, []byte(heading)...)
 		result = append(result, '\n')
 	}
-	
+
 	return result
 }
 
@@ -466,31 +466,31 @@ func PathMatches(actualPath []string, targetSegments []string, skipLevels int) b
 	if len(actualPath) < len(targetSegments) {
 		return false
 	}
-	
+
 	// Adjust for skip levels
 	if skipLevels >= len(actualPath) {
 		return false
 	}
-	
+
 	startIndex := skipLevels
 	if len(actualPath)-startIndex < len(targetSegments) {
 		return false
 	}
-	
+
 	// Check each segment for contains match
 	for i, segment := range targetSegments {
 		actualIndex := startIndex + i
 		if actualIndex >= len(actualPath) {
 			return false
 		}
-		
+
 		actual := strings.ToLower(actualPath[actualIndex])
 		target := strings.ToLower(segment)
-		
+
 		if !strings.Contains(actual, target) {
 			return false
 		}
 	}
-	
+
 	return true
 }
