@@ -127,14 +127,8 @@ destination: inbox.md
 refile_mode: append
 tags: [%s]
 ---
-# %s - $(date '+%%Y-%%m-%%d %%H:%%M')
+## %s - $(date '+%%Y-%%m-%%d %%H:%%M')
 
-**Created:** $(date '+%%Y-%%m-%%d')
-
-## Notes
-
-
-## Action Items
 
 `, strings.ToLower(name), strings.Title(name))
 
