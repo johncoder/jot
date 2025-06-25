@@ -5,15 +5,17 @@ import (
 	"os"
 	"os/exec"
 
+	"github.com/johncoder/jot/internal/workspace"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
 var (
-	cfgFile   string
-	version   = "dev"
-	buildTime = "unknown"
-	gitCommit = "unknown"
+	cfgFile       string
+	workspaceName string
+	version       = "dev"
+	buildTime     = "unknown"
+	gitCommit     = "unknown"
 )
 
 var rootCmd = &cobra.Command{
@@ -69,6 +71,7 @@ func init() {
 
 	// Global flags
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.jotrc)")
+	rootCmd.PersistentFlags().StringVarP(&workspaceName, "workspace", "w", "", "use specific workspace (bypasses discovery)")
 	rootCmd.PersistentFlags().BoolVar(&jsonOutput, "json", false, "output in JSON format")
 
 	// Version handling
@@ -131,4 +134,11 @@ func addCommands() {
 	rootCmd.AddCommand(templateCmd)
 	rootCmd.AddCommand(evalCmd)
 	rootCmd.AddCommand(tangleCmd)
+	rootCmd.AddCommand(workspaceCmd)
+}
+
+// getWorkspace returns a workspace using the global workspace flag override if provided
+func getWorkspace(cmd *cobra.Command) (*workspace.Workspace, error) {
+	workspaceName, _ := cmd.Flags().GetString("workspace")
+	return workspace.RequireWorkspaceWithOverride(workspaceName)
 }

@@ -8,7 +8,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/johncoder/jot/internal/workspace"
 	"github.com/spf13/cobra"
 )
 
@@ -31,7 +30,7 @@ Examples:
   jot find todo --archive        # Include archived notes`,
 	Args: cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		ws, err := workspace.RequireWorkspace()
+		ws, err := getWorkspace(cmd)
 		if err != nil {
 			return err
 		}

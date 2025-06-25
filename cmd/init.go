@@ -4,15 +4,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
-	"github.com/johncoder/jot/internal/config"
 	"github.com/spf13/cobra"
-)
-
-var (
-	initWorkspaceName string
 )
 
 var initCmd = &cobra.Command{
@@ -26,12 +20,13 @@ This command creates:
 - .jot/: Directory for internal data (SQLite, logs, etc.)
 
 The workspace will be created in the current directory or the specified path.
-The workspace will be registered in the global ~/.jotrc configuration file.
+
+To register this workspace for global access:
+  jot workspace add <name> <path>
 
 Examples:
   jot init                    # Initialize in current directory
-  jot init ~/my-notes         # Initialize in specific directory
-  jot init --name project-a   # Initialize with custom workspace name`,
+  jot init ~/my-notes         # Initialize in specific directory`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		startTime := time.Now()
@@ -168,31 +163,6 @@ Use 'jot refile' to move notes from your inbox to organized files here.
 			Size:        int64(len(libReadmeContent)),
 		})
 
-		// Register workspace in global configuration
-		workspaceName := initWorkspaceName
-		if workspaceName == "" {
-			// Auto-generate workspace name from directory name
-			workspaceName = filepath.Base(absPath)
-			// Clean up the name to be filesystem-safe
-			workspaceName = strings.ReplaceAll(workspaceName, " ", "-")
-			workspaceName = strings.ToLower(workspaceName)
-		}
-
-		// Add workspace to registry
-		if err := config.RegisterWorkspace(workspaceName, absPath); err != nil {
-			if strings.Contains(err.Error(), "already exists") {
-				err := fmt.Errorf("workspace name %q already exists. Try: jot init --name %s-2", workspaceName, workspaceName)
-				if isJSONOutput(cmd) {
-					return outputJSONError(cmd, err, startTime)
-				}
-				return err
-			}
-			// For other errors, continue but warn the user
-			if !isJSONOutput(cmd) {
-				fmt.Printf("Warning: Failed to register workspace in global config: %v\n", err)
-			}
-		}
-
 		// Output results
 		if isJSONOutput(cmd) {
 			// Calculate summary
@@ -224,16 +194,19 @@ Use 'jot refile' to move notes from your inbox to organized files here.
 		fmt.Println("✓ Created .jot/ directory")
 		fmt.Println("✓ Initialized workspace structure")
 		fmt.Println()
-		fmt.Println("Workspace initialized! You can now:")
-		fmt.Println("  jot capture    # Add your first note")
-		fmt.Println("  jot status     # Check workspace status")
+		fmt.Println("Workspace created successfully!")
+		fmt.Println()
+		fmt.Printf("To register this workspace for global access:\n")
+		fmt.Printf("  jot workspace add <name> %s\n", absPath)
+		fmt.Println()
+		fmt.Println("Or work locally by running commands from within the workspace directory.")
 
 		return nil
 	},
 }
 
 func init() {
-	initCmd.Flags().StringVar(&initWorkspaceName, "name", "", "custom name for the workspace (default: directory name)")
+	// No flags needed for init command
 }
 
 // JSON response structures for init command

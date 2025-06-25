@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/johncoder/jot/internal/workspace"
 	"github.com/spf13/cobra"
 )
 
@@ -28,7 +27,7 @@ Examples:
   jot status --verbose           # Show detailed information`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		startTime := time.Now()
-		ws, err := workspace.RequireWorkspace()
+		ws, err := getWorkspace(cmd)
 		if err != nil {
 			if isJSONOutput(cmd) {
 				return outputJSONError(cmd, err, startTime)
