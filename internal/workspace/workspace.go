@@ -91,11 +91,43 @@ func findWorkspaceFromGlobalConfig() (*Workspace, error) {
 
 // RequireWorkspace finds a workspace or returns an error
 func RequireWorkspace() (*Workspace, error) {
+	return RequireWorkspaceWithOverride("")
+}
+
+// RequireWorkspaceWithOverride finds a workspace, optionally using a specific workspace name override
+func RequireWorkspaceWithOverride(workspaceName string) (*Workspace, error) {
+	// If workspace name is provided, use specific workspace
+	if workspaceName != "" {
+		return RequireSpecificWorkspace(workspaceName)
+	}
+	
+	// Otherwise use normal discovery
 	ws, err := FindWorkspace()
 	if err != nil {
 		return nil, fmt.Errorf("%w\nRun 'jot init' to initialize a workspace", err)
 	}
 	return ws, nil
+}
+
+// RequireSpecificWorkspace finds a workspace by name from the config registry
+func RequireSpecificWorkspace(name string) (*Workspace, error) {
+	path, err := config.GetWorkspace(name)
+	if err != nil {
+		return nil, fmt.Errorf("workspace '%s' not found in registry: %w\nUse 'jot workspace list' to see available workspaces", name, err)
+	}
+
+	// Validate that the path exists and is initialized
+	jotDir := filepath.Join(path, ".jot")
+	if info, err := os.Stat(jotDir); err != nil || !info.IsDir() {
+		return nil, fmt.Errorf("workspace '%s' is not initialized (missing .jot directory at %s)\nRun 'jot init' in %s to initialize it", name, jotDir, path)
+	}
+
+	return &Workspace{
+		Root:      path,
+		JotDir:    jotDir,
+		InboxPath: filepath.Join(path, "inbox.md"),
+		LibDir:    filepath.Join(path, "lib"),
+	}, nil
 }
 
 // IsWorkspace checks if the current directory is a jot workspace
