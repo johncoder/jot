@@ -22,14 +22,14 @@ on your filesystem. Each workspace represents a collection of notes and can be
 accessed globally using the --workspace flag.
 
 Examples:
-  jot workspace                    # Show current workspace
+  jot workspace                    # Show current workspace path
   jot workspace list              # List all registered workspaces
   jot workspace add notes ~/notes # Add a workspace named 'notes'
   jot workspace remove old-proj  # Remove a workspace
   jot workspace default notes    # Set default workspace`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Show current workspace
-		return workspaceShowCurrent(cmd)
+		// Show current workspace path only (for piping to other commands)
+		return workspaceShowPath(cmd)
 	},
 }
 
@@ -93,6 +93,22 @@ func init() {
 }
 
 // Workspace management command implementations
+
+func workspaceShowPath(cmd *cobra.Command) error {
+	// Initialize config system
+	if err := config.Initialize(cfgFile); err != nil {
+		return fmt.Errorf("failed to initialize config: %w", err)
+	}
+
+	ws, err := workspace.FindWorkspace()
+	if err != nil {
+		return fmt.Errorf("no workspace found: %w\nRun 'jot init' to initialize a workspace or 'jot workspace list' to see registered workspaces", err)
+	}
+
+	// Output just the path for piping to other commands
+	fmt.Println(ws.Root)
+	return nil
+}
 
 func workspaceShowCurrent(cmd *cobra.Command) error {
 	startTime := time.Now()

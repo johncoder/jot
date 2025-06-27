@@ -95,12 +95,18 @@ Examples:
 			return outputJSON(response)
 		}
 
+		// Get workspace discovery information
+		discoveryMethod := determineDiscoveryMethod(ws)
+		workspaceName := getWorkspaceNameFromPath(ws.Root)
+
 		// Human-readable output
 		fmt.Println("Jot Workspace Status")
 		fmt.Println("===================")
 		fmt.Println()
 
-		fmt.Printf("Location: %s\n", ws.Root)
+		fmt.Printf("Workspace: %s\n", workspaceName)
+		fmt.Printf("Location:  %s\n", ws.Root)
+		fmt.Printf("Status:    Active (%s)\n", discoveryMethod)
 
 		fmt.Println()
 		fmt.Println("Notes Summary:")
