@@ -80,7 +80,25 @@ func runFZFLoop(resultsFile string, results []SearchResult, query string) error 
 			return nil
 		}
 
-		selectedLine := strings.TrimSpace(string(output))
+		selectedOutput := strings.TrimSpace(string(output))
+		if selectedOutput == "" {
+			return nil
+		}
+
+		// When using --expect, FZF outputs the key on first line, selection on second line
+		lines := strings.Split(selectedOutput, "\n")
+		var keyPressed, selectedLine string
+		
+		if len(lines) == 2 {
+			keyPressed = lines[0]
+			selectedLine = lines[1]
+		} else if len(lines) == 1 {
+			keyPressed = "" // Default enter
+			selectedLine = lines[0]
+		} else {
+			continue
+		}
+
 		if selectedLine == "" {
 			return nil
 		}
@@ -104,28 +122,32 @@ func runFZFLoop(resultsFile string, results []SearchResult, query string) error 
 			continue
 		}
 
-		// Handle the selected result
-		action, err := promptForAction(selectedResult)
-		if err != nil {
-			return err
+		// Determine action based on key pressed
+		var action string
+		if keyPressed == "alt-enter" {
+			action = "edit"
+		} else {
+			action = "view"
 		}
 
-		switch action {
-		case "view":
-			if err := viewFile(selectedResult); err != nil {
-				fmt.Printf("Error viewing file: %v\n", err)
-			}
-			// Continue the loop to return to FZF
-		case "edit":
-			if err := editFile(selectedResult); err != nil {
-				fmt.Printf("Error editing file: %v\n", err)
-			}
-			// Continue the loop to return to FZF
-		case "quit":
-			return nil
-		default:
-			// Unknown action, continue loop
+		// Handle the selected result
+		err = handleAction(selectedResult, action)
+		if err != nil {
+			fmt.Printf("Error: %v\n", err)
 		}
+		// Continue the loop to return to FZF
+	}
+}
+
+// handleAction performs the specified action on the selected result
+func handleAction(result *SearchResult, action string) error {
+	switch action {
+	case "view":
+		return viewFile(result)
+	case "edit":
+		return editFile(result)
+	default:
+		return nil
 	}
 }
 
@@ -138,8 +160,9 @@ func buildFZFCommand(resultsFile, query string) *exec.Cmd {
 		"--preview-window=right:50%:wrap",
 		"--bind=tab:toggle-preview",
 		"--bind=enter:accept",
-		"--bind=ctrl-o:accept",
-		"--header=ENTER/v: view, CTRL-O: edit, TAB: toggle preview, ESC: quit",
+		"--bind=alt-enter:accept",
+		"--expect=alt-enter", // Distinguish between enter and alt-enter
+		"--header=ENTER: view, ALT-ENTER: edit, TAB: toggle preview, ESC: quit",
 		"--prompt=" + fmt.Sprintf("Search '%s' > ", query),
 	}
 
@@ -155,18 +178,11 @@ func buildFZFCommand(resultsFile, query string) *exec.Cmd {
 
 // buildPreviewCommand creates the preview command for FZF
 func buildPreviewCommand() string {
-	// Extract the enhanced selector from the FZF line and use jot peek
-	// Format: index|enhanced_selector|filepath|context
-	// The enhanced_selector is field 2, which might be "file:line#heading" or just "file:line"
-	return `selector=$(echo {} | cut -d'|' -f2); jot peek "$selector" 2>/dev/null || echo "Preview not available for: $selector"`
-}
-
-// promptForAction determines what action to take based on FZF key binding
-// For now, we'll default to view action
-func promptForAction(result *SearchResult) (string, error) {
-	// In the future, we can detect which key was pressed in FZF
-	// For now, default to view
-	return "view", nil
+	// Extract the selector from the FZF line and use jot peek
+	// For find results: index|enhanced_selector|filepath|context -> use field 2 (enhanced_selector)
+	// For file results: index|displaypath|filepath|context -> use field 3 (filepath)
+	// Try field 2 first (enhanced selector), fallback to field 3 (filepath)
+	return `selector=$(echo {} | cut -d'|' -f2); filepath=$(echo {} | cut -d'|' -f3); jot peek "$selector" 2>/dev/null || jot peek "$filepath" 2>/dev/null || echo "Preview not available"`
 }
 
 // viewFile opens the selected file in the configured pager
