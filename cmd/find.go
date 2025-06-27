@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/johncoder/jot/internal/fzf"
+	"github.com/johncoder/jot/internal/markdown"
 	"github.com/johncoder/jot/internal/workspace"
 	"github.com/spf13/cobra"
 )
@@ -134,11 +135,14 @@ func runInteractiveFind(ws *workspace.Workspace, query string) error {
 		return nil
 	}
 
+	// Enhance results with heading information for better selectors
+	enhancedResults := enhanceResultsWithHeadings(results)
+
 	// Convert to FZF format
-	fzfResults := make([]fzf.SearchResult, len(results))
-	for i, result := range results {
+	fzfResults := make([]fzf.SearchResult, len(enhancedResults))
+	for i, result := range enhancedResults {
 		fzfResults[i] = fzf.SearchResult{
-			DisplayLine: fmt.Sprintf("%s:%d", result.RelativePath, result.LineNumber),
+			DisplayLine: result.RelativePath, // Now contains enhanced selector like "file:line#heading"
 			FilePath:    result.FilePath,
 			LineNumber:  result.LineNumber,
 			Context:     result.Context,
@@ -148,6 +152,51 @@ func runInteractiveFind(ws *workspace.Workspace, query string) error {
 
 	// Run interactive FZF search
 	return fzf.RunInteractiveSearch(fzfResults, query)
+}
+
+// enhanceResultsWithHeadings adds heading information to search results
+// by parsing markdown files efficiently and creating enhanced selectors
+func enhanceResultsWithHeadings(results []SearchResult) []SearchResult {
+	// Group results by file for efficient processing
+	fileGroups := make(map[string][]int) // filePath -> []resultIndex
+	for i, result := range results {
+		fileGroups[result.FilePath] = append(fileGroups[result.FilePath], i)
+	}
+
+	// Process each file once
+	for filePath, resultIndices := range fileGroups {
+		// Read file content
+		content, err := os.ReadFile(filePath)
+		if err != nil {
+			continue // Skip files we can't read
+		}
+
+		// Extract line numbers for this file
+		var targetLines []int
+		for _, idx := range resultIndices {
+			targetLines = append(targetLines, results[idx].LineNumber)
+		}
+
+		// Find headings for all target lines in this file
+		headingMap, err := markdown.FindNearestHeadingsForLines(content, targetLines)
+		if err != nil {
+			continue // Skip files we can't parse
+		}
+
+		// Update results with enhanced selectors
+		for _, idx := range resultIndices {
+			result := &results[idx]
+			lineNum := result.LineNumber
+			
+			if headingPath, found := headingMap[lineNum]; found && headingPath != "" {
+				// Create enhanced selector: file:line#heading/path
+				result.RelativePath = fmt.Sprintf("%s:%d#%s", result.RelativePath, lineNum, headingPath)
+			}
+			// If no heading found, keep the original format (file:line)
+		}
+	}
+
+	return results
 }
 
 // collectSearchResults performs the actual search and returns results

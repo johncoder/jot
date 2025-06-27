@@ -155,10 +155,10 @@ func buildFZFCommand(resultsFile, query string) *exec.Cmd {
 
 // buildPreviewCommand creates the preview command for FZF
 func buildPreviewCommand() string {
-	// Extract the absolute file path from the FZF line
-	// Format: index|displayline|filepath|context
-	// We want field 3 (absolute file path)
-	return `f=$(echo {} | cut -d'|' -f3); [ -f "$f" ] && head -50 "$f" || echo "File not found: $f"`
+	// Extract the enhanced selector from the FZF line and use jot peek
+	// Format: index|enhanced_selector|filepath|context
+	// The enhanced_selector is field 2, which might be "file:line#heading" or just "file:line"
+	return `selector=$(echo {} | cut -d'|' -f2); jot peek "$selector" 2>/dev/null || echo "Preview not available for: $selector"`
 }
 
 // promptForAction determines what action to take based on FZF key binding

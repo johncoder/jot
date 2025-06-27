@@ -84,6 +84,12 @@ This is useful for quickly reviewing files or specific sections without opening 
 
 		selector := args[0]
 
+		// Handle enhanced selectors with line numbers (e.g., "file:42" or "file:42#heading")
+		if enhancedSelector, err := parseEnhancedSelector(ws, selector); err == nil && enhancedSelector != selector {
+			// Successfully converted line number to heading, use the enhanced selector
+			selector = enhancedSelector
+		}
+
 		// Check if this is a whole file request (no # selector) or a subtree request
 		if !strings.Contains(selector, "#") {
 			// Handle whole file display
@@ -1404,4 +1410,81 @@ func buildPathToHeading(target HeadingInfo, allHeadings []HeadingInfo) []string 
 	}
 
 	return path
+}
+
+// parseEnhancedSelector handles enhanced selectors with line numbers
+// Converts "file:42" to "file:42#heading/path" or "file:42#heading" to "file#heading"
+func parseEnhancedSelector(ws *workspace.Workspace, selector string) (string, error) {
+	// Check if selector contains a line number (has ":" but not necessarily "#")
+	colonIndex := strings.Index(selector, ":")
+	if colonIndex == -1 {
+		// No line number, return as-is
+		return selector, nil
+	}
+
+	hashIndex := strings.Index(selector, "#")
+	
+	var filename string
+	var lineNumStr string
+	var headingPart string
+
+	if hashIndex == -1 {
+		// Format: "file:42" (no heading part)
+		filename = selector[:colonIndex]
+		lineNumStr = selector[colonIndex+1:]
+	} else if hashIndex > colonIndex {
+		// Format: "file:42#heading/path" 
+		filename = selector[:colonIndex]
+		lineNumStr = selector[colonIndex+1:hashIndex]
+		headingPart = selector[hashIndex:] // includes the #
+	} else {
+		// Hash comes before colon, this is invalid for our enhanced format
+		return selector, nil
+	}
+
+	// Parse line number
+	var lineNum int
+	if _, err := fmt.Sscanf(lineNumStr, "%d", &lineNum); err != nil {
+		// Not a valid line number, return as-is
+		return selector, nil
+	}
+
+	// If we already have a heading part, just remove the line number
+	if headingPart != "" {
+		return filename + headingPart, nil
+	}
+
+	// Need to resolve line number to heading path
+	filePath := filepath.Join(ws.Root, filename)
+	if !filepath.IsAbs(filename) {
+		// Try inbox
+		if filename == "inbox.md" {
+			filePath = ws.InboxPath
+		} else {
+			// Try lib directory
+			filePath = filepath.Join(ws.LibDir, filename)
+		}
+	}
+
+	// Read file content
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		// Can't read file, return original selector
+		return selector, nil
+	}
+
+	// Find heading for this line
+	headingMap, err := markdown.FindNearestHeadingsForLines(content, []int{lineNum})
+	if err != nil {
+		// Can't parse markdown, return original selector  
+		return selector, nil
+	}
+
+	if headingPath, found := headingMap[lineNum]; found && headingPath != "" {
+		// Found heading, create enhanced selector
+		return fmt.Sprintf("%s#%s", filename, headingPath), nil
+	}
+
+	// No heading found, return whole file selector
+	return filename, nil
 }

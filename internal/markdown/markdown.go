@@ -4,6 +4,7 @@ package markdown
 import (
 	"bytes"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/yuin/goldmark"
@@ -493,4 +494,99 @@ func PathMatches(actualPath []string, targetSegments []string, skipLevels int) b
 	}
 
 	return true
+}
+
+// LineHeadingMap represents the mapping from line numbers to heading paths
+type LineHeadingMap map[int]string
+
+// FindNearestHeadingsForLines efficiently finds the nearest dominant heading for multiple line numbers
+// by parsing the document once and tracking heading context as we go.
+// It stops parsing once all target lines have been resolved.
+func FindNearestHeadingsForLines(content []byte, targetLines []int) (LineHeadingMap, error) {
+	if len(targetLines) == 0 {
+		return make(LineHeadingMap), nil
+	}
+
+	// Sort target lines for efficient processing
+	sortedLines := make([]int, len(targetLines))
+	copy(sortedLines, targetLines)
+	sort.Ints(sortedLines)
+
+	// Create result map
+	result := make(LineHeadingMap)
+
+	// Track which lines we still need to resolve
+	remainingLines := make(map[int]bool)
+	for _, line := range targetLines {
+		remainingLines[line] = true
+	}
+
+	// Parse the markdown document
+	md := goldmark.New()
+	doc := md.Parser().Parse(text.NewReader(content))
+
+	// Track current heading context as we walk through the document
+	var currentHeadingPath []string
+	var levelStack []int
+	currentLine := 1
+
+	// Walk through the AST and track line numbers
+	ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
+		if !entering {
+			return ast.WalkContinue, nil
+		}
+
+		// Calculate current line number from node offset
+		nodeOffset := GetNodeOffset(n, content)
+		currentLine = CalculateLineNumber(content, nodeOffset)
+
+		// Handle headings - update our current context
+		if heading, ok := n.(*ast.Heading); ok {
+			headingText := ExtractHeadingText(heading, content)
+
+			// Adjust path stack based on heading level
+			for len(levelStack) > 0 && levelStack[len(levelStack)-1] >= heading.Level {
+				levelStack = levelStack[:len(levelStack)-1]
+				if len(currentHeadingPath) > 0 {
+					currentHeadingPath = currentHeadingPath[:len(currentHeadingPath)-1]
+				}
+			}
+
+			// Add current heading to path
+			levelStack = append(levelStack, heading.Level)
+			currentHeadingPath = append(currentHeadingPath, headingText)
+		}
+
+		// Check if we've reached any target lines and assign the current heading context
+		for line := range remainingLines {
+			if currentLine >= line {
+				// This line is under the current heading context
+				if len(currentHeadingPath) > 0 {
+					result[line] = strings.Join(currentHeadingPath, "/")
+				} else {
+					result[line] = "" // No heading context (top of file)
+				}
+				delete(remainingLines, line)
+			}
+		}
+
+		// Early exit if we've resolved all target lines
+		if len(remainingLines) == 0 {
+			return ast.WalkStop, nil
+		}
+
+		return ast.WalkContinue, nil
+	})
+
+	// Handle any remaining lines that weren't reached (assign last known heading context)
+	lastHeadingPath := ""
+	if len(currentHeadingPath) > 0 {
+		lastHeadingPath = strings.Join(currentHeadingPath, "/")
+	}
+
+	for line := range remainingLines {
+		result[line] = lastHeadingPath
+	}
+
+	return result, nil
 }
