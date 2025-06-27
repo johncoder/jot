@@ -538,7 +538,22 @@ func FindNearestHeadingsForLines(content []byte, targetLines []int) (LineHeading
 
 		// Calculate current line number from node offset
 		nodeOffset := GetNodeOffset(n, content)
-		currentLine = CalculateLineNumber(content, nodeOffset)
+		newLine := CalculateLineNumber(content, nodeOffset)
+
+		// Assign any target lines between the previous position and current position
+		// to the current heading context (before we potentially update it)
+		for line := currentLine; line < newLine && line <= sortedLines[len(sortedLines)-1]; line++ {
+			if remainingLines[line] {
+				if len(currentHeadingPath) > 0 {
+					result[line] = strings.Join(currentHeadingPath, "/")
+				} else {
+					result[line] = "" // No heading context (top of file)
+				}
+				delete(remainingLines, line)
+			}
+		}
+
+		currentLine = newLine
 
 		// Handle headings - update our current context
 		if heading, ok := n.(*ast.Heading); ok {
@@ -557,17 +572,14 @@ func FindNearestHeadingsForLines(content []byte, targetLines []int) (LineHeading
 			currentHeadingPath = append(currentHeadingPath, headingText)
 		}
 
-		// Check if we've reached any target lines and assign the current heading context
-		for line := range remainingLines {
-			if currentLine >= line {
-				// This line is under the current heading context
-				if len(currentHeadingPath) > 0 {
-					result[line] = strings.Join(currentHeadingPath, "/")
-				} else {
-					result[line] = "" // No heading context (top of file)
-				}
-				delete(remainingLines, line)
+		// Assign any target lines at the current position to the current heading context
+		if remainingLines[currentLine] {
+			if len(currentHeadingPath) > 0 {
+				result[currentLine] = strings.Join(currentHeadingPath, "/")
+			} else {
+				result[currentLine] = "" // No heading context (top of file)
 			}
+			delete(remainingLines, currentLine)
 		}
 
 		// Early exit if we've resolved all target lines
