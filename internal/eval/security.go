@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/johncoder/jot/internal/workspace"
 	"github.com/spf13/viper"
 )
 
@@ -60,14 +61,19 @@ func NewSecurityManager() (*SecurityManager, error) {
 		docApprovals: make(map[string]*DocumentApprovalRecord),
 	}
 
-	// Find .jot directory
-	jotDir, err := findJotDirectory()
+	// Get workspace using the standard workspace resolution
+	ws, err := workspace.RequireWorkspace()
 	if err != nil {
-		return nil, fmt.Errorf("could not find .jot directory: %w", err)
+		return nil, fmt.Errorf("could not find workspace: %w", err)
 	}
 
-	sm.configPath = filepath.Join(jotDir, "eval_permissions")
-	sm.docConfigPath = filepath.Join(jotDir, "eval_document_permissions")
+	sm.configPath = filepath.Join(ws.JotDir, "eval_permissions")
+	sm.docConfigPath = filepath.Join(ws.JotDir, "eval_document_permissions")
+
+	// Ensure .jot directory exists
+	if err := os.MkdirAll(ws.JotDir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create .jot directory: %w", err)
+	}
 
 	// Load existing approvals
 	if err := sm.loadApprovals(); err != nil {
@@ -79,29 +85,6 @@ func NewSecurityManager() (*SecurityManager, error) {
 	}
 
 	return sm, nil
-}
-
-// findJotDirectory looks for .jot directory in current or parent directories
-func findJotDirectory() (string, error) {
-	dir, err := os.Getwd()
-	if err != nil {
-		return "", err
-	}
-
-	for {
-		jotDir := filepath.Join(dir, ".jot")
-		if info, err := os.Stat(jotDir); err == nil && info.IsDir() {
-			return jotDir, nil
-		}
-
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			break // reached root
-		}
-		dir = parent
-	}
-
-	return "", fmt.Errorf(".jot directory not found")
 }
 
 // loadApprovals loads approval records from disk

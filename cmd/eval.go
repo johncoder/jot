@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/johncoder/jot/internal/eval"
+	"github.com/johncoder/jot/internal/workspace"
 	"github.com/spf13/cobra"
 )
 
@@ -20,6 +21,17 @@ var evalRevoke bool
 var evalListApproved bool
 var evalApproveDocument bool
 var evalRevokeDocument bool
+
+// resolveEvalFilePath consolidates file path resolution logic for eval operations
+func resolveEvalFilePath(ws *workspace.Workspace, filename string) string {
+	if filename == "inbox.md" {
+		return ws.InboxPath
+	}
+	if filepath.IsAbs(filename) {
+		return filename
+	}
+	return filepath.Join(ws.Root, filename)
+}
 
 var evalCmd = &cobra.Command{
 	Use:   "eval [file] [block_name]",
@@ -83,14 +95,25 @@ Examples:
 			return err
 		}
 
+		// Get workspace for file path resolution
+		ws, err := workspace.RequireWorkspace()
+		if err != nil {
+			if isJSONOutput(cmd) {
+				return outputJSONError(cmd, err, startTime)
+			}
+			return err
+		}
+
 		filename := args[0]
+		// Resolve file path relative to workspace
+		resolvedFilename := resolveEvalFilePath(ws, filename)
 
 		// Handle revoke operations
 		if evalRevokeDocument {
 			if isJSONOutput(cmd) {
-				return revokeDocumentApprovalJSON(cmd, filename, startTime)
+				return revokeDocumentApprovalJSON(cmd, resolvedFilename, startTime)
 			}
-			return revokeDocumentApproval(filename)
+			return revokeDocumentApproval(resolvedFilename)
 		}
 
 		if evalRevoke {
@@ -102,25 +125,25 @@ Examples:
 				return err
 			}
 			if isJSONOutput(cmd) {
-				return revokeApprovalJSON(cmd, filename, args[1], startTime)
+				return revokeApprovalJSON(cmd, resolvedFilename, args[1], startTime)
 			}
-			return revokeApproval(filename, args[1])
+			return revokeApproval(resolvedFilename, args[1])
 		}
 
 		// Handle approve operations
 		if evalApproveDocument {
 			if isJSONOutput(cmd) {
-				return approveDocumentJSON(cmd, filename, evalMode, startTime)
+				return approveDocumentJSON(cmd, resolvedFilename, evalMode, startTime)
 			}
-			return approveDocument(filename, evalMode)
+			return approveDocument(resolvedFilename, evalMode)
 		}
 
 		// If no block name specified, list blocks (unless --all is used)
 		if len(args) == 1 && !evalAll {
 			if isJSONOutput(cmd) {
-				return listBlocksJSON(cmd, filename, startTime)
+				return listBlocksJSON(cmd, resolvedFilename, startTime)
 			}
-			return listBlocks(filename)
+			return listBlocks(resolvedFilename)
 		}
 
 		var blockName string
@@ -138,21 +161,20 @@ Examples:
 				return err
 			}
 			if isJSONOutput(cmd) {
-				return approveBlockJSON(cmd, filename, blockName, evalMode, startTime)
+				return approveBlockJSON(cmd, resolvedFilename, blockName, evalMode, startTime)
 			}
-			return approveBlock(filename, blockName, evalMode)
+			return approveBlock(resolvedFilename, blockName, evalMode)
 		}
 
 		// Execute blocks
 		var results []*eval.EvalResult
-		var err error
 
 		if blockName != "" {
 			// Execute specific block by name
-			results, err = eval.ExecuteEvaluableBlockByName(filename, blockName)
+			results, err = eval.ExecuteEvaluableBlockByName(resolvedFilename, blockName)
 		} else if evalAll {
 			// Execute all blocks
-			results, err = eval.ExecuteEvaluableBlocks(filename)
+			results, err = eval.ExecuteEvaluableBlocks(resolvedFilename)
 		} else {
 			err := fmt.Errorf("please specify a block name or use --all to execute all blocks")
 			if isJSONOutput(cmd) {
@@ -189,7 +211,7 @@ Examples:
 		}
 
 		// Update results in markdown
-		err = eval.UpdateMarkdownWithResults(filename, results)
+		err = eval.UpdateMarkdownWithResults(resolvedFilename, results)
 		if err != nil {
 			return fmt.Errorf("error updating results in %s: %w", filename, err)
 		}
