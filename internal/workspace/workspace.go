@@ -139,7 +139,7 @@ func IsWorkspace() bool {
 // AppendToInbox adds content to the inbox with a timestamp
 func (w *Workspace) AppendToInbox(content string) error {
 	timestamp := time.Now().Format("2006-01-02 15:04:05")
-	entry := fmt.Sprintf("\n## %s\n\n%s\n", timestamp, content)
+	entry := fmt.Sprintf("\n## %s\n\n%s\n\n", timestamp, content)
 
 	file, err := os.OpenFile(w.InboxPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
@@ -175,7 +175,7 @@ func (w *Workspace) AppendToFile(filePath, content string) error {
 	}
 	defer file.Close()
 
-	_, err = file.WriteString(content + "\n")
+	_, err = file.WriteString(content + "\n\n")
 	if err != nil {
 		return fmt.Errorf("failed to write to file: %w", err)
 	}
