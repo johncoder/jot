@@ -226,8 +226,18 @@ func extractSubtreeFromHeading(heading *ast.Heading, content []byte) *Subtree {
 	// Find the end of this subtree
 	endOffset := findSubtreeEnd(heading, content)
 
-	// Extract content
+	// Extract content and trim trailing spacing to avoid spacing ownership issues
 	subtreeContent := content[startOffset:endOffset]
+	
+	// Trim trailing newlines/whitespace - spacing belongs to document structure, not content
+	trimmedContent := bytes.TrimRight(subtreeContent, " \t\n")
+	
+	// Always ensure content ends with exactly one newline for consistent formatting
+	if len(trimmedContent) > 0 {
+		subtreeContent = append(trimmedContent, '\n')
+	} else {
+		subtreeContent = trimmedContent
+	}
 
 	return &Subtree{
 		Heading:     headingText,
