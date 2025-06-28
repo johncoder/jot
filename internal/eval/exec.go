@@ -67,7 +67,7 @@ func ExecuteEvaluableBlocks(filename string) ([]*EvalResult, error) {
 			continue
 		}
 
-		output, err := executeBlock(b)
+		output, err := executeBlock(b, filename)
 		results = append(results, &EvalResult{Block: b, Output: output, Err: err})
 	}
 	return results, nil
@@ -122,7 +122,7 @@ func ExecuteEvaluableBlockByName(filename, name string) ([]*EvalResult, error) {
 			break
 		}
 
-		output, err := executeBlock(b)
+		output, err := executeBlock(b, filename)
 		results = append(results, &EvalResult{Block: b, Output: output, Err: err})
 	}
 	if len(results) == 0 {
@@ -132,7 +132,7 @@ func ExecuteEvaluableBlockByName(filename, name string) ([]*EvalResult, error) {
 }
 
 // executeBlock runs the code block using the shell/interpreter specified in EvalMetadata or inferred from language
-func executeBlock(b *CodeBlock) (string, error) {
+func executeBlock(b *CodeBlock, filename string) (string, error) {
 	lang := b.Lang
 	if shell, ok := b.Eval.Params["shell"]; ok && shell != "" {
 		lang = shell
@@ -166,9 +166,12 @@ func executeBlock(b *CodeBlock) (string, error) {
 	c := exec.CommandContext(ctx, cmd, args...)
 	c.Stdin = strings.NewReader(strings.Join(b.Code, "\n"))
 
-	// Set working directory if specified
+	// Set working directory - default to file's directory (org-mode behavior)
 	if cwd, ok := b.Eval.Params["cwd"]; ok && cwd != "" {
 		c.Dir = cwd
+	} else {
+		// Default to directory containing the markdown file for org-mode compatibility
+		c.Dir = filepath.Dir(filename)
 	}
 
 	// Set environment variables if specified
