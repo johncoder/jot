@@ -1295,7 +1295,7 @@ func selectSourceFile(ws *workspace.Workspace, defaultFile string, verbose bool)
 		fmt.Printf("Found %d markdown files\n", len(files))
 	}
 
-	return runFileSelectionFZF(files, "Select source file > ")
+	return runFileSelectionFZF(ws, files, "Select source file > ")
 }
 
 // selectSourceSubtree shows FZF subtree browser for the selected file
@@ -1348,7 +1348,7 @@ func selectTargetFile(ws *workspace.Workspace, verbose bool) (string, error) {
 		fmt.Printf("Found %d markdown files for target\n", len(files))
 	}
 
-	return runFileSelectionFZF(files, "Select target file > ")
+	return runFileSelectionFZF(ws, files, "Select target file > ")
 }
 
 // selectTargetLocation shows FZF heading browser for the selected target file
@@ -1545,7 +1545,7 @@ func moveToFront(files []string, target string) []string {
 }
 
 // runFileSelectionFZF runs FZF for file selection
-func runFileSelectionFZF(files []string, prompt string) (string, error) {
+func runFileSelectionFZF(ws *workspace.Workspace, files []string, prompt string) (string, error) {
 	// Validate FZF availability
 	if _, err := exec.LookPath("fzf"); err != nil {
 		return "", fmt.Errorf("fzf not found in PATH. Please install fzf or set JOT_FZF=0 to disable")
@@ -1559,16 +1559,32 @@ func runFileSelectionFZF(files []string, prompt string) (string, error) {
 	defer os.Remove(tempFile.Name())
 	defer tempFile.Close()
 
-	// Write files to temp file
+	// Write files to temp file with absolute paths for preview
 	for _, file := range files {
-		fmt.Fprintln(tempFile, file)
+		// Resolve to absolute path for preview
+		var absolutePath string
+		if file == "inbox.md" {
+			absolutePath = ws.InboxPath
+		} else if filepath.IsAbs(file) {
+			absolutePath = file
+		} else {
+			absolutePath = filepath.Join(ws.Root, file)
+		}
+		
+		// Write both the display name and absolute path (tab-separated)
+		fmt.Fprintf(tempFile, "%s\t%s\n", file, absolutePath)
 	}
 	tempFile.Close()
 
+	// Use the absolute path (second field) for preview
+	previewCmd := "head -20 {2}"
+
 	// Build FZF command
 	cmd := exec.Command("fzf",
+		"--delimiter", "\t",
+		"--with-nth", "1", // Only show the filename (first field)
 		"--prompt", prompt,
-		"--preview", "head -20 {}",
+		"--preview", previewCmd,
 		"--preview-window", "right:50%:wrap",
 		"--bind", "tab:toggle-preview",
 		"--header", "ENTER:select | TAB:preview | ESC:cancel",
@@ -1599,6 +1615,16 @@ func runFileSelectionFZF(files []string, prompt string) (string, error) {
 	}
 
 	selected := strings.TrimSpace(string(output))
+	if selected == "" {
+		return "", nil
+	}
+
+	// Extract just the filename (first field) from the tab-separated result
+	parts := strings.Split(selected, "\t")
+	if len(parts) > 0 {
+		return parts[0], nil
+	}
+	
 	return selected, nil
 }
 
