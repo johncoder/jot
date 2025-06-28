@@ -3,10 +3,12 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/johncoder/jot/internal/fzf"
 	"github.com/johncoder/jot/internal/markdown"
 	"github.com/johncoder/jot/internal/workspace"
 	"github.com/spf13/cobra"
@@ -61,6 +63,12 @@ Examples:
 		to, _ := cmd.Flags().GetString("to")
 		prepend, _ := cmd.Flags().GetBool("prepend")
 		verbose, _ := cmd.Flags().GetBool("verbose")
+		interactive, _ := cmd.Flags().GetBool("interactive")
+
+		// Check for interactive mode
+		if fzf.ShouldUseFZF(interactive) {
+			return runInteractiveRefile(cmd, args, ws)
+		}
 
 		// No source and no destination: show usage help
 		if len(args) == 0 && to == "" {
@@ -458,6 +466,7 @@ func init() {
 	refileCmd.Flags().String("to", "", "Destination path (e.g., 'work.md#projects/frontend')")
 	refileCmd.Flags().Bool("prepend", false, "Insert content at the beginning under target heading")
 	refileCmd.Flags().BoolP("verbose", "v", false, "Show detailed information about the refile operation")
+	refileCmd.Flags().BoolP("interactive", "i", false, "Interactive mode using FZF (requires JOT_FZF=1)")
 }
 
 // showSelectorsForFile displays available selectors for a specific file
@@ -897,4 +906,732 @@ func inspectDestinationJSON(cmd *cobra.Command, ws *workspace.Workspace, destPat
 	}
 
 	return outputJSON(response)
+}
+
+// runInteractiveRefile handles the interactive refile workflow using FZF
+func runInteractiveRefile(cmd *cobra.Command, args []string, ws *workspace.Workspace) error {
+	var sourceSelector, targetSelector string
+	var err error
+
+	// Get flags
+	to, _ := cmd.Flags().GetString("to")
+	verbose, _ := cmd.Flags().GetBool("verbose")
+
+	// Stage 1 & 2: Select source (if not provided)
+	if len(args) > 0 {
+		sourceSelector = args[0]
+		if verbose {
+			fmt.Printf("Using provided source: %s\n", sourceSelector)
+		}
+	} else {
+		sourceSelector, err = selectSource(ws, verbose)
+		if err != nil {
+			return err
+		}
+		if sourceSelector == "" {
+			fmt.Println("Source selection cancelled.")
+			return nil
+		}
+	}
+
+	// Stage 3 & 4: Select target (if not provided)
+	if to != "" {
+		targetSelector = to
+		if verbose {
+			fmt.Printf("Using provided target: %s\n", targetSelector)
+		}
+	} else {
+		targetSelector, err = selectTarget(ws, verbose)
+		if err != nil {
+			return err
+		}
+		if targetSelector == "" {
+			fmt.Println("Target selection cancelled.")
+			return nil
+		}
+	}
+
+	// Stage 5: Confirmation
+	confirmed, err := confirmRefile(sourceSelector, targetSelector, ws)
+	if err != nil {
+		return err
+	}
+	if !confirmed {
+		fmt.Println("Refile cancelled.")
+		return nil
+	}
+
+	// Execute refile using existing logic
+	return executeRefile(sourceSelector, targetSelector, cmd, ws)
+}
+
+// selectSource handles source file and subtree selection
+func selectSource(ws *workspace.Workspace, verbose bool) (string, error) {
+	// Stage 1: Select source file
+	sourceFile, err := selectSourceFile(ws, "inbox.md", verbose)
+	if err != nil {
+		return "", fmt.Errorf("source file selection failed: %w", err)
+	}
+	if sourceFile == "" {
+		return "", nil // User cancelled
+	}
+
+	// Stage 2: Select subtree from source file
+	return selectSourceSubtree(ws, sourceFile, verbose)
+}
+
+// selectTarget handles target file and location selection
+func selectTarget(ws *workspace.Workspace, verbose bool) (string, error) {
+	// Stage 3: Select target file
+	targetFile, err := selectTargetFile(ws, verbose)
+	if err != nil {
+		return "", fmt.Errorf("target file selection failed: %w", err)
+	}
+	if targetFile == "" {
+		return "", nil // User cancelled
+	}
+
+	// Stage 4: Select target location
+	return selectTargetLocation(ws, targetFile, verbose)
+}
+
+// selectSourceFile shows FZF file browser for source selection
+func selectSourceFile(ws *workspace.Workspace, defaultFile string, verbose bool) (string, error) {
+	files, err := scanWorkspaceMarkdownFiles(ws)
+	if err != nil {
+		return "", err
+	}
+
+	if len(files) == 0 {
+		return "", fmt.Errorf("no markdown files found in workspace")
+	}
+
+	// Move default file to front if it exists
+	if defaultFile != "" {
+		files = moveToFront(files, defaultFile)
+	}
+
+	if verbose {
+		fmt.Printf("Found %d markdown files\n", len(files))
+	}
+
+	return runFileSelectionFZF(files, "Select source file > ")
+}
+
+// selectSourceSubtree shows FZF subtree browser for the selected file
+func selectSourceSubtree(ws *workspace.Workspace, sourceFile string, verbose bool) (string, error) {
+	subtrees, err := extractSubtreesFromFile(ws, sourceFile)
+	if err != nil {
+		return "", fmt.Errorf("failed to extract subtrees: %w", err)
+	}
+
+	if len(subtrees) == 0 {
+		return "", fmt.Errorf("no headings found in %s - cannot refile from a file without headings", sourceFile)
+	}
+
+	// Check for duplicate heading titles
+	duplicates := findDuplicateHeadings(subtrees)
+	if len(duplicates) > 0 && verbose {
+		fmt.Printf("⚠️  Warning: Found duplicate headings in %s: %s\n", sourceFile, strings.Join(duplicates, ", "))
+		fmt.Println("   Use the preview (TAB) to distinguish between them")
+	}
+
+	if verbose {
+		fmt.Printf("Found %d subtrees in %s\n", len(subtrees), sourceFile)
+	}
+
+	selector, err := runSubtreeSelectionFZF(subtrees, "Select subtree to refile > ")
+	if err != nil {
+		return "", err
+	}
+	
+	if selector == "" {
+		return "", nil // User cancelled
+	}
+
+	// Validate that the selected subtree can be uniquely identified
+	return validateAndDisambiguateSelector(ws, selector, subtrees)
+}
+
+// selectTargetFile shows FZF file browser for target selection
+func selectTargetFile(ws *workspace.Workspace, verbose bool) (string, error) {
+	files, err := scanWorkspaceMarkdownFiles(ws)
+	if err != nil {
+		return "", err
+	}
+
+	if len(files) == 0 {
+		return "", fmt.Errorf("no markdown files found in workspace")
+	}
+
+	if verbose {
+		fmt.Printf("Found %d markdown files for target\n", len(files))
+	}
+
+	return runFileSelectionFZF(files, "Select target file > ")
+}
+
+// selectTargetLocation shows FZF heading browser for the selected target file
+func selectTargetLocation(ws *workspace.Workspace, targetFile string, verbose bool) (string, error) {
+	subtrees, err := extractSubtreesFromFile(ws, targetFile)
+	if err != nil {
+		return "", fmt.Errorf("failed to extract headings: %w", err)
+	}
+
+	if len(subtrees) == 0 {
+		// No headings, allow top-level insertion
+		if verbose {
+			fmt.Printf("No headings found in %s - content will be inserted at top level\n", targetFile)
+		}
+		return targetFile, nil
+	}
+
+	// Check for duplicate heading titles
+	duplicates := findDuplicateHeadings(subtrees)
+	if len(duplicates) > 0 && verbose {
+		fmt.Printf("⚠️  Warning: Found duplicate headings in %s: %s\n", targetFile, strings.Join(duplicates, ", "))
+		fmt.Println("   Use the preview (TAB) to distinguish between them")
+	}
+
+	if verbose {
+		fmt.Printf("Found %d target locations in %s\n", len(subtrees), targetFile)
+	}
+
+	// Add option for top-level insertion
+	topLevel := SubtreeItem{
+		Selector: targetFile,
+		Title:    "(Top level - beginning of file)",
+		Level:    0,
+		Preview:  "Insert at the beginning of the file",
+	}
+	allTargets := append([]SubtreeItem{topLevel}, subtrees...)
+
+	selector, err := runSubtreeSelectionFZF(allTargets, "Select target location > ")
+	if err != nil {
+		return "", err
+	}
+	
+	if selector == "" {
+		return "", nil // User cancelled
+	}
+
+	// For top-level insertion, convert to proper selector format
+	if selector == targetFile {
+		return targetFile + "#", nil
+	}
+
+	// For heading targets, validate uniqueness
+	return validateAndDisambiguateSelector(ws, selector, subtrees)
+}
+
+// confirmRefile shows a confirmation dialog before executing the refile
+func confirmRefile(sourceSelector, targetSelector string, ws *workspace.Workspace) (bool, error) {
+	border := strings.Repeat("=", 60)
+	separator := strings.Repeat("-", 60)
+	
+	fmt.Printf("\n%s\n", border)
+	fmt.Printf("📋 REFILE OPERATION SUMMARY\n")
+	fmt.Printf("%s\n", border)
+	
+	// Parse selectors to get more detailed info
+	sourcePath, err := markdown.ParsePath(sourceSelector)
+	if err != nil {
+		fmt.Printf("  Source: %s (⚠️  parse error: %v)\n", sourceSelector, err)
+	} else {
+		if len(sourcePath.Segments) > 0 {
+			fmt.Printf("  📤 Source: %s → '%s'\n", sourcePath.File, strings.Join(sourcePath.Segments, "/"))
+		} else {
+			fmt.Printf("  📤 Source: %s (entire file)\n", sourcePath.File)
+		}
+	}
+	
+	destPath, err := markdown.ParsePath(targetSelector)
+	if err != nil {
+		fmt.Printf("  Target: %s (⚠️  parse error: %v)\n", targetSelector, err)
+	} else {
+		if len(destPath.Segments) > 0 {
+			fmt.Printf("  📥 Target: %s → '%s'\n", destPath.File, strings.Join(destPath.Segments, "/"))
+		} else {
+			fmt.Printf("  📥 Target: %s (top level)\n", destPath.File)
+		}
+	}
+	
+	fmt.Printf("%s\n", separator)
+	fmt.Printf("⚠️  This will:\n")
+	fmt.Printf("   • Move the selected content from the source file\n")
+	fmt.Printf("   • Insert it at the target location\n")
+	fmt.Printf("   • Remove it from the original location\n")
+	fmt.Printf("   • This operation cannot be easily undone\n")
+	fmt.Printf("%s\n", border)
+
+	fmt.Printf("\n🤔 Proceed with this refile operation? [y/N]: ")
+
+	var response string
+	fmt.Scanln(&response)
+	response = strings.ToLower(strings.TrimSpace(response))
+	
+	return response == "y" || response == "yes", nil
+}
+
+// executeRefile executes the refile operation using existing logic
+func executeRefile(sourceSelector, targetSelector string, cmd *cobra.Command, ws *workspace.Workspace) error {
+	// Parse paths
+	sourcePath, err := markdown.ParsePath(sourceSelector)
+	if err != nil {
+		return fmt.Errorf("invalid source selector '%s': %w", sourceSelector, err)
+	}
+
+	destPath, err := markdown.ParsePath(targetSelector)
+	if err != nil {
+		return fmt.Errorf("invalid target selector '%s': %w", targetSelector, err)
+	}
+
+	// Extract subtree from source
+	subtree, err := ExtractSubtree(ws, sourcePath)
+	if err != nil {
+		return fmt.Errorf("failed to extract subtree: %w", err)
+	}
+
+	// Get flags
+	prepend, _ := cmd.Flags().GetBool("prepend")
+	verbose, _ := cmd.Flags().GetBool("verbose")
+
+	// Resolve destination
+	destTarget, err := ResolveDestination(ws, destPath, prepend)
+	if err != nil {
+		return fmt.Errorf("failed to resolve destination: %w", err)
+	}
+
+	// Transform subtree level
+	transformedContent := TransformSubtreeLevel(subtree, destTarget.TargetLevel)
+
+	// Perform the refile operation using existing logic
+	err = performRefile(ws, sourcePath, subtree, destTarget, transformedContent)
+	if err != nil {
+		return fmt.Errorf("refile operation failed: %w", err)
+	}
+
+	if verbose {
+		fmt.Printf("✓ Refiled subtree from %s to %s\n", sourceSelector, targetSelector)
+	} else {
+		fmt.Printf("✓ Successfully refiled '%s' to '%s'\n",
+			subtree.Heading, destPath.File+"#"+strings.Join(destPath.Segments, "/"))
+	}
+
+	return nil
+}
+
+// SubtreeItem represents a subtree for FZF selection
+type SubtreeItem struct {
+	Selector string // e.g., "inbox.md#meeting-notes"
+	Title    string // Heading title for display
+	Level    int    // Heading level (1-6)
+	Preview  string // First few lines for display
+}
+
+// extractSubtreesFromFile extracts all headings from a markdown file
+func extractSubtreesFromFile(ws *workspace.Workspace, filename string) ([]SubtreeItem, error) {
+	// Determine full file path
+	var filePath string
+	if filename == "inbox.md" {
+		filePath = ws.InboxPath
+	} else if filepath.IsAbs(filename) {
+		filePath = filename
+	} else {
+		filePath = filepath.Join(ws.Root, filename)
+	}
+
+	// Read file content
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read file %s: %w", filePath, err)
+	}
+
+	// Parse markdown document
+	doc := markdown.ParseDocument(content)
+
+	var subtrees []SubtreeItem
+
+	// Walk through the document and find headings
+	err = ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
+		if !entering {
+			return ast.WalkContinue, nil
+		}
+
+		if heading, ok := n.(*ast.Heading); ok {
+			// Extract heading text
+			headingText := markdown.ExtractHeadingText(heading, content)
+			if headingText == "" {
+				return ast.WalkContinue, nil
+			}
+
+			// Create selector using the heading text
+			selector := fmt.Sprintf("%s#%s", filename, headingText)
+
+			// Extract some preview content (next few lines after heading)
+			preview := extractPreviewContent(n, content, 100)
+
+			subtree := SubtreeItem{
+				Selector: selector,
+				Title:    headingText,
+				Level:    heading.Level,
+				Preview:  preview,
+			}
+
+			subtrees = append(subtrees, subtree)
+		}
+
+		return ast.WalkContinue, nil
+	})
+
+	return subtrees, err
+}
+
+// extractPreviewContent gets some preview text after a heading
+func extractPreviewContent(node ast.Node, content []byte, maxLen int) string {
+	// Get the position of this heading in the content
+	startPos := markdown.GetNodeOffset(node, content)
+	
+	// Find the heading line and skip it
+	lines := strings.Split(string(content), "\n")
+	var headingLineIndex int
+	var currentPos int
+	
+	// Find which line this heading is on
+	for i, line := range lines {
+		if currentPos >= startPos {
+			headingLineIndex = i
+			break
+		}
+		currentPos += len(line) + 1 // +1 for newline
+	}
+	
+	// Collect content from the next few lines after the heading
+	var preview strings.Builder
+	lineCount := 0
+	
+	for i := headingLineIndex + 1; i < len(lines) && lineCount < 3; i++ {
+		line := strings.TrimSpace(lines[i])
+		
+		// Skip empty lines at the beginning
+		if preview.Len() == 0 && line == "" {
+			continue
+		}
+		
+		// Stop if we hit another heading
+		if strings.HasPrefix(line, "#") {
+			break
+		}
+		
+		// Add meaningful content
+		if line != "" {
+			if preview.Len() > 0 {
+				preview.WriteString(" ")
+			}
+			preview.WriteString(line)
+			lineCount++
+			
+			// Stop if we've gotten enough content
+			if preview.Len() > maxLen {
+				break
+			}
+		}
+	}
+	
+	result := preview.String()
+	if len(result) > maxLen {
+		result = result[:maxLen-3] + "..."
+	}
+	
+	if result == "" {
+		result = "No content"
+	}
+	
+	return result
+}
+
+// runSubtreeSelectionFZF runs FZF for subtree selection
+func runSubtreeSelectionFZF(subtrees []SubtreeItem, prompt string) (string, error) {
+	// Validate FZF availability
+	if _, err := exec.LookPath("fzf"); err != nil {
+		return "", fmt.Errorf("fzf not found in PATH. Please install fzf or set JOT_FZF=0 to disable")
+	}
+
+	// Create temporary file with subtree list
+	tempFile, err := os.CreateTemp("", "jot-subtrees-*.txt")
+	if err != nil {
+		return "", fmt.Errorf("failed to create temp file: %w", err)
+	}
+	defer os.Remove(tempFile.Name())
+	defer tempFile.Close()
+
+	// Write subtrees to temp file in format: selector\ttitle\tpreview
+	for _, subtree := range subtrees {
+		var levelIndent string
+		if subtree.Level == 0 {
+			levelIndent = "" // Top-level insertion option
+		} else {
+			levelIndent = strings.Repeat("  ", subtree.Level-1)
+		}
+		displayTitle := fmt.Sprintf("%s%s", levelIndent, subtree.Title)
+		line := fmt.Sprintf("%s\t%s\t%s\n", subtree.Selector, displayTitle, subtree.Preview)
+		tempFile.WriteString(line)
+	}
+	tempFile.Close()
+
+	// Build FZF command
+	cmd := exec.Command("fzf",
+		"--delimiter", "\t",
+		"--with-nth", "2,3", // Show title and preview
+		"--prompt", prompt,
+		"--preview", "jot peek {1}", // Use first field (selector) for preview
+		"--preview-window", "right:50%:wrap",
+		"--bind", "tab:toggle-preview",
+		"--header", "ENTER:select | TAB:preview | ESC:cancel",
+		"--height", "60%",
+		"--border",
+	)
+
+	// Set up input from temp file
+	tempFileRead, err := os.Open(tempFile.Name())
+	if err != nil {
+		return "", fmt.Errorf("failed to open temp file: %w", err)
+	}
+	defer tempFileRead.Close()
+
+	cmd.Stdin = tempFileRead
+	cmd.Stderr = os.Stderr
+
+	// Run FZF and capture selection
+	output, err := cmd.Output()
+	if err != nil {
+		// Check if it's a cancellation (exit code 130) vs actual error
+		if exitError, ok := err.(*exec.ExitError); ok {
+			if exitError.ExitCode() == 130 {
+				return "", nil // User cancelled
+			}
+		}
+		return "", fmt.Errorf("fzf command failed: %w", err)
+	}
+
+	selectedLine := strings.TrimSpace(string(output))
+	if selectedLine == "" {
+		return "", nil
+	}
+
+	// Extract the selector (first field)
+	parts := strings.Split(selectedLine, "\t")
+	if len(parts) > 0 {
+		return parts[0], nil
+	}
+
+	return "", nil
+}
+
+// scanWorkspaceMarkdownFiles returns all markdown files in the workspace
+func scanWorkspaceMarkdownFiles(ws *workspace.Workspace) ([]string, error) {
+	var files []string
+
+	// Add inbox.md if it exists
+	if _, err := os.Stat(ws.InboxPath); err == nil {
+		files = append(files, "inbox.md")
+	}
+
+	// Scan for markdown files in workspace root
+	err := filepath.Walk(ws.Root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		// Skip hidden directories and .jot directory
+		if info.IsDir() && (strings.HasPrefix(info.Name(), ".") || info.Name() == ".jot") {
+			return filepath.SkipDir
+		}
+
+		// Only include .md files
+		if !info.IsDir() && strings.HasSuffix(info.Name(), ".md") {
+			relPath, err := filepath.Rel(ws.Root, path)
+			if err == nil && relPath != "inbox.md" { // Don't duplicate inbox.md
+				files = append(files, relPath)
+			}
+		}
+
+		return nil
+	})
+
+	return files, err
+}
+
+// moveToFront moves the specified item to the front of the slice if it exists
+func moveToFront(files []string, target string) []string {
+	for i, file := range files {
+		if file == target {
+			// Move to front
+			result := make([]string, len(files))
+			result[0] = target
+			copy(result[1:], files[:i])
+			copy(result[1+i:], files[i+1:])
+			return result
+		}
+	}
+	return files
+}
+
+// runFileSelectionFZF runs FZF for file selection
+func runFileSelectionFZF(files []string, prompt string) (string, error) {
+	// Validate FZF availability
+	if _, err := exec.LookPath("fzf"); err != nil {
+		return "", fmt.Errorf("fzf not found in PATH. Please install fzf or set JOT_FZF=0 to disable")
+	}
+
+	// Create temporary file with file list
+	tempFile, err := os.CreateTemp("", "jot-files-*.txt")
+	if err != nil {
+		return "", fmt.Errorf("failed to create temp file: %w", err)
+	}
+	defer os.Remove(tempFile.Name())
+	defer tempFile.Close()
+
+	// Write files to temp file
+	for _, file := range files {
+		fmt.Fprintln(tempFile, file)
+	}
+	tempFile.Close()
+
+	// Build FZF command
+	cmd := exec.Command("fzf",
+		"--prompt", prompt,
+		"--preview", "head -20 {}",
+		"--preview-window", "right:50%:wrap",
+		"--bind", "tab:toggle-preview",
+		"--header", "ENTER:select | TAB:preview | ESC:cancel",
+		"--height", "60%",
+		"--border",
+	)
+
+	// Set up input from temp file
+	tempFileRead, err := os.Open(tempFile.Name())
+	if err != nil {
+		return "", fmt.Errorf("failed to open temp file: %w", err)
+	}
+	defer tempFileRead.Close()
+
+	cmd.Stdin = tempFileRead
+	cmd.Stderr = os.Stderr
+
+	// Run FZF and capture selection
+	output, err := cmd.Output()
+	if err != nil {
+		// Check if it's a cancellation (exit code 130) vs actual error
+		if exitError, ok := err.(*exec.ExitError); ok {
+			if exitError.ExitCode() == 130 {
+				return "", nil // User cancelled
+			}
+		}
+		return "", fmt.Errorf("fzf command failed: %w", err)
+	}
+
+	selected := strings.TrimSpace(string(output))
+	return selected, nil
+}
+
+// findDuplicateHeadings checks for duplicate heading titles in subtrees
+func findDuplicateHeadings(subtrees []SubtreeItem) []string {
+	titleCount := make(map[string]int)
+	for _, subtree := range subtrees {
+		titleCount[subtree.Title]++
+	}
+
+	var duplicates []string
+	for title, count := range titleCount {
+		if count > 1 {
+			duplicates = append(duplicates, title)
+		}
+	}
+	return duplicates
+}
+
+// validateAndDisambiguateSelector validates a selector and handles ambiguous cases
+func validateAndDisambiguateSelector(ws *workspace.Workspace, selector string, subtrees []SubtreeItem) (string, error) {
+	// Parse the selector to extract the heading
+	parsedPath, err := markdown.ParsePath(selector)
+	if err != nil {
+		return "", fmt.Errorf("invalid selector format: %w", err)
+	}
+
+	if len(parsedPath.Segments) == 0 {
+		return selector, nil // File-level selector
+	}
+
+	// Get the heading name from the selector
+	headingName := parsedPath.Segments[len(parsedPath.Segments)-1]
+
+	// Check how many subtrees match this heading name
+	var matches []SubtreeItem
+	for _, subtree := range subtrees {
+		if subtree.Title == headingName {
+			matches = append(matches, subtree)
+		}
+	}
+
+	if len(matches) == 0 {
+		return "", fmt.Errorf("heading '%s' not found in the file", headingName)
+	}
+
+	if len(matches) == 1 {
+		return selector, nil // Unique match, no ambiguity
+	}
+
+	// Multiple matches - this could be problematic for the actual refile operation
+	// For now, we'll use the first match but warn the user
+	fmt.Printf("⚠️  Warning: Multiple headings named '%s' found. Using the first occurrence.\n", headingName)
+	fmt.Printf("   Preview showed: %s\n", matches[0].Preview)
+	
+	return selector, nil
+}
+
+// improvePreviewFormatting enhances the preview content extraction
+func improvePreviewFormatting(content []byte, startPos, endPos int) string {
+	lines := strings.Split(string(content[startPos:endPos]), "\n")
+	
+	var preview strings.Builder
+	lineCount := 0
+	
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		
+		// Skip empty lines at the beginning
+		if preview.Len() == 0 && trimmed == "" {
+			continue
+		}
+		
+		// Stop at next heading
+		if strings.HasPrefix(trimmed, "#") && preview.Len() > 0 {
+			break
+		}
+		
+		// Add line with proper formatting
+		if trimmed != "" {
+			if preview.Len() > 0 {
+				preview.WriteString(" ")
+			}
+			preview.WriteString(trimmed)
+			lineCount++
+			
+			// Limit preview length
+			if preview.Len() > 120 || lineCount >= 3 {
+				break
+			}
+		}
+	}
+	
+	result := preview.String()
+	if len(result) > 120 {
+		result = result[:117] + "..."
+	}
+	if result == "" {
+		result = "No content"
+	}
+	
+	return result
 }
