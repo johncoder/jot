@@ -336,7 +336,12 @@ func resolveDestinationPath(doc ast.Node, content []byte, destPath *markdown.Hea
 			if insertOffset > 0 && content[insertOffset-1] != '\n' {
 				insertOffset = len(content)
 			}
-			targetLevel = destPath.SkipLevels + len(destPath.Segments)
+			// For top-level insertion with empty segments, default to level 2
+			if len(destPath.Segments) == 0 {
+				targetLevel = 2 // Default level for top-level insertion
+			} else {
+				targetLevel = destPath.SkipLevels + len(destPath.Segments)
+			}
 		}
 	}
 
@@ -357,68 +362,82 @@ func TransformSubtreeLevel(subtree *markdown.Subtree, newBaseLevel int) []byte {
 
 // performRefile executes the actual refile operation
 func performRefile(ws *workspace.Workspace, sourcePath *markdown.HeadingPath, subtree *markdown.Subtree, dest *DestinationTarget, transformedContent []byte) error {
-	// Read source file
+	// Resolve file paths
 	var sourceFilePath string
 	if sourcePath.File == "inbox.md" {
 		sourceFilePath = ws.InboxPath
 	} else if filepath.IsAbs(sourcePath.File) {
 		sourceFilePath = sourcePath.File
 	} else {
-		// Use workspace root for relative paths, not lib/ directory
 		sourceFilePath = filepath.Join(ws.Root, sourcePath.File)
 	}
 
-	sourceContent, err := os.ReadFile(sourceFilePath)
-	if err != nil {
-		return fmt.Errorf("failed to read source file: %w", err)
-	}
-
-	// Read destination file
 	var destFilePath string
 	if dest.File == "inbox.md" {
 		destFilePath = ws.InboxPath
 	} else if filepath.IsAbs(dest.File) {
 		destFilePath = dest.File
 	} else {
-		// Use workspace root for relative paths, not lib/ directory
 		destFilePath = filepath.Join(ws.Root, dest.File)
 	}
 
+	// Check if this is a same-file operation
+	sameFile := sourceFilePath == destFilePath
+
+	// Step 1: Read source file and remove the subtree
+	sourceContent, err := os.ReadFile(sourceFilePath)
+	if err != nil {
+		return fmt.Errorf("failed to read source file: %w", err)
+	}
+
+	newSourceContent := append(sourceContent[:subtree.StartOffset], sourceContent[subtree.EndOffset:]...)
+
+	// Step 2: Write the updated source file (without the subtree)
+	if err := os.WriteFile(sourceFilePath, newSourceContent, 0644); err != nil {
+		return fmt.Errorf("failed to write source file: %w", err)
+	}
+
+	// Step 3: Read the destination file (which might be the updated source file)
 	destContent, err := os.ReadFile(destFilePath)
 	if err != nil {
 		return fmt.Errorf("failed to read destination file: %w", err)
 	}
 
-	// Remove from source
-	newSourceContent := append(sourceContent[:subtree.StartOffset], sourceContent[subtree.EndOffset:]...)
+	// Step 4: Calculate insertion point
+	insertOffset := dest.InsertOffset
+	if sameFile && dest.InsertOffset > subtree.StartOffset {
+		// Adjust offset for same-file operations when inserting after the removed content
+		insertOffset = dest.InsertOffset - (subtree.EndOffset - subtree.StartOffset)
+	}
 
-	// Insert into destination
-	var newDestContent []byte
+	// Step 5: Prepare content for insertion
 	insertContent := transformedContent
 
 	// Add missing headings if needed
 	if len(dest.CreatePath) > 0 {
-		// Calculate the base level for missing headings
 		baseLevel := dest.TargetLevel - len(dest.CreatePath)
 		pathContent := markdown.CreateHeadingStructure(dest.CreatePath, baseLevel)
 
 		// Ensure proper spacing
-		if dest.InsertOffset > 0 && destContent[dest.InsertOffset-1] != '\n' {
+		if insertOffset > 0 && destContent[insertOffset-1] != '\n' {
 			pathContent = append([]byte("\n"), pathContent...)
 		}
 
 		insertContent = append(pathContent, insertContent...)
+	} else {
+		// Ensure proper newline spacing
+		if insertOffset > 0 && destContent[insertOffset-1] != '\n' {
+			insertContent = append([]byte("\n\n"), insertContent...)
+		} else if insertOffset > 0 {
+			insertContent = append([]byte("\n"), insertContent...)
+		}
 	}
 
-	// Insert at the specified offset
-	newDestContent = append(destContent[:dest.InsertOffset], insertContent...)
-	newDestContent = append(newDestContent, destContent[dest.InsertOffset:]...)
+	// Step 6: Insert content into destination
+	newDestContent := append(destContent[:insertOffset], insertContent...)
+	newDestContent = append(newDestContent, destContent[insertOffset:]...)
 
-	// Write files back
-	if err := os.WriteFile(sourceFilePath, newSourceContent, 0644); err != nil {
-		return fmt.Errorf("failed to write source file: %w", err)
-	}
-
+	// Step 7: Write the final destination file
 	if err := os.WriteFile(destFilePath, newDestContent, 0644); err != nil {
 		return fmt.Errorf("failed to write destination file: %w", err)
 	}
