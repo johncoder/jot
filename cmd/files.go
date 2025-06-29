@@ -24,10 +24,21 @@ flag and JOT_FZF=1, provides an interactive file browser with preview.
 Examples:
   jot files                              # List all markdown files
   JOT_FZF=1 jot files --interactive      # Interactive file browser
-  JOT_FZF=1 jot files --interactive --edit  # Interactive browser with editor`,
+  JOT_FZF=1 jot files --interactive --edit  # Interactive browser with editor
+  JOT_FZF=1 jot files -i -s             # Interactive selection for composition
+  cat $(jot files -i -s)                # Example: view selected file content`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		interactive, _ := cmd.Flags().GetBool("interactive")
 		edit, _ := cmd.Flags().GetBool("edit")
+		selectMode, _ := cmd.Flags().GetBool("select")
+
+		// Validate flag combinations
+		if selectMode && !interactive {
+			return fmt.Errorf("--select flag requires --interactive mode")
+		}
+		if selectMode && edit {
+			return fmt.Errorf("--select and --edit flags cannot be used together")
+		}
 
 		ws, err := getWorkspace(cmd)
 		if err != nil {
@@ -47,7 +58,7 @@ Examples:
 
 		// Check if interactive mode is requested
 		if fzf.ShouldUseFZF(interactive) {
-			return runInteractiveFilesBrowser(ws, files, edit)
+			return runInteractiveFilesBrowser(ws, files, edit, selectMode)
 		}
 
 		// Default: simple file listing with workspace-relative paths
@@ -85,7 +96,7 @@ func findMarkdownFiles(root string) ([]string, error) {
 }
 
 // runInteractiveFilesBrowser runs FZF file browser with optional editor integration
-func runInteractiveFilesBrowser(ws *workspace.Workspace, files []string, edit bool) error {
+func runInteractiveFilesBrowser(ws *workspace.Workspace, files []string, edit bool, selectMode bool) error {
 	if len(files) == 0 {
 		fmt.Println("No files to browse")
 		return nil
@@ -106,8 +117,10 @@ func runInteractiveFilesBrowser(ws *workspace.Workspace, files []string, edit bo
 		}
 	}
 
-	// If edit mode, set up for editor opening
-	if edit {
+	// Handle different modes
+	if selectMode {
+		return runInteractiveFilesWithSelection(results)
+	} else if edit {
 		return runInteractiveFilesWithEditor(results)
 	}
 
@@ -118,7 +131,7 @@ func runInteractiveFilesBrowser(ws *workspace.Workspace, files []string, edit bo
 // runInteractiveFilesWithEditor runs FZF and opens selected file in editor
 func runInteractiveFilesWithEditor(results []fzf.SearchResult) error {
 	// Create a simpler FZF command for file selection
-	selectedFile, err := runSimpleFZFFileSelection(results)
+	selectedFile, err := runSimpleFZFFileSelection(results, "ENTER: open in editor, ESC: cancel")
 	if err != nil {
 		return err
 	}
@@ -155,8 +168,25 @@ func runInteractiveFilesWithEditor(results []fzf.SearchResult) error {
 	return cmd.Run()
 }
 
+// runInteractiveFilesWithSelection runs FZF and outputs the selected file path for composition with other tools
+func runInteractiveFilesWithSelection(results []fzf.SearchResult) error {
+	// Create a simpler FZF command for file selection
+	selectedFile, err := runSimpleFZFFileSelection(results, "ENTER: select file path, ESC: cancel")
+	if err != nil {
+		return err
+	}
+
+	if selectedFile == "" {
+		return nil // User cancelled
+	}
+
+	// Output the full path to stdout for composition with other CLI tools
+	fmt.Println(selectedFile)
+	return nil
+}
+
 // runSimpleFZFFileSelection runs a simple FZF selection and returns the chosen file path
-func runSimpleFZFFileSelection(results []fzf.SearchResult) (string, error) {
+func runSimpleFZFFileSelection(results []fzf.SearchResult, headerText string) (string, error) {
 	// Create temporary file with file paths
 	tempFile, err := os.CreateTemp("", "jot-files-*.txt")
 	if err != nil {
@@ -182,7 +212,7 @@ func runSimpleFZFFileSelection(results []fzf.SearchResult) (string, error) {
 		"--preview", "jot peek {}",
 		"--preview-window", "right:50%",
 		"--prompt", "Select file > ",
-		"--header", "ENTER: open in editor, ESC: cancel",
+		"--header", headerText,
 	)
 
 	// Set up input from temp file
@@ -218,6 +248,7 @@ func runSimpleFZFFileSelection(results []fzf.SearchResult) (string, error) {
 func init() {
 	filesCmd.Flags().BoolP("interactive", "i", false, "Interactive file browser (requires JOT_FZF=1)")
 	filesCmd.Flags().Bool("edit", false, "Open selected file in editor (use with --interactive)")
+	filesCmd.Flags().BoolP("select", "s", false, "Output selected file path for composition with other tools (use with --interactive)")
 
 	rootCmd.AddCommand(filesCmd)
 }
