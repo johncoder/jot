@@ -9,6 +9,7 @@ import (
 
 	"github.com/johncoder/jot/internal/config"
 	"github.com/johncoder/jot/internal/fzf"
+	"github.com/johncoder/jot/internal/workspace"
 	"github.com/spf13/cobra"
 )
 
@@ -46,12 +47,12 @@ Examples:
 
 		// Check if interactive mode is requested
 		if fzf.ShouldUseFZF(interactive) {
-			return runInteractiveFilesBrowser(files, edit)
+			return runInteractiveFilesBrowser(ws, files, edit)
 		}
 
-		// Default: simple file listing
+		// Default: simple file listing with workspace-relative paths
 		for _, file := range files {
-			fmt.Println(file)
+			fmt.Println(ws.RelativePath(file))
 		}
 
 		return nil
@@ -84,7 +85,7 @@ func findMarkdownFiles(root string) ([]string, error) {
 }
 
 // runInteractiveFilesBrowser runs FZF file browser with optional editor integration
-func runInteractiveFilesBrowser(files []string, edit bool) error {
+func runInteractiveFilesBrowser(ws *workspace.Workspace, files []string, edit bool) error {
 	if len(files) == 0 {
 		fmt.Println("No files to browse")
 		return nil
@@ -93,16 +94,11 @@ func runInteractiveFilesBrowser(files []string, edit bool) error {
 	// Create FZF search results for files
 	results := make([]fzf.SearchResult, len(files))
 	for i, file := range files {
-		// Use relative path for display if possible
-		displayPath := file
-		if cwd, err := os.Getwd(); err == nil {
-			if relPath, err := filepath.Rel(cwd, file); err == nil && !strings.HasPrefix(relPath, "..") {
-				displayPath = relPath
-			}
-		}
+		// Use workspace-relative path for display
+		displayPath := ws.RelativePath(file)
 
 		results[i] = fzf.SearchResult{
-			DisplayLine: displayPath, // Show relative path in FZF
+			DisplayLine: displayPath, // Show workspace-relative path in FZF
 			FilePath:    file,        // Full path available for preview
 			LineNumber:  1,
 			Context:     fmt.Sprintf("📄 %s", filepath.Base(file)),

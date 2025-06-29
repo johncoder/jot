@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/johncoder/jot/internal/config"
@@ -134,6 +135,15 @@ func RequireSpecificWorkspace(name string) (*Workspace, error) {
 func IsWorkspace() bool {
 	_, err := FindWorkspace()
 	return err == nil
+}
+
+// RelativePath converts an absolute path to a path relative to the workspace root
+// If the path is not within the workspace, returns the original path
+func (w *Workspace) RelativePath(absolutePath string) string {
+	if relPath, err := filepath.Rel(w.Root, absolutePath); err == nil && !strings.HasPrefix(relPath, "..") {
+		return relPath
+	}
+	return absolutePath
 }
 
 // AppendToInbox adds content to the inbox with a timestamp
