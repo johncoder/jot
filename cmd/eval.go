@@ -23,14 +23,27 @@ var evalApproveDocument bool
 var evalRevokeDocument bool
 
 // resolveEvalFilePath consolidates file path resolution logic for eval operations
-func resolveEvalFilePath(ws *workspace.Workspace, filename string) string {
-	if filename == "inbox.md" {
+func resolveEvalFilePath(ws *workspace.Workspace, filename string, noWorkspace bool) string {
+	if noWorkspace {
+		// Non-workspace mode: resolve relative to current directory
+		if filepath.IsAbs(filename) {
+			return filename
+		}
+		cwd, _ := os.Getwd()
+		return filepath.Join(cwd, filename)
+	}
+	
+	// Workspace mode: existing logic
+	if filename == "inbox.md" && ws != nil {
 		return ws.InboxPath
 	}
 	if filepath.IsAbs(filename) {
 		return filename
 	}
-	return filepath.Join(ws.Root, filename)
+	if ws != nil {
+		return filepath.Join(ws.Root, filename)
+	}
+	return filename // Fallback
 }
 
 var evalCmd = &cobra.Command{
@@ -96,7 +109,8 @@ Examples:
 		}
 
 		// Get workspace for file path resolution
-		ws, err := workspace.RequireWorkspace()
+		noWorkspace, _ := cmd.Flags().GetBool("no-workspace")
+		ws, err := workspace.GetWorkspaceContext(noWorkspace)
 		if err != nil {
 			if isJSONOutput(cmd) {
 				return outputJSONError(cmd, err, startTime)
@@ -105,8 +119,8 @@ Examples:
 		}
 
 		filename := args[0]
-		// Resolve file path relative to workspace
-		resolvedFilename := resolveEvalFilePath(ws, filename)
+		// Resolve file path relative to workspace or current directory
+		resolvedFilename := resolveEvalFilePath(ws, filename, noWorkspace)
 
 		// Handle revoke operations
 		if evalRevokeDocument {
@@ -521,6 +535,7 @@ func init() {
 	evalCmd.Flags().BoolVar(&evalListApproved, "list-approved", false, "List all approved blocks")
 	evalCmd.Flags().BoolVar(&evalApproveDocument, "approve-document", false, "Approve the entire document")
 	evalCmd.Flags().BoolVar(&evalRevokeDocument, "revoke-document", false, "Revoke document approval")
+	evalCmd.Flags().Bool("no-workspace", false, "Resolve file paths relative to current directory instead of workspace")
 }
 
 // JSON output functions for eval command

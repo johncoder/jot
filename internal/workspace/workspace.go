@@ -192,3 +192,14 @@ func (w *Workspace) AppendToFile(filePath, content string) error {
 
 	return nil
 }
+
+// GetWorkspaceContext attempts to find workspace for configuration but allows operation without it
+// When noWorkspace is true, workspace detection failures are ignored and nil workspace is returned
+func GetWorkspaceContext(noWorkspace bool) (*Workspace, error) {
+	if noWorkspace {
+		// Try to find workspace for config, but don't fail if not found
+		ws, _ := FindWorkspace()
+		return ws, nil // Return nil workspace without error if not found
+	}
+	return RequireWorkspace() // Existing behavior
+}

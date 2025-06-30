@@ -2,6 +2,7 @@ package tangle
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 
 	"github.com/johncoder/jot/internal/eval"
@@ -29,7 +30,7 @@ func NewEngine() *Engine {
 }
 
 // FindTangleBlocks scans a markdown file for code blocks with tangle attributes
-func (e *Engine) FindTangleBlocks(ws *workspace.Workspace, filePath string) error {
+func (e *Engine) FindTangleBlocks(ws *workspace.Workspace, filePath string, noWorkspace bool) error {
 	// Parse the markdown file for eval blocks using the existing eval system
 	codeBlocks, err := eval.ParseMarkdownForEvalBlocks(filePath)
 	if err != nil {
@@ -45,8 +46,8 @@ func (e *Engine) FindTangleBlocks(ws *workspace.Workspace, filePath string) erro
 				continue
 			}
 
-			// Resolve tangle file path relative to workspace
-			absoluteTangleFilePath := resolveTangleFilePath(ws, tangleFilePath)
+			// Resolve tangle file path relative to workspace or current directory
+			absoluteTangleFilePath := resolveTangleFilePath(ws, tangleFilePath, noWorkspace)
 
 			content := ""
 			if len(block.Code) > 0 {
@@ -90,9 +91,23 @@ func (e *Engine) GroupBlocksByFile() map[string][]TangleBlock {
 }
 
 // resolveTangleFilePath consolidates file path resolution logic for tangle operations
-func resolveTangleFilePath(ws *workspace.Workspace, filename string) string {
+func resolveTangleFilePath(ws *workspace.Workspace, filename string, noWorkspace bool) string {
+	if noWorkspace {
+		// Non-workspace mode: resolve relative to current directory
+		if filepath.IsAbs(filename) {
+			return filename
+		}
+		// Get current working directory and resolve relative to it
+		cwd, _ := os.Getwd()
+		return filepath.Join(cwd, filename)
+	}
+	
+	// Workspace mode: existing logic
 	if filepath.IsAbs(filename) {
 		return filename
 	}
-	return filepath.Join(ws.Root, filename)
+	if ws != nil {
+		return filepath.Join(ws.Root, filename)
+	}
+	return filename // Fallback
 }

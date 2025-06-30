@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 
 	"github.com/johncoder/jot/internal/tangle"
@@ -25,14 +26,15 @@ Examples:
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Get workspace for file path resolution
-		ws, err := workspace.RequireWorkspace()
+		noWorkspace, _ := cmd.Flags().GetBool("no-workspace")
+		ws, err := workspace.GetWorkspaceContext(noWorkspace)
 		if err != nil {
 			return err
 		}
 
 		filename := args[0]
-		// Resolve file path relative to workspace
-		resolvedFilename := resolveTangleFilePath(ws, filename)
+		// Resolve file path relative to workspace or current directory
+		resolvedFilename := resolveTangleFilePath(ws, filename, noWorkspace)
 		
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
 		verbose, _ := cmd.Flags().GetBool("verbose")
@@ -43,19 +45,20 @@ Examples:
 			fmt.Printf("Tangling code blocks in file: %s\n", resolvedFilename)
 		}
 		
-		return tangleMarkdown(ws, resolvedFilename, dryRun, verbose)
+		return tangleMarkdown(ws, resolvedFilename, dryRun, verbose, noWorkspace)
 	},
 }
 
 func init() {
 	tangleCmd.Flags().Bool("dry-run", false, "Show what would be tangled without actually writing files")
 	tangleCmd.Flags().BoolP("verbose", "v", false, "Show detailed information about the tangle operation")
+	tangleCmd.Flags().Bool("no-workspace", false, "Resolve file paths relative to current directory instead of workspace")
 }
 
-func tangleMarkdown(ws *workspace.Workspace, filePath string, dryRun, verbose bool) error {
+func tangleMarkdown(ws *workspace.Workspace, filePath string, dryRun, verbose bool, noWorkspace bool) error {
 	// Create tangle engine and find tangle blocks
 	engine := tangle.NewEngine()
-	if err := engine.FindTangleBlocks(ws, filePath); err != nil {
+	if err := engine.FindTangleBlocks(ws, filePath, noWorkspace); err != nil {
 		return fmt.Errorf("failed to find tangle blocks: %w", err)
 	}
 
@@ -85,12 +88,25 @@ func tangleMarkdown(ws *workspace.Workspace, filePath string, dryRun, verbose bo
 }
 
 // resolveTangleFilePath consolidates file path resolution logic for tangle operations
-func resolveTangleFilePath(ws *workspace.Workspace, filename string) string {
-	if filename == "inbox.md" {
+func resolveTangleFilePath(ws *workspace.Workspace, filename string, noWorkspace bool) string {
+	if noWorkspace {
+		// Non-workspace mode: resolve relative to current directory
+		if filepath.IsAbs(filename) {
+			return filename
+		}
+		cwd, _ := os.Getwd()
+		return filepath.Join(cwd, filename)
+	}
+	
+	// Workspace mode: existing logic
+	if filename == "inbox.md" && ws != nil {
 		return ws.InboxPath
 	}
 	if filepath.IsAbs(filename) {
 		return filename
 	}
-	return filepath.Join(ws.Root, filename)
+	if ws != nil {
+		return filepath.Join(ws.Root, filename)
+	}
+	return filename // Fallback
 }

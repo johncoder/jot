@@ -43,7 +43,8 @@ This is useful for quickly reviewing files or specific sections without opening 
 	Args: cobra.RangeArgs(0, 1), // Allow 0 or 1 arguments for --toc mode
 	RunE: func(cmd *cobra.Command, args []string) error {
 		startTime := time.Now()
-		ws, err := workspace.RequireWorkspace()
+		noWorkspace, _ := cmd.Flags().GetBool("no-workspace")
+		ws, err := workspace.GetWorkspaceContext(noWorkspace)
 		if err != nil {
 			if isJSONOutput(cmd) {
 				return outputJSONError(cmd, err, startTime)
@@ -70,7 +71,7 @@ This is useful for quickly reviewing files or specific sections without opening 
 			if isJSONOutput(cmd) {
 				return showTableOfContentsJSON(cmd, ws, args[0], short, startTime)
 			}
-			return showTableOfContents(ws, args[0], short)
+			return showTableOfContents(ws, args[0], short, noWorkspace)
 		}
 
 		// Regular peek mode requires exactly one argument
@@ -96,7 +97,7 @@ This is useful for quickly reviewing files or specific sections without opening 
 			if isJSONOutput(cmd) {
 				return showWholeFileJSON(cmd, ws, selector, startTime)
 			}
-			return showWholeFile(ws, selector, raw, info)
+			return showWholeFile(ws, selector, raw, info, noWorkspace)
 		}
 
 		// Parse the source path selector for subtree extraction
@@ -110,7 +111,7 @@ This is useful for quickly reviewing files or specific sections without opening 
 		}
 
 		// Extract the subtree
-		subtree, err := ExtractSubtree(ws, sourcePath)
+		subtree, err := ExtractSubtreeWithOptions(ws, sourcePath, noWorkspace)
 		if err != nil {
 			err := fmt.Errorf("failed to extract subtree: %w", err)
 			if isJSONOutput(cmd) {
@@ -150,17 +151,9 @@ This is useful for quickly reviewing files or specific sections without opening 
 }
 
 // showWholeFile displays the entire content of a file
-func showWholeFile(ws *workspace.Workspace, filename string, raw bool, info bool) error {
-	// Construct full file path
-	var filePath string
-	if filename == "inbox.md" {
-		filePath = ws.InboxPath
-	} else if filepath.IsAbs(filename) {
-		filePath = filename
-	} else {
-		// Use workspace root for relative paths
-		filePath = filepath.Join(ws.Root, filename)
-	}
+func showWholeFile(ws *workspace.Workspace, filename string, raw bool, info bool, noWorkspace bool) error {
+	// Construct full file path using the new resolution function
+	filePath := resolvePeekFilePath(ws, filename, noWorkspace)
 
 	// Read file content
 	content, err := os.ReadFile(filePath)
@@ -297,7 +290,7 @@ func splitLines(content []byte) []string {
 }
 
 // showTableOfContents displays a table of contents for a file or subtree
-func showTableOfContents(ws *workspace.Workspace, selector string, useShortSelectors bool) error {
+func showTableOfContents(ws *workspace.Workspace, selector string, useShortSelectors bool, noWorkspace bool) error {
 	// Check if this is a simple file name or a path selector
 	var content []byte
 	var filename string
@@ -312,7 +305,7 @@ func showTableOfContents(ws *workspace.Workspace, selector string, useShortSelec
 			return fmt.Errorf("invalid selector: %w", parseErr)
 		}
 
-		subtree, extractErr := ExtractSubtree(ws, sourcePath)
+		subtree, extractErr := ExtractSubtreeWithOptions(ws, sourcePath, noWorkspace)
 		if extractErr != nil {
 			return fmt.Errorf("failed to extract subtree: %w", extractErr)
 		}
@@ -338,7 +331,7 @@ func showTableOfContents(ws *workspace.Workspace, selector string, useShortSelec
 				baseFilename = selector
 				filename = selector
 			}
-			filePath = filepath.Join(ws.Root, selector)
+			filePath = resolvePeekFilePath(ws, selector, noWorkspace)
 		}
 
 		// Check if file exists
@@ -785,6 +778,7 @@ func init() {
 	peekCmd.Flags().BoolP("info", "i", false, "Show subtree metadata information")
 	peekCmd.Flags().BoolP("toc", "t", false, "Show table of contents for file or subtree")
 	peekCmd.Flags().BoolP("short", "s", false, "Generate shortest possible selectors (use with --toc)")
+	peekCmd.Flags().Bool("no-workspace", false, "Resolve file paths relative to current directory instead of workspace")
 
 	// Add to root command
 	rootCmd.AddCommand(peekCmd)
@@ -1256,7 +1250,7 @@ func showTableOfContentsJSON(cmd *cobra.Command, ws *workspace.Workspace, select
 			return outputJSONError(cmd, fmt.Errorf("invalid selector: %w", parseErr), startTime)
 		}
 
-		subtree, extractErr := ExtractSubtree(ws, sourcePath)
+		subtree, extractErr := ExtractSubtreeWithOptions(ws, sourcePath, false) // TODO: Add noWorkspace support to JSON functions
 		if extractErr != nil {
 			return outputJSONError(cmd, fmt.Errorf("failed to extract subtree: %w", extractErr), startTime)
 		}
@@ -1487,4 +1481,28 @@ func parseEnhancedSelector(ws *workspace.Workspace, selector string) (string, er
 
 	// No heading found, return whole file selector
 	return filename, nil
+}
+
+// resolvePeekFilePath consolidates file path resolution logic for peek operations
+func resolvePeekFilePath(ws *workspace.Workspace, filename string, noWorkspace bool) string {
+	if noWorkspace {
+		// Non-workspace mode: resolve relative to current directory
+		if filepath.IsAbs(filename) {
+			return filename
+		}
+		cwd, _ := os.Getwd()
+		return filepath.Join(cwd, filename)
+	}
+	
+	// Workspace mode: existing logic
+	if filename == "inbox.md" && ws != nil {
+		return ws.InboxPath
+	}
+	if filepath.IsAbs(filename) {
+		return filename
+	}
+	if ws != nil {
+		return filepath.Join(ws.Root, filename)
+	}
+	return filename // Fallback
 }
