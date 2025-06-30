@@ -2,15 +2,11 @@ package cmd
 
 import (
 	"fmt"
-	"io/ioutil"
-	"os"
 	"path/filepath"
-	"strings"
 
+	"github.com/johncoder/jot/internal/tangle"
+	"github.com/johncoder/jot/internal/workspace"
 	"github.com/spf13/cobra"
-	"github.com/yuin/goldmark"
-	"github.com/yuin/goldmark/ast"
-	"github.com/yuin/goldmark/text"
 )
 
 var tangleCmd = &cobra.Command{
@@ -18,88 +14,83 @@ var tangleCmd = &cobra.Command{
 	Short: "Extract code blocks into standalone source files",
 	Long: `Extract code blocks from Markdown files into standalone source files.
 
-The tangle command looks for code blocks with :tangle or :file header arguments 
+The tangle command looks for code blocks with <eval tangle file="..."/> elements 
 and extracts them to the specified file paths. Directories are created as needed.
 
 Examples:
   jot tangle notes.md              # Extract code blocks from notes.md
-  jot tangle docs/tutorial.md      # Extract from tutorial file`,
+  jot tangle docs/tutorial.md      # Extract from tutorial file
+  jot tangle --dry-run notes.md    # Show what would be tangled
+  jot tangle --verbose notes.md    # Show detailed output`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		filePath := args[0]
-		fmt.Printf("Tangling code blocks in file: %s\n", filePath)
-		return tangleMarkdown(filePath)
+		// Get workspace for file path resolution
+		ws, err := workspace.RequireWorkspace()
+		if err != nil {
+			return err
+		}
+
+		filename := args[0]
+		// Resolve file path relative to workspace
+		resolvedFilename := resolveTangleFilePath(ws, filename)
+		
+		dryRun, _ := cmd.Flags().GetBool("dry-run")
+		verbose, _ := cmd.Flags().GetBool("verbose")
+		
+		if dryRun {
+			fmt.Printf("Dry run - analyzing file: %s\n", resolvedFilename)
+		} else {
+			fmt.Printf("Tangling code blocks in file: %s\n", resolvedFilename)
+		}
+		
+		return tangleMarkdown(ws, resolvedFilename, dryRun, verbose)
 	},
 }
 
 func init() {
+	tangleCmd.Flags().Bool("dry-run", false, "Show what would be tangled without actually writing files")
+	tangleCmd.Flags().BoolP("verbose", "v", false, "Show detailed information about the tangle operation")
 }
 
-func tangleMarkdown(filePath string) error {
-	content, err := ioutil.ReadFile(filePath)
-	if err != nil {
-		return fmt.Errorf("failed to read file: %w", err)
+func tangleMarkdown(ws *workspace.Workspace, filePath string, dryRun, verbose bool) error {
+	// Create tangle engine and find tangle blocks
+	engine := tangle.NewEngine()
+	if err := engine.FindTangleBlocks(ws, filePath); err != nil {
+		return fmt.Errorf("failed to find tangle blocks: %w", err)
 	}
 
-	md := goldmark.New()
-	node := md.Parser().Parse(text.NewReader(content))
-
-	// Traverse the AST to find code blocks with :tangle
-	walker := func(n ast.Node, entering bool) (ast.WalkStatus, error) {
-		if n.Kind() == ast.KindFencedCodeBlock {
-			codeBlock := n.(*ast.FencedCodeBlock)
-			info := string(codeBlock.Info.Text(content))
-			args := parseHeaderArguments(info)
-
-			if _, ok := args["tangle"]; ok {
-				filePath, hasFile := args["file"]
-				if !hasFile {
-					fmt.Printf("Skipping code block without :file argument\n")
-					return ast.WalkContinue, nil
-				}
-
-				code := string(codeBlock.Text(content))
-				if err := writeToFile(filePath, code); err != nil {
-					return ast.WalkStop, err
-				}
-			}
-		}
-		return ast.WalkContinue, nil
+	// Group blocks by target file
+	groups := engine.GroupBlocksByFile()
+	
+	if len(groups) == 0 {
+		fmt.Println("No tangle blocks found")
+		return nil
 	}
 
-	if err := ast.Walk(node, walker); err != nil {
-		return fmt.Errorf("failed to walk AST: %w", err)
+	// Create writer and configure it
+	writer := tangle.NewWriter()
+	writer.SetVerbose(verbose)
+
+	if dryRun {
+		writer.DryRun(groups)
+		return nil
+	}
+
+	// Write the files
+	if err := writer.WriteBlocks(groups); err != nil {
+		return fmt.Errorf("failed to write tangle blocks: %w", err)
 	}
 
 	return nil
 }
 
-func writeToFile(filePath, content string) error {
-	dir := filepath.Dir(filePath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return fmt.Errorf("failed to create directories for %s: %w", filePath, err)
+// resolveTangleFilePath consolidates file path resolution logic for tangle operations
+func resolveTangleFilePath(ws *workspace.Workspace, filename string) string {
+	if filename == "inbox.md" {
+		return ws.InboxPath
 	}
-
-	if err := ioutil.WriteFile(filePath, []byte(content), 0644); err != nil {
-		return fmt.Errorf("failed to write file %s: %w", filePath, err)
+	if filepath.IsAbs(filename) {
+		return filename
 	}
-
-	fmt.Printf("Wrote code block to %s\n", filePath)
-	return nil
-}
-
-func parseHeaderArguments(info string) map[string]string {
-	args := make(map[string]string)
-	for _, part := range strings.Fields(info) {
-		if strings.HasPrefix(part, ":") {
-			// Handle arguments like :name
-			args[part] = "true"
-		} else if strings.Contains(part, "=") {
-			kv := strings.SplitN(part, "=", 2)
-			args[kv[0]] = kv[1]
-		} else {
-			args[part] = ""
-		}
-	}
-	return args
+	return filepath.Join(ws.Root, filename)
 }

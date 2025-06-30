@@ -52,3 +52,34 @@ func IsEvalElement(line string) bool {
 	line = strings.TrimSpace(line)
 	return strings.HasPrefix(line, "<eval") && strings.Contains(line, "/>")
 }
+
+// IsTangleElement returns true if the eval element has tangle attributes
+func (e *EvalMetadata) IsTangleElement() bool {
+	_, hasTangle := e.Params["tangle"]
+	_, hasFile := e.Params["file"]
+	return hasTangle || hasFile
+}
+
+// GetTangleFile returns the target file path for tangling
+func (e *EvalMetadata) GetTangleFile() string {
+	if file, ok := e.Params["file"]; ok {
+		return file
+	}
+	return ""
+}
+
+// GetName returns the name identifier for the block
+func (e *EvalMetadata) GetName() string {
+	if name, ok := e.Params["name"]; ok {
+		return name
+	}
+	return ""
+}
+
+// HasTangleFlag returns true if the element has a tangle flag set
+func (e *EvalMetadata) HasTangleFlag() bool {
+	if tangle, ok := e.Params["tangle"]; ok {
+		return tangle == "yes" || tangle == "true" || tangle == ""
+	}
+	return false
+}
