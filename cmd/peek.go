@@ -95,7 +95,7 @@ This is useful for quickly reviewing files or specific sections without opening 
 		if !strings.Contains(selector, "#") {
 			// Handle whole file display
 			if isJSONOutput(cmd) {
-				return showWholeFileJSON(cmd, ws, selector, startTime)
+				return showWholeFileJSON(cmd, ws, selector, noWorkspace, startTime)
 			}
 			return showWholeFile(ws, selector, raw, info, noWorkspace)
 		}
@@ -191,17 +191,9 @@ func showWholeFile(ws *workspace.Workspace, filename string, raw bool, info bool
 }
 
 // showWholeFileJSON outputs the whole file content in JSON format
-func showWholeFileJSON(cmd *cobra.Command, ws *workspace.Workspace, filename string, startTime time.Time) error {
-	// Construct full file path
-	var filePath string
-	if filename == "inbox.md" {
-		filePath = ws.InboxPath
-	} else if filepath.IsAbs(filename) {
-		filePath = filename
-	} else {
-		// Use workspace root for relative paths
-		filePath = filepath.Join(ws.Root, filename)
-	}
+func showWholeFileJSON(cmd *cobra.Command, ws *workspace.Workspace, filename string, noWorkspace bool, startTime time.Time) error {
+	// Use the same file resolution logic as the non-JSON path
+	filePath := resolvePeekFilePath(ws, filename, noWorkspace)
 
 	// Read file content
 	content, err := os.ReadFile(filePath)
