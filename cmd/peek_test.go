@@ -459,7 +459,7 @@ How to get help.
 			// Capture stdout for testing
 			// For this test, we'll check that the function doesn't panic
 			// and returns appropriate errors
-			err := showTableOfContents(ws, tt.selector, false) // Use default (non-short) selectors for tests
+			err := showTableOfContents(ws, tt.selector, false, false) // Use default (non-short) selectors for tests, workspace mode
 
 			if tt.expectError {
 				if err == nil {
@@ -541,7 +541,7 @@ func TestTableOfContentsEdgeCases(t *testing.T) {
 			}
 
 			// Test TOC function
-			err := showTableOfContents(ws, tt.filename, false) // Use default (non-short) selectors for tests
+			err := showTableOfContents(ws, tt.filename, false, false) // Use default (non-short) selectors for tests, workspace mode
 
 			if tt.expectError {
 				if err == nil {
