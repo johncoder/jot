@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/johncoder/jot/internal/fzf"
 	"github.com/johncoder/jot/internal/markdown"
@@ -35,65 +36,43 @@ Examples:
   JOT_FZF=1 jot find todo --interactive  # Interactive search with FZF`,
 	Args: cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		startTime := time.Now()
+
 		ws, err := getWorkspace(cmd)
 		if err != nil {
+			if isJSONOutput(cmd) {
+				return outputJSONError(cmd, err, startTime)
+			}
 			return err
 		}
 
 		query := strings.Join(args, " ")
 		
-		// Check for interactive mode with FZF
+		// Check for interactive mode with FZF (not available in JSON mode)
 		if fzf.ShouldUseFZF(findInteractive) {
+			if isJSONOutput(cmd) {
+				err := fmt.Errorf("interactive mode not available with JSON output")
+				return outputJSONError(cmd, err, startTime)
+			}
 			return runInteractiveFind(ws, query)
 		}
 
-		fmt.Printf("Searching for: %s\n", query)
-
-		if findInArchive {
-			fmt.Println("Including archived notes in search...")
-		}
-
-		// Collect all markdown files to search
-		var filesToSearch []string
-
-		// Add inbox if it exists
-		if ws.InboxExists() {
-			filesToSearch = append(filesToSearch, ws.InboxPath)
-		}
-
-		// Add lib files
-		err = filepath.Walk(ws.LibDir, func(path string, info os.FileInfo, err error) error {
-			if err != nil {
-				return nil // Skip files we can't read
+		if !isJSONOutput(cmd) {
+			fmt.Printf("Searching for: %s\n", query)
+			if findInArchive {
+				fmt.Println("Including archived notes in search...")
 			}
-
-			if !info.IsDir() && strings.HasSuffix(strings.ToLower(path), ".md") {
-				filesToSearch = append(filesToSearch, path)
-			}
-			return nil
-		})
-		if err != nil {
-			return fmt.Errorf("failed to scan lib directory: %w", err)
 		}
 
-		// Search files and collect results
-		var results []SearchResult
-		for _, filePath := range filesToSearch {
-			matches := searchInFile(filePath, query, ws.Root)
-			results = append(results, matches...)
+		// Collect search results
+		results := collectSearchResults(ws, query)
+
+		// Handle JSON output
+		if isJSONOutput(cmd) {
+			return outputFindJSON(cmd, results, query, startTime)
 		}
 
-		// Sort results by relevance (simple keyword count for now)
-		sort.Slice(results, func(i, j int) bool {
-			return results[i].Score > results[j].Score
-		})
-
-		// Apply limit
-		if len(results) > findLimit {
-			results = results[:findLimit]
-		}
-
-		// Display results
+		// Display results in text format
 		if len(results) == 0 {
 			fmt.Printf("No matches found for '%s'\n", query)
 			return nil
@@ -242,6 +221,35 @@ func collectSearchResults(ws *workspace.Workspace, query string) []SearchResult 
 	}
 
 	return results
+}
+
+// outputFindJSON outputs search results in JSON format
+func outputFindJSON(cmd *cobra.Command, results []SearchResult, query string, startTime time.Time) error {
+	// Convert search results to JSON-friendly format
+	jsonResults := make([]map[string]interface{}, len(results))
+	for i, result := range results {
+		jsonResults[i] = map[string]interface{}{
+			"file_path":     result.FilePath,
+			"relative_path": result.RelativePath,
+			"line_number":   result.LineNumber,
+			"context":       result.Context,
+			"score":         result.Score,
+		}
+	}
+
+	response := map[string]interface{}{
+		"query":        query,
+		"total_found":  len(results),
+		"results":      jsonResults,
+		"search_info": map[string]interface{}{
+			"include_archive": findInArchive,
+			"limit":          findLimit,
+			"limited":        len(results) >= findLimit,
+		},
+		"metadata": createJSONMetadata(cmd, true, startTime),
+	}
+
+	return outputJSON(response)
 }
 
 // searchInFile searches for query in a file and returns matches

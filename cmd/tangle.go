@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/johncoder/jot/internal/tangle"
 	"github.com/johncoder/jot/internal/workspace"
@@ -25,10 +26,15 @@ Examples:
   jot tangle --verbose notes.md    # Show detailed output`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		startTime := time.Now()
+
 		// Get workspace for file path resolution
 		noWorkspace, _ := cmd.Flags().GetBool("no-workspace")
 		ws, err := workspace.GetWorkspaceContext(noWorkspace)
 		if err != nil {
+			if isJSONOutput(cmd) {
+				return outputJSONError(cmd, err, startTime)
+			}
 			return err
 		}
 
@@ -39,13 +45,15 @@ Examples:
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
 		verbose, _ := cmd.Flags().GetBool("verbose")
 		
-		if dryRun {
-			fmt.Printf("Dry run - analyzing file: %s\n", resolvedFilename)
-		} else {
-			fmt.Printf("Tangling code blocks in file: %s\n", resolvedFilename)
+		if !isJSONOutput(cmd) {
+			if dryRun {
+				fmt.Printf("Dry run - analyzing file: %s\n", resolvedFilename)
+			} else {
+				fmt.Printf("Tangling code blocks in file: %s\n", resolvedFilename)
+			}
 		}
 		
-		return tangleMarkdown(ws, resolvedFilename, dryRun, verbose, noWorkspace)
+		return tangleMarkdown(ws, resolvedFilename, dryRun, verbose, noWorkspace, cmd, startTime)
 	},
 }
 
@@ -55,10 +63,13 @@ func init() {
 	tangleCmd.Flags().Bool("no-workspace", false, "Resolve file paths relative to current directory instead of workspace")
 }
 
-func tangleMarkdown(ws *workspace.Workspace, filePath string, dryRun, verbose bool, noWorkspace bool) error {
+func tangleMarkdown(ws *workspace.Workspace, filePath string, dryRun, verbose bool, noWorkspace bool, cmd *cobra.Command, startTime time.Time) error {
 	// Create tangle engine and find tangle blocks
 	engine := tangle.NewEngine()
 	if err := engine.FindTangleBlocks(ws, filePath, noWorkspace); err != nil {
+		if isJSONOutput(cmd) {
+			return outputJSONError(cmd, fmt.Errorf("failed to find tangle blocks: %w", err), startTime)
+		}
 		return fmt.Errorf("failed to find tangle blocks: %w", err)
 	}
 
@@ -66,8 +77,32 @@ func tangleMarkdown(ws *workspace.Workspace, filePath string, dryRun, verbose bo
 	groups := engine.GroupBlocksByFile()
 	
 	if len(groups) == 0 {
+		if isJSONOutput(cmd) {
+			return outputTangleJSON(cmd, []map[string]interface{}{}, filePath, dryRun, startTime)
+		}
 		fmt.Println("No tangle blocks found")
 		return nil
+	}
+
+	// Handle JSON output for found blocks
+	if isJSONOutput(cmd) {
+		// Convert groups to JSON format
+		jsonGroups := make([]map[string]interface{}, 0, len(groups))
+		for targetFile, blocks := range groups {
+			blockInfo := make([]map[string]interface{}, len(blocks))
+			for i, block := range blocks {
+				blockInfo[i] = map[string]interface{}{
+					"content":  block.Content,
+					"language": block.Language,
+				}
+			}
+			jsonGroups = append(jsonGroups, map[string]interface{}{
+				"target_file": targetFile,
+				"blocks":      blockInfo,
+				"block_count": len(blocks),
+			})
+		}
+		return outputTangleJSON(cmd, jsonGroups, filePath, dryRun, startTime)
 	}
 
 	// Create writer and configure it
@@ -85,6 +120,19 @@ func tangleMarkdown(ws *workspace.Workspace, filePath string, dryRun, verbose bo
 	}
 
 	return nil
+}
+
+// outputTangleJSON outputs tangle results in JSON format
+func outputTangleJSON(cmd *cobra.Command, groups []map[string]interface{}, sourceFile string, dryRun bool, startTime time.Time) error {
+	response := map[string]interface{}{
+		"source_file":   sourceFile,
+		"dry_run":       dryRun,
+		"total_groups":  len(groups),
+		"target_files":  groups,
+		"metadata":      createJSONMetadata(cmd, true, startTime),
+	}
+
+	return outputJSON(response)
 }
 
 // resolveTangleFilePath consolidates file path resolution logic for tangle operations
