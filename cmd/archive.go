@@ -7,9 +7,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/johncoder/jot/internal/hooks"
 	"github.com/johncoder/jot/internal/workspace"
 	"github.com/spf13/cobra"
 )
+
+var archiveNoVerify bool
 
 var archiveCmd = &cobra.Command{
 	Use:   "archive [SOURCE]",
@@ -223,13 +226,60 @@ func archiveWithRefile(cmd *cobra.Command, ws *workspace.Workspace, source strin
 			return err
 		}
 	}
+
+	// Initialize hook manager and run pre-archive hook
+	hookManager := hooks.NewManager(ws)
+	if !archiveNoVerify {
+		hookCtx := &hooks.HookContext{
+			Type:        hooks.PreArchive,
+			Workspace:   ws,
+			SourceFile:  source,
+			DestPath:    archiveLocation,
+			Timeout:     30 * time.Second,
+			AllowBypass: archiveNoVerify,
+		}
+		
+		result, err := hookManager.Execute(hookCtx)
+		if err != nil {
+			if isJSONOutput(cmd) {
+				return outputJSONError(cmd, fmt.Errorf("pre-archive hook failed: %s", err.Error()), startTime)
+			}
+			return fmt.Errorf("pre-archive hook failed: %s", err.Error())
+		}
+		
+		if result.Aborted {
+			if isJSONOutput(cmd) {
+				return outputJSONError(cmd, fmt.Errorf("pre-archive hook aborted operation"), startTime)
+			}
+			return fmt.Errorf("pre-archive hook aborted operation")
+		}
+	}
 	
 	if !isJSONOutput(cmd) {
 		fmt.Printf("Archiving '%s' to '%s'...\n", source, archiveLocation)
 	}
 	
 	// Call the internal refile function directly to avoid recursion
-	return executeRefile(source, archiveLocation, cmd, ws)
+	err := executeRefile(source, archiveLocation, cmd, ws)
+	
+	// Run post-archive hook (informational only)
+	if !archiveNoVerify && err == nil {
+		hookCtx := &hooks.HookContext{
+			Type:        hooks.PostArchive,
+			Workspace:   ws,
+			SourceFile:  source,
+			DestPath:    archiveLocation,
+			Timeout:     30 * time.Second,
+			AllowBypass: archiveNoVerify,
+		}
+		
+		_, hookErr := hookManager.Execute(hookCtx)
+		if hookErr != nil && !isJSONOutput(cmd) {
+			fmt.Printf("Warning: post-archive hook failed: %s\n", hookErr.Error())
+		}
+	}
+	
+	return err
 }
 
 // JSON response structures for archive command
@@ -267,4 +317,5 @@ type ArchiveSummary struct {
 func init() {
 	archiveCmd.Flags().Bool("config", false, "Show current archive configuration")
 	archiveCmd.Flags().String("set-location", "", "Set archive location path")
+	archiveCmd.Flags().BoolVar(&archiveNoVerify, "no-verify", false, "Skip hooks verification")
 }

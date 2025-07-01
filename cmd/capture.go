@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/johncoder/jot/internal/editor"
+	"github.com/johncoder/jot/internal/hooks"
 	"github.com/johncoder/jot/internal/markdown"
 	"github.com/johncoder/jot/internal/template"
 	"github.com/johncoder/jot/internal/workspace"
@@ -17,9 +18,9 @@ import (
 
 var (
 	captureNote     string
-	captureStdin    bool
 	captureTemplate string
 	captureContent  string
+	captureNoVerify bool
 )
 
 var captureCmd = &cobra.Command{
@@ -54,6 +55,41 @@ Examples:
 				return outputJSONError(cmd, err, startTime)
 			}
 			return err
+		}
+
+		// Initialize hook manager
+		hookManager := hooks.NewManager(ws)
+
+		// Run pre-capture hook unless --no-verify is set
+		if !captureNoVerify {
+			hookCtx := &hooks.HookContext{
+				Type:         hooks.PreCapture,
+				Workspace:    ws,
+				Content:      captureContent,
+				TemplateName: captureTemplate,
+				Timeout:      30 * time.Second,
+				AllowBypass:  captureNoVerify,
+			}
+			
+			result, err := hookManager.Execute(hookCtx)
+			if err != nil {
+				if isJSONOutput(cmd) {
+					return outputJSONError(cmd, fmt.Errorf("pre-capture hook failed: %s", err.Error()), startTime)
+				}
+				return fmt.Errorf("pre-capture hook failed: %s", err.Error())
+			}
+			
+			if result.Aborted {
+				if isJSONOutput(cmd) {
+					return outputJSONError(cmd, fmt.Errorf("pre-capture hook aborted operation"), startTime)
+				}
+				return fmt.Errorf("pre-capture hook aborted operation")
+			}
+			
+			// Update content if hook modified it
+			if result.Content != captureContent {
+				captureContent = result.Content
+			}
 		}
 
 		// Use positional argument as template name if provided
@@ -177,6 +213,25 @@ Examples:
 					}
 					return outputCaptureJSON(cmd, "capture_and_refile", finalContent, getContentSource(appendContent, useEditor), destination, false, true, destination, templateInfo, startTime)
 				}
+
+				// Run post-capture hook for refile case
+				if !captureNoVerify {
+					hookCtx := &hooks.HookContext{
+						Type:         hooks.PostCapture,
+						Workspace:    ws,
+						Content:      finalContent,
+						TemplateName: captureTemplate,
+						SourceFile:   destination,
+						Timeout:      30 * time.Second,
+						AllowBypass:  captureNoVerify,
+					}
+					
+					_, err := hookManager.Execute(hookCtx)
+					if err != nil && !isJSONOutput(cmd) {
+						fmt.Printf("Warning: post-capture hook failed: %s\n", err.Error())
+					}
+				}
+
 				fmt.Printf("✓ Captured '%s' and refiled to '%s'\n", captureTemplate, destination)
 			} else {
 				// Simple file destination
@@ -205,6 +260,25 @@ Examples:
 					}
 					return outputCaptureJSON(cmd, "capture_to_file", finalContent, getContentSource(appendContent, useEditor), destinationPath, destination == "inbox.md", false, destination, templateInfo, startTime)
 				}
+
+				// Run post-capture hook for file destination case
+				if !captureNoVerify {
+					hookCtx := &hooks.HookContext{
+						Type:         hooks.PostCapture,
+						Workspace:    ws,
+						Content:      finalContent,
+						TemplateName: captureTemplate,
+						SourceFile:   destinationPath,
+						Timeout:      30 * time.Second,
+						AllowBypass:  captureNoVerify,
+					}
+					
+					_, err := hookManager.Execute(hookCtx)
+					if err != nil && !isJSONOutput(cmd) {
+						fmt.Printf("Warning: post-capture hook failed: %s\n", err.Error())
+					}
+				}
+
 				fmt.Printf("✓ Captured '%s' to '%s'\n", captureTemplate, destination)
 			}
 
@@ -248,6 +322,27 @@ Examples:
 			return err
 		}
 
+		// Run post-capture hook unless --no-verify is set
+		if !captureNoVerify {
+			hookCtx := &hooks.HookContext{
+				Type:         hooks.PostCapture,
+				Workspace:    ws,
+				Content:      finalContent,
+				TemplateName: captureTemplate,
+				SourceFile:   ws.InboxPath,
+				Timeout:      30 * time.Second,
+				AllowBypass:  captureNoVerify,
+			}
+			
+			_, err := hookManager.Execute(hookCtx)
+			if err != nil {
+				// Post-capture hooks are informational only - log but don't fail
+				if !isJSONOutput(cmd) {
+					fmt.Printf("Warning: post-capture hook failed: %s\n", err.Error())
+				}
+			}
+		}
+
 		// Handle JSON output
 		if isJSONOutput(cmd) {
 			var templateInfo *CaptureTemplate
@@ -276,6 +371,8 @@ Examples:
 func init() {
 	captureCmd.Flags().StringVar(&captureTemplate, "template", "", "Use a named template for structured capture")
 	captureCmd.Flags().StringVar(&captureContent, "content", "", "Note content to append (skips editor)")
+	captureCmd.Flags().StringVar(&captureNote, "note", "", "Note content to append (legacy alias for --content)")
+	captureCmd.Flags().BoolVar(&captureNoVerify, "no-verify", false, "Skip hooks verification")
 }
 
 // refileContentToDestination performs refile operation for captured content
