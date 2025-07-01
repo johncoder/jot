@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/johncoder/jot/internal/fzf"
+	"github.com/johncoder/jot/internal/hooks"
 	"github.com/johncoder/jot/internal/markdown"
 	"github.com/johncoder/jot/internal/workspace"
 	"github.com/spf13/cobra"
@@ -233,6 +234,8 @@ type PathResolution struct {
 	MissingSegments []string     // Segments that need to be created
 }
 
+var refileNoVerify bool
+
 var refileCmd = &cobra.Command{
 	Use:   "refile [SOURCE] --to DESTINATION",
 	Short: "Move markdown subtrees between files using path-based selectors",
@@ -351,6 +354,36 @@ Examples:
 		// Transform subtree level
 		transformedContent := TransformSubtreeLevel(subtree, dest.TargetLevel)
 
+		// Run pre-refile hook
+		hookManager := hooks.NewManager(ws)
+		if !refileNoVerify {
+			hookCtx := &hooks.HookContext{
+				Type:        hooks.PreRefile,
+				Workspace:   ws,
+				SourceFile:  args[0],
+				DestPath:    to,
+				Timeout:     30 * time.Second,
+				AllowBypass: refileNoVerify,
+			}
+			
+			result, err := hookManager.Execute(hookCtx)
+			if err != nil {
+				err := fmt.Errorf("pre-refile hook failed: %s", err.Error())
+				if isJSONOutput(cmd) {
+					return outputJSONError(cmd, err, startTime)
+				}
+				return err
+			}
+			
+			if result.Aborted {
+				err := fmt.Errorf("pre-refile hook aborted operation")
+				if isJSONOutput(cmd) {
+					return outputJSONError(cmd, err, startTime)
+				}
+				return err
+			}
+		}
+
 		// Perform the refile operation
 		if err := performRefile(ws, sourcePath, subtree, dest, transformedContent); err != nil {
 			err := fmt.Errorf("refile operation failed: %w", err)
@@ -358,6 +391,23 @@ Examples:
 				return outputJSONError(cmd, err, startTime)
 			}
 			return err
+		}
+
+		// Run post-refile hook (informational only)
+		if !refileNoVerify {
+			hookCtx := &hooks.HookContext{
+				Type:        hooks.PostRefile,
+				Workspace:   ws,
+				SourceFile:  args[0],
+				DestPath:    to,
+				Timeout:     30 * time.Second,
+				AllowBypass: refileNoVerify,
+			}
+			
+			_, hookErr := hookManager.Execute(hookCtx)
+			if hookErr != nil && !isJSONOutput(cmd) {
+				fmt.Printf("Warning: post-refile hook failed: %s\n", hookErr.Error())
+			}
 		}
 
 		// Handle JSON output
@@ -578,6 +628,30 @@ func performRefile(ws *workspace.Workspace, sourcePath *markdown.HeadingPath, su
 
 // executeRefile executes the refile operation using existing logic
 func executeRefile(sourceSelector, targetSelector string, cmd *cobra.Command, ws *workspace.Workspace) error {
+	// Initialize hook manager
+	hookManager := hooks.NewManager(ws)
+	
+	// Run pre-refile hook
+	if !refileNoVerify {
+		hookCtx := &hooks.HookContext{
+			Type:        hooks.PreRefile,
+			Workspace:   ws,
+			SourceFile:  sourceSelector,
+			DestPath:    targetSelector,
+			Timeout:     30 * time.Second,
+			AllowBypass: refileNoVerify,
+		}
+		
+		result, err := hookManager.Execute(hookCtx)
+		if err != nil {
+			return fmt.Errorf("pre-refile hook failed: %s", err.Error())
+		}
+		
+		if result.Aborted {
+			return fmt.Errorf("pre-refile hook aborted operation")
+		}
+	}
+
 	// Parse paths
 	sourcePath, err := markdown.ParsePath(sourceSelector)
 	if err != nil {
@@ -612,6 +686,26 @@ func executeRefile(sourceSelector, targetSelector string, cmd *cobra.Command, ws
 	err = performRefile(ws, sourcePath, subtree, destTarget, transformedContent)
 	if err != nil {
 		return fmt.Errorf("refile operation failed: %w", err)
+	}
+
+	// Run post-refile hook (informational only)
+	if !refileNoVerify {
+		hookCtx := &hooks.HookContext{
+			Type:        hooks.PostRefile,
+			Workspace:   ws,
+			SourceFile:  sourceSelector,
+			DestPath:    targetSelector,
+			Timeout:     30 * time.Second,
+			AllowBypass: refileNoVerify,
+		}
+		
+		_, hookErr := hookManager.Execute(hookCtx)
+		if hookErr != nil {
+			// Check for JSON output to determine if we should show warnings
+			if !isJSONOutput(cmd) {
+				fmt.Printf("Warning: post-refile hook failed: %s\n", hookErr.Error())
+			}
+		}
 	}
 
 	if verbose {
@@ -665,6 +759,7 @@ func init() {
 	refileCmd.Flags().Bool("prepend", false, "Insert content at the beginning under target heading")
 	refileCmd.Flags().BoolP("verbose", "v", false, "Show detailed information about the refile operation")
 	refileCmd.Flags().BoolP("interactive", "i", false, "Interactive mode using FZF (requires JOT_FZF=1)")
+	refileCmd.Flags().BoolVar(&refileNoVerify, "no-verify", false, "Skip hooks verification")
 }
 
 // showSelectorsForFile displays available selectors for a specific file

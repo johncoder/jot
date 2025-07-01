@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/johncoder/jot/internal/eval"
+	"github.com/johncoder/jot/internal/hooks"
 	"github.com/johncoder/jot/internal/workspace"
 	"github.com/spf13/cobra"
 )
@@ -21,6 +22,7 @@ var evalRevoke bool
 var evalListApproved bool
 var evalApproveDocument bool
 var evalRevokeDocument bool
+var evalNoVerify bool
 
 // resolveEvalFilePath consolidates file path resolution logic for eval operations
 func resolveEvalFilePath(ws *workspace.Workspace, filename string, noWorkspace bool) string {
@@ -183,6 +185,33 @@ Examples:
 		// Execute blocks
 		var results []*eval.EvalResult
 
+		// Initialize hook manager and run pre-eval hook
+		if ws != nil && !evalNoVerify {
+			hookManager := hooks.NewManager(ws)
+			hookCtx := &hooks.HookContext{
+				Type:        hooks.PreEval,
+				Workspace:   ws,
+				SourceFile:  resolvedFilename,
+				Timeout:     30 * time.Second,
+				AllowBypass: evalNoVerify,
+			}
+			
+			result, err := hookManager.Execute(hookCtx)
+			if err != nil {
+				if isJSONOutput(cmd) {
+					return outputJSONError(cmd, fmt.Errorf("pre-eval hook failed: %s", err.Error()), startTime)
+				}
+				return fmt.Errorf("pre-eval hook failed: %s", err.Error())
+			}
+			
+			if result.Aborted {
+				if isJSONOutput(cmd) {
+					return outputJSONError(cmd, fmt.Errorf("pre-eval hook aborted operation"), startTime)
+				}
+				return fmt.Errorf("pre-eval hook aborted operation")
+			}
+		}
+
 		if blockName != "" {
 			// Execute specific block by name
 			results, err = eval.ExecuteEvaluableBlockByName(resolvedFilename, blockName)
@@ -203,6 +232,23 @@ Examples:
 				return outputJSONError(cmd, err, startTime)
 			}
 			return err
+		}
+
+		// Run post-eval hook (informational only)
+		if ws != nil && !evalNoVerify {
+			hookManager := hooks.NewManager(ws)
+			hookCtx := &hooks.HookContext{
+				Type:        hooks.PostEval,
+				Workspace:   ws,
+				SourceFile:  resolvedFilename,
+				Timeout:     30 * time.Second,
+				AllowBypass: evalNoVerify,
+			}
+			
+			_, hookErr := hookManager.Execute(hookCtx)
+			if hookErr != nil && !isJSONOutput(cmd) {
+				fmt.Printf("Warning: post-eval hook failed: %s\n", hookErr.Error())
+			}
 		}
 
 		// Handle JSON output for execution results
@@ -536,6 +582,7 @@ func init() {
 	evalCmd.Flags().BoolVar(&evalApproveDocument, "approve-document", false, "Approve the entire document")
 	evalCmd.Flags().BoolVar(&evalRevokeDocument, "revoke-document", false, "Revoke document approval")
 	evalCmd.Flags().Bool("no-workspace", false, "Resolve file paths relative to current directory instead of workspace")
+	evalCmd.Flags().BoolVar(&evalNoVerify, "no-verify", false, "Skip hooks verification")
 }
 
 // JSON output functions for eval command
