@@ -1,6 +1,7 @@
 package workspace
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -10,12 +11,72 @@ import (
 	"github.com/johncoder/jot/internal/config"
 )
 
+// WorkspaceConfig represents workspace-specific configuration
+type WorkspaceConfig struct {
+	ArchiveLocation string `json:"archive_location,omitempty"`
+}
+
 // Workspace represents a jot workspace
 type Workspace struct {
 	Root      string
 	JotDir    string
 	InboxPath string
 	LibDir    string
+	Config    *WorkspaceConfig
+}
+
+// LoadWorkspaceConfig loads workspace-specific configuration from .jot/config.json
+func LoadWorkspaceConfig(jotDir string) (*WorkspaceConfig, error) {
+	configPath := filepath.Join(jotDir, "config.json")
+
+	// Return default config if file doesn't exist
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		return &WorkspaceConfig{
+			ArchiveLocation: "archive/archive.md#Archive", // Default simple path
+		}, nil
+	}
+
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read workspace config: %w", err)
+	}
+
+	var cfg WorkspaceConfig
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return nil, fmt.Errorf("failed to parse workspace config: %w", err)
+	}
+
+	// Set default if not specified
+	if cfg.ArchiveLocation == "" {
+		cfg.ArchiveLocation = "archive/archive.md#Archive"
+	}
+
+	return &cfg, nil
+}
+
+// SaveWorkspaceConfig saves workspace configuration to .jot/config.json
+func (ws *Workspace) SaveWorkspaceConfig() error {
+	configPath := filepath.Join(ws.JotDir, "config.json")
+
+	data, err := json.MarshalIndent(ws.Config, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal workspace config: %w", err)
+	}
+
+	if err := os.WriteFile(configPath, data, 0644); err != nil {
+		return fmt.Errorf("failed to write workspace config: %w", err)
+	}
+
+	return nil
+}
+
+// GetArchiveLocation returns the configured archive location
+func (ws *Workspace) GetArchiveLocation() string {
+	if ws.Config == nil || ws.Config.ArchiveLocation == "" {
+		return "archive/archive.md#Archive"
+	}
+	
+	return ws.Config.ArchiveLocation
 }
 
 // FindWorkspace searches for a jot workspace using the enhanced discovery algorithm:
@@ -35,11 +96,18 @@ func FindWorkspace() (*Workspace, error) {
 		// Check for .jot/ directory (local workspace)
 		jotDir := filepath.Join(dir, ".jot")
 		if info, err := os.Stat(jotDir); err == nil && info.IsDir() {
+			// Load workspace configuration
+			cfg, err := LoadWorkspaceConfig(jotDir)
+			if err != nil {
+				return nil, fmt.Errorf("failed to load workspace config: %w", err)
+			}
+			
 			return &Workspace{
 				Root:      dir,
 				JotDir:    jotDir,
 				InboxPath: filepath.Join(dir, "inbox.md"),
 				LibDir:    filepath.Join(dir, "lib"),
+				Config:    cfg,
 			}, nil
 		}
 
@@ -82,11 +150,18 @@ func findWorkspaceFromGlobalConfig() (*Workspace, error) {
 		return nil, fmt.Errorf("default workspace %q (%s) is not valid - missing .jot/ directory. Run 'jot init' in %s or set a different default workspace", defaultName, defaultPath, defaultPath)
 	}
 
+	// Load workspace configuration
+	cfg, err := LoadWorkspaceConfig(jotDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load workspace config: %w", err)
+	}
+
 	return &Workspace{
 		Root:      defaultPath,
 		JotDir:    jotDir,
 		InboxPath: filepath.Join(defaultPath, "inbox.md"),
 		LibDir:    filepath.Join(defaultPath, "lib"),
+		Config:    cfg,
 	}, nil
 }
 
@@ -101,7 +176,7 @@ func RequireWorkspaceWithOverride(workspaceName string) (*Workspace, error) {
 	if workspaceName != "" {
 		return RequireSpecificWorkspace(workspaceName)
 	}
-	
+
 	// Otherwise use normal discovery
 	ws, err := FindWorkspace()
 	if err != nil {
@@ -123,11 +198,18 @@ func RequireSpecificWorkspace(name string) (*Workspace, error) {
 		return nil, fmt.Errorf("workspace '%s' is not initialized (missing .jot directory at %s)\nRun 'jot init' in %s to initialize it", name, jotDir, path)
 	}
 
+	// Load workspace configuration
+	cfg, err := LoadWorkspaceConfig(jotDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load workspace config: %w", err)
+	}
+
 	return &Workspace{
 		Root:      path,
 		JotDir:    jotDir,
 		InboxPath: filepath.Join(path, "inbox.md"),
 		LibDir:    filepath.Join(path, "lib"),
+		Config:    cfg,
 	}, nil
 }
 

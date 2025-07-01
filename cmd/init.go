@@ -136,6 +136,26 @@ tmp/
 			Size:        int64(len(gitignoreContent)),
 		})
 
+		// Create default workspace configuration
+		configPath := filepath.Join(jotDir, "config.json")
+		configContent := `{
+  "archive_location": "archive/archive.md#Archive"
+}
+`
+		if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+			err := fmt.Errorf("failed to create workspace config: %w", err)
+			if isJSONOutput(cmd) {
+				return outputJSONError(cmd, err, startTime)
+			}
+			return err
+		}
+		createdFiles = append(createdFiles, InitFile{
+			Path:        ".jot/config.json",
+			Type:        "file",
+			Description: "Workspace configuration",
+			Size:        int64(len(configContent)),
+		})
+
 		// Create a README in lib/ to explain the organization
 		libReadmePath := filepath.Join(libDir, "README.md")
 		libReadmeContent := `# Library
