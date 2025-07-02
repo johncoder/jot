@@ -219,11 +219,11 @@ Examples:
 					
 					_, err := hookManager.Execute(hookCtx)
 					if err != nil && !ctx.IsJSONOutput() {
-						fmt.Printf("Warning: post-capture hook failed: %s\n", err.Error())
+						cmdutil.ShowWarning("Warning: post-capture hook failed: %s", err.Error())
 					}
 				}
 
-				fmt.Printf("✓ Captured '%s' and refiled to '%s'\n", captureTemplate, destination)
+				cmdutil.ShowSuccess("✓ Captured '%s' and refiled to '%s'", captureTemplate, destination)
 			} else {
 				// Simple file destination
 				destinationPath := destination
@@ -284,11 +284,11 @@ Examples:
 					
 					_, err := hookManager.Execute(hookCtx)
 					if err != nil && !ctx.IsJSONOutput() {
-						fmt.Printf("Warning: post-capture hook failed: %s\n", err.Error())
+						cmdutil.ShowWarning("Warning: post-capture hook failed: %s", err.Error())
 					}
 				}
 
-				fmt.Printf("✓ Captured '%s' to '%s'\n", captureTemplate, destination)
+				cmdutil.ShowSuccess("✓ Captured '%s' to '%s'", captureTemplate, destination)
 			}
 
 			return nil
@@ -353,7 +353,7 @@ Examples:
 			if err != nil {
 				// Post-capture hooks are informational only - log but don't fail
 				if !ctx.IsJSONOutput() {
-					fmt.Printf("Warning: post-capture hook failed: %s\n", err.Error())
+					cmdutil.ShowWarning("Warning: post-capture hook failed: %s", err.Error())
 				}
 			}
 		}
@@ -395,11 +395,11 @@ Examples:
 		}
 
 		// Human-readable output
-		fmt.Printf("✓ Note captured (%d characters)\n", len(finalContent))
+		cmdutil.ShowSuccess("✓ Note captured (%d characters)", len(finalContent))
 		if captureTemplate != "" {
-			fmt.Printf("✓ Used template: %s\n", captureTemplate)
+			cmdutil.ShowSuccess("✓ Used template: %s", captureTemplate)
 		}
-		fmt.Printf("✓ Added to %s\n", ws.InboxPath)
+		cmdutil.ShowSuccess("✓ Added to %s", ws.InboxPath)
 
 		return nil
 	},

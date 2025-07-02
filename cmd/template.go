@@ -330,12 +330,13 @@ current content hash - any changes will require re-approval.`,
 		fmt.Printf("Template hash: %s\n\n", t.Hash[:16]+"...")
 
 		// Confirm approval
-		fmt.Print("Approve this template? [y/N]: ")
-		var response string
-		fmt.Scanln(&response)
-
-		if strings.ToLower(response) != "y" && strings.ToLower(response) != "yes" {
-			fmt.Println("Template not approved.")
+		confirmed, err := cmdutil.ConfirmOperation("Approve this template?")
+		if err != nil {
+			return err
+		}
+		
+		if !confirmed {
+			cmdutil.ShowInfo("Template not approved.")
 			return nil
 		}
 

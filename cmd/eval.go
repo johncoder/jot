@@ -1,9 +1,7 @@
 package cmd
 
 import (
-	"bufio"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -195,7 +193,7 @@ Examples:
 			
 			_, hookErr := hookManager.Execute(hookCtx)
 			if hookErr != nil && !ctx.IsJSONOutput() {
-				fmt.Printf("Warning: post-eval hook failed: %s\n", hookErr.Error())
+				cmdutil.ShowWarning("Warning: post-eval hook failed: %s", hookErr.Error())
 			}
 		}
 
@@ -234,10 +232,10 @@ Examples:
 
 		if blockName != "" {
 			if executed > 0 {
-				fmt.Printf("✓ Executed block '%s' in %s\n", blockName, filename)
+				cmdutil.ShowSuccess("✓ Executed block '%s' in %s", blockName, filename)
 			}
 		} else if evalAll {
-			fmt.Printf("✓ Executed %d approved blocks in %s\n", executed, filename)
+			cmdutil.ShowSuccess("✓ Executed %d approved blocks in %s", executed, filename)
 		}
 
 		return nil
@@ -299,7 +297,7 @@ func revokeApproval(filename, blockName string) error {
 		return fmt.Errorf("failed to revoke approval: %w", err)
 	}
 
-	fmt.Printf("✓ Revoked approval for block '%s' in %s\n", blockName, filename)
+	cmdutil.ShowSuccess("✓ Revoked approval for block '%s' in %s", blockName, filename)
 	return nil
 }
 
@@ -344,16 +342,13 @@ func approveBlock(filename, blockName, mode string) error {
 	fmt.Println("────────────────────────────────────────")
 
 	// Confirm approval
-	fmt.Printf("Approve this block with %s mode? [y/N]: ", approvalMode)
-	reader := bufio.NewReader(os.Stdin)
-	response, err := reader.ReadString('\n')
+	confirmed, err := cmdutil.ConfirmOperation(fmt.Sprintf("Approve this block with %s mode?", approvalMode))
 	if err != nil {
 		return err
 	}
-
-	response = strings.TrimSpace(strings.ToLower(response))
-	if response != "y" && response != "yes" {
-		fmt.Println("Approval cancelled.")
+	
+	if !confirmed {
+		cmdutil.ShowInfo("Approval cancelled.")
 		return nil
 	}
 
@@ -373,8 +368,8 @@ func approveBlock(filename, blockName, mode string) error {
 		return fmt.Errorf("failed to approve block: %w", err)
 	}
 
-	fmt.Printf("✓ Block '%s' approved with %s mode.\n", blockName, approvalMode)
-	fmt.Println("Use 'jot eval' to execute the approved block.")
+	cmdutil.ShowSuccess("✓ Block '%s' approved with %s mode.", blockName, approvalMode)
+	cmdutil.ShowInfo("Use 'jot eval' to execute the approved block.")
 
 	return nil
 }
@@ -423,16 +418,13 @@ func approveDocument(filename, mode string) error {
 	fmt.Println("────────────────────────────────────────")
 
 	// Confirm approval
-	fmt.Printf("Approve entire document with %s mode? [y/N]: ", approvalMode)
-	reader := bufio.NewReader(os.Stdin)
-	response, err := reader.ReadString('\n')
+	confirmed, err := cmdutil.ConfirmOperation(fmt.Sprintf("Approve entire document with %s mode?", approvalMode))
 	if err != nil {
 		return err
 	}
-
-	response = strings.TrimSpace(strings.ToLower(response))
-	if response != "y" && response != "yes" {
-		fmt.Println("Document approval cancelled.")
+	
+	if !confirmed {
+		cmdutil.ShowInfo("Document approval cancelled.")
 		return nil
 	}
 

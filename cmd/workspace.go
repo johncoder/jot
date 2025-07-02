@@ -318,10 +318,10 @@ func workspaceAdd(cmd *cobra.Command, name, path string) error {
 		return cmdutil.OutputJSON(response)
 	}
 
-	fmt.Printf("✓ Added workspace '%s' at %s\n", name, absPath)
-	fmt.Printf("✓ Workspace validated and ready to use\n")
+	cmdutil.ShowSuccess("✓ Added workspace '%s' at %s", name, absPath)
+	cmdutil.ShowSuccess("✓ Workspace validated and ready to use")
 	if setAsDefault {
-		fmt.Printf("✓ Set as default workspace (first workspace added)\n")
+		cmdutil.ShowSuccess("✓ Set as default workspace (first workspace added)")
 	}
 
 	return nil
@@ -387,20 +387,20 @@ func workspaceRemove(cmd *cobra.Command, name string) error {
 	}
 
 	if isActive {
-		fmt.Printf("Warning: Removing currently active workspace '%s'\n", name)
+		cmdutil.ShowWarning("Warning: Removing currently active workspace '%s'", name)
 	}
 	if isDefault {
-		fmt.Printf("Warning: Removing default workspace '%s'\n", name)
+		cmdutil.ShowWarning("Warning: Removing default workspace '%s'", name)
 		
 		// Get new default if any workspaces remain
 		newDefault, _, _ := config.GetDefaultWorkspace()
 		if newDefault != "" {
-			fmt.Printf("✓ Set '%s' as new default workspace\n", newDefault)
+			cmdutil.ShowSuccess("✓ Set '%s' as new default workspace", newDefault)
 		}
 	}
 
-	fmt.Printf("✓ Removed workspace '%s' from registry\n", name)
-	fmt.Printf("Note: Workspace files at %s remain unchanged\n", workspacePath)
+	cmdutil.ShowSuccess("✓ Removed workspace '%s' from registry", name)
+	cmdutil.ShowInfo("Note: Workspace files at %s remain unchanged", workspacePath)
 
 	return nil
 }
@@ -448,7 +448,7 @@ func workspaceSetDefault(cmd *cobra.Command, name string) error {
 		return cmdutil.OutputJSON(response)
 	}
 
-	fmt.Printf("✓ Set '%s' as default workspace\n", name)
+	cmdutil.ShowSuccess("✓ Set '%s' as default workspace", name)
 	return nil
 }
 

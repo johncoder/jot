@@ -98,7 +98,7 @@ func setArchiveLocation(ctx *cmdutil.CommandContext, ws *workspace.Workspace, lo
 		return cmdutil.OutputJSON(response)
 	}
 
-	fmt.Printf("✓ Archive location updated to: %s\n", location)
+	cmdutil.ShowSuccess("✓ Archive location updated to: %s", location)
 	
 	return nil
 }
@@ -256,7 +256,7 @@ func archiveWithRefile(ctx *cmdutil.CommandContext, ws *workspace.Workspace, sou
 		
 		_, hookErr := hookManager.Execute(hookCtx)
 		if hookErr != nil && !ctx.IsJSONOutput() {
-			fmt.Printf("Warning: post-archive hook failed: %s\n", hookErr.Error())
+			cmdutil.ShowWarning("Warning: post-archive hook failed: %s", hookErr.Error())
 		}
 	}
 	

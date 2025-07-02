@@ -89,7 +89,7 @@ Examples:
 		}
 
 		if !ctx.IsJSONOutput() {
-			fmt.Printf("✓ Found workspace at: %s\n", ws.Root)
+			cmdutil.ShowSuccess("✓ Found workspace at: %s", ws.Root)
 		}
 		checks = append(checks, DoctorCheck{
 			Name:    "workspace_detection",
@@ -121,7 +121,7 @@ Examples:
 				Message: "inbox.md exists",
 			})
 			if !ctx.IsJSONOutput() {
-				fmt.Println("✓ inbox.md exists")
+				cmdutil.ShowSuccess("✓ inbox.md exists")
 			}
 		}
 
@@ -148,7 +148,7 @@ Examples:
 				Message: "lib/ directory exists",
 			})
 			if !ctx.IsJSONOutput() {
-				fmt.Println("✓ lib/ directory exists")
+				cmdutil.ShowSuccess("✓ lib/ directory exists")
 			}
 		}
 

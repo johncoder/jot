@@ -415,15 +415,15 @@ func inspectDestination(ws *workspace.Workspace, destPath *markdown.HeadingPath)
 	}
 
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
-		fmt.Printf("✗ File not found: %s\n", destPath.File)
+		cmdutil.ShowError("✗ File not found: %s", destPath.File)
 		return nil
 	}
-	fmt.Printf("✓ File exists: %s\n", destPath.File)
+	cmdutil.ShowSuccess("✓ File exists: %s", destPath.File)
 
 	// Read and parse the file to analyze the path
 	content, err := os.ReadFile(filePath)
 	if err != nil {
-		fmt.Printf("✗ Error reading file: %s\n", err.Error())
+		cmdutil.ShowError("✗ Error reading file: %s", err.Error())
 		return nil
 	}
 
@@ -441,8 +441,8 @@ func inspectDestination(ws *workspace.Workspace, destPath *markdown.HeadingPath)
 		fmt.Printf("Ready to receive content at level %d\n", targetLevel)
 	} else if len(pathResolution.FoundSegments) > 0 {
 		// Partial path exists
-		fmt.Printf("✓ Partial path exists: %s\n", strings.Join(pathResolution.FoundSegments, " > "))
-		fmt.Printf("✗ Missing path: %s\n", strings.Join(pathResolution.MissingSegments, " > "))
+		cmdutil.ShowSuccess("✓ Partial path exists: %s", strings.Join(pathResolution.FoundSegments, " > "))
+		cmdutil.ShowError("✗ Missing path: %s", strings.Join(pathResolution.MissingSegments, " > "))
 
 		// Show what would be created
 		baseLevel := pathResolution.ParentHeading.Level + 1
@@ -680,9 +680,9 @@ func executeRefile(sourceSelector, targetSelector string, ctx *cmdutil.CommandCo
 	}
 
 	if verbose {
-		fmt.Printf("✓ Refiled subtree from %s to %s\n", sourceSelector, targetSelector)
+		cmdutil.ShowSuccess("✓ Refiled subtree from %s to %s", sourceSelector, targetSelector)
 	} else {
-		fmt.Printf("✓ Successfully refiled '%s' to '%s'\n",
+		cmdutil.ShowSuccess("✓ Successfully refiled '%s' to '%s'",
 			subtree.Heading, destPath.File+"#"+strings.Join(destPath.Segments, "/"))
 	}
 
@@ -1513,13 +1513,8 @@ func confirmRefile(sourceSelector, targetSelector string, ws *workspace.Workspac
 	}
 	
 	fmt.Printf("%s\n", separator)
-	fmt.Printf("\n🚀 Execute refile operation? [y/N]: ")
 	
-	var response string
-	fmt.Scanln(&response)
-	
-	response = strings.ToLower(strings.TrimSpace(response))
-	return response == "y" || response == "yes", nil
+	return cmdutil.ConfirmOperation("\n🚀 Execute refile operation?")
 }
 
 // extractSubtreesFromFile extracts all headings from a markdown file

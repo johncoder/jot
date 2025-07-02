@@ -149,11 +149,11 @@ func showWholeFile(ws *workspace.Workspace, filename string, raw bool, info bool
 
 	// Display file information if requested
 	if info {
-		fmt.Printf("File Information:\n")
-		fmt.Printf("  File: %s\n", filename)
-		fmt.Printf("  Path: %s\n", filePath)
-		fmt.Printf("  Content length: %d bytes\n", len(content))
-		fmt.Printf("  Lines: %d\n", strings.Count(string(content), "\n")+1)
+		cmdutil.ShowInfo("File Information:")
+		cmdutil.ShowInfo("  File: %s", filename)
+		cmdutil.ShowInfo("  Path: %s", filePath)
+		cmdutil.ShowInfo("  Content length: %d bytes", len(content))
+		cmdutil.ShowInfo("  Lines: %d", strings.Count(string(content), "\n")+1)
 		fmt.Println()
 	}
 
@@ -206,17 +206,17 @@ func showWholeFileJSON(ctx *cmdutil.CommandContext, ws *workspace.Workspace, fil
 
 // printSubtreeInfo displays metadata about the subtree
 func printSubtreeInfo(subtree *markdown.Subtree, filename string) {
-	fmt.Printf("Subtree Information:\n")
-	fmt.Printf("  File: %s\n", filename)
-	fmt.Printf("  Heading: %q\n", subtree.Heading)
-	fmt.Printf("  Level: %d\n", subtree.Level)
-	fmt.Printf("  Content length: %d bytes\n", len(subtree.Content))
-	fmt.Printf("  Byte range: %d-%d\n", subtree.StartOffset, subtree.EndOffset)
+	cmdutil.ShowInfo("Subtree Information:")
+	cmdutil.ShowInfo("  File: %s", filename)
+	cmdutil.ShowInfo("  Heading: %q", subtree.Heading)
+	cmdutil.ShowInfo("  Level: %d", subtree.Level)
+	cmdutil.ShowInfo("  Content length: %d bytes", len(subtree.Content))
+	cmdutil.ShowInfo("  Byte range: %d-%d", subtree.StartOffset, subtree.EndOffset)
 
 	// Count nested headings
 	nestedCount := countNestedHeadings(subtree.Content, subtree.Level)
 	if nestedCount > 0 {
-		fmt.Printf("  Nested headings: %d\n", nestedCount)
+		cmdutil.ShowInfo("  Nested headings: %d", nestedCount)
 	}
 }
 
@@ -325,7 +325,7 @@ func showTableOfContents(ws *workspace.Workspace, selector string, useShortSelec
 	}
 
 	if len(content) == 0 {
-		fmt.Printf("File %s is empty (no table of contents available)\n", filename)
+		cmdutil.ShowInfo("File %s is empty (no table of contents available)", filename)
 		return nil
 	}
 
@@ -334,7 +334,7 @@ func showTableOfContents(ws *workspace.Workspace, selector string, useShortSelec
 	headings := extractHeadingsFromContent(doc, content)
 
 	if len(headings) == 0 {
-		fmt.Printf("No headings found in %s\n", filename)
+		cmdutil.ShowInfo("No headings found in %s", filename)
 		return nil
 	}
 
@@ -391,7 +391,7 @@ func showTableOfContents(ws *workspace.Workspace, selector string, useShortSelec
 			}
 		}
 		if hasUnselectable {
-			fmt.Printf("Warning: Headings marked with ⚠️ may have ambiguous selectors.\n")
+			cmdutil.ShowWarning("Warning: Headings marked with ⚠️ may have ambiguous selectors.")
 		}
 	} else {
 		fmt.Printf("This is a table of contents for the subtree '%s'.\n", subtreePath)
