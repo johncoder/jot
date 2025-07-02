@@ -6,8 +6,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"time"
 
+	"github.com/johncoder/jot/internal/cmdutil"
 	"github.com/johncoder/jot/internal/config"
 	"github.com/johncoder/jot/internal/fzf"
 	"github.com/johncoder/jot/internal/workspace"
@@ -29,7 +29,7 @@ Examples:
   JOT_FZF=1 jot files -i -s             # Interactive selection for composition
   cat $(jot files -i -s)                # Example: view selected file content`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		startTime := time.Now()
+		ctx := cmdutil.StartCommand(cmd)
 
 		interactive, _ := cmd.Flags().GetBool("interactive")
 		edit, _ := cmd.Flags().GetBool("edit")
@@ -38,40 +38,28 @@ Examples:
 		// Validate flag combinations
 		if selectMode && !interactive {
 			err := fmt.Errorf("--select flag requires --interactive mode")
-			if isJSONOutput(cmd) {
-				return outputJSONError(cmd, err, startTime)
-			}
-			return err
+			return ctx.HandleError(err)
 		}
 		if selectMode && edit {
 			err := fmt.Errorf("--select and --edit flags cannot be used together")
-			if isJSONOutput(cmd) {
-				return outputJSONError(cmd, err, startTime)
-			}
-			return err
+			return ctx.HandleError(err)
 		}
 
 		ws, err := getWorkspace(cmd)
 		if err != nil {
-			if isJSONOutput(cmd) {
-				return outputJSONError(cmd, err, startTime)
-			}
-			return err
+			return ctx.HandleError(err)
 		}
 
 		// Get all markdown files in workspace
 		files, err := findMarkdownFiles(ws.Root)
 		if err != nil {
 			err = fmt.Errorf("failed to find files: %w", err)
-			if isJSONOutput(cmd) {
-				return outputJSONError(cmd, err, startTime)
-			}
-			return err
+			return ctx.HandleError(err)
 		}
 
 		if len(files) == 0 {
-			if isJSONOutput(cmd) {
-				return outputFilesJSON(cmd, files, ws, startTime)
+			if cmdutil.IsJSONOutput(ctx.Cmd) {
+				return outputFilesJSON(ctx, files, ws)
 			}
 			fmt.Println("No markdown files found in workspace")
 			return nil
@@ -79,16 +67,16 @@ Examples:
 
 		// Check if interactive mode is requested (not available in JSON mode)
 		if fzf.ShouldUseFZF(interactive) {
-			if isJSONOutput(cmd) {
+			if cmdutil.IsJSONOutput(ctx.Cmd) {
 				err := fmt.Errorf("interactive mode not available with JSON output")
-				return outputJSONError(cmd, err, startTime)
+				return ctx.HandleError(err)
 			}
 			return runInteractiveFilesBrowser(ws, files, edit, selectMode)
 		}
 
 		// Handle JSON output
-		if isJSONOutput(cmd) {
-			return outputFilesJSON(cmd, files, ws, startTime)
+		if cmdutil.IsJSONOutput(ctx.Cmd) {
+			return outputFilesJSON(ctx, files, ws)
 		}
 
 		// Default: simple file listing with workspace-relative paths
@@ -126,7 +114,7 @@ func findMarkdownFiles(root string) ([]string, error) {
 }
 
 // outputFilesJSON outputs file list in JSON format
-func outputFilesJSON(cmd *cobra.Command, files []string, ws *workspace.Workspace, startTime time.Time) error {
+func outputFilesJSON(ctx *cmdutil.CommandContext, files []string, ws *workspace.Workspace) error {
 	// Convert file paths to JSON-friendly format with metadata
 	jsonFiles := make([]map[string]interface{}, len(files))
 	for i, file := range files {
@@ -155,10 +143,10 @@ func outputFilesJSON(cmd *cobra.Command, files []string, ws *workspace.Workspace
 			"root": ws.Root,
 			"name": filepath.Base(ws.Root),
 		},
-		"metadata": createJSONMetadata(cmd, true, startTime),
+		"metadata": cmdutil.CreateJSONMetadata(ctx.Cmd, true, ctx.StartTime),
 	}
 
-	return outputJSON(response)
+	return cmdutil.OutputJSON(response)
 }
 
 // runInteractiveFilesBrowser runs FZF file browser with optional editor integration

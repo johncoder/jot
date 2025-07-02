@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/johncoder/jot/internal/cmdutil"
 	"github.com/johncoder/jot/internal/hooks"
 	"github.com/johncoder/jot/internal/workspace"
 	"github.com/spf13/cobra"
@@ -41,17 +42,14 @@ var hooksListCmd = &cobra.Command{
 	Short: "List all hooks in the workspace",
 	Long:  `List all executable hooks found in the workspace .jot/hooks/ directory.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		startTime := time.Now()
+		ctx := cmdutil.StartCommand(cmd)
 
 		ws, err := workspace.RequireWorkspace()
 		if err != nil {
-			if isJSONOutput(cmd) {
-				return outputJSONError(cmd, err, startTime)
-			}
-			return err
+			return ctx.HandleError(err)
 		}
 
-		return listHooks(cmd, ws, startTime)
+		return listHooks(ctx, ws)
 	},
 }
 
@@ -63,17 +61,14 @@ var hooksInstallSamplesCmd = &cobra.Command{
 Sample hooks demonstrate common use cases and can be customized for your workflow.
 They are created with .sample extension and must be renamed to be active.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		startTime := time.Now()
+		ctx := cmdutil.StartCommand(cmd)
 
 		ws, err := workspace.RequireWorkspace()
 		if err != nil {
-			if isJSONOutput(cmd) {
-				return outputJSONError(cmd, err, startTime)
-			}
-			return err
+			return ctx.HandleError(err)
 		}
 
-		return installSampleHooks(cmd, ws, startTime)
+		return installSampleHooks(ctx, ws)
 	},
 }
 
@@ -86,27 +81,24 @@ This runs the hook with test data and shows the output, allowing you to
 debug and verify your hook scripts work as expected.`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		startTime := time.Now()
+		ctx := cmdutil.StartCommand(cmd)
 
 		ws, err := workspace.RequireWorkspace()
 		if err != nil {
-			if isJSONOutput(cmd) {
-				return outputJSONError(cmd, err, startTime)
-			}
-			return err
+			return ctx.HandleError(err)
 		}
 
-		return testHook(cmd, ws, args[0], startTime)
+		return testHook(ctx, ws, args[0])
 	},
 }
 
 // listHooks lists all hooks in the workspace
-func listHooks(cmd *cobra.Command, ws *workspace.Workspace, startTime time.Time) error {
+func listHooks(ctx *cmdutil.CommandContext, ws *workspace.Workspace) error {
 	hooksDir := filepath.Join(ws.JotDir, "hooks")
 
 	// Check if hooks directory exists
 	if _, err := os.Stat(hooksDir); os.IsNotExist(err) {
-		if isJSONOutput(cmd) {
+		if ctx.IsJSONOutput() {
 			response := HooksResponse{
 				Operation: "list",
 				HooksDir:  hooksDir,
@@ -116,7 +108,7 @@ func listHooks(cmd *cobra.Command, ws *workspace.Workspace, startTime time.Time)
 					ExecutableHooks: 0,
 					SampleHooks:     0,
 				},
-				Metadata: createJSONMetadata(cmd, true, startTime),
+				Metadata: cmdutil.CreateJSONMetadata(ctx.Cmd, true, ctx.StartTime),
 			}
 			return outputJSON(response)
 		}
@@ -129,8 +121,8 @@ func listHooks(cmd *cobra.Command, ws *workspace.Workspace, startTime time.Time)
 	// Read hooks directory
 	entries, err := os.ReadDir(hooksDir)
 	if err != nil {
-		if isJSONOutput(cmd) {
-			return outputJSONError(cmd, err, startTime)
+		if ctx.IsJSONOutput() {
+			return ctx.HandleError(err)
 		}
 		return fmt.Errorf("failed to read hooks directory: %w", err)
 	}
@@ -172,7 +164,7 @@ func listHooks(cmd *cobra.Command, ws *workspace.Workspace, startTime time.Time)
 		hooksList = append(hooksList, hookInfo)
 	}
 
-	if isJSONOutput(cmd) {
+	if ctx.IsJSONOutput() {
 		response := HooksResponse{
 			Operation: "list",
 			HooksDir:  hooksDir,
@@ -182,7 +174,7 @@ func listHooks(cmd *cobra.Command, ws *workspace.Workspace, startTime time.Time)
 				ExecutableHooks: executableCount,
 				SampleHooks:     sampleCount,
 			},
-			Metadata: createJSONMetadata(cmd, true, startTime),
+			Metadata: cmdutil.CreateJSONMetadata(ctx.Cmd, true, ctx.StartTime),
 		}
 		return outputJSON(response)
 	}
@@ -221,26 +213,26 @@ func listHooks(cmd *cobra.Command, ws *workspace.Workspace, startTime time.Time)
 }
 
 // installSampleHooks installs sample hook scripts
-func installSampleHooks(cmd *cobra.Command, ws *workspace.Workspace, startTime time.Time) error {
+func installSampleHooks(ctx *cmdutil.CommandContext, ws *workspace.Workspace) error {
 	manager := hooks.NewManager(ws)
 	
 	if err := manager.CreateSampleHooks(); err != nil {
-		if isJSONOutput(cmd) {
-			return outputJSONError(cmd, err, startTime)
+		if ctx.IsJSONOutput() {
+			return ctx.HandleError(err)
 		}
 		return fmt.Errorf("failed to install sample hooks: %w", err)
 	}
 
 	hooksDir := filepath.Join(ws.JotDir, "hooks")
 
-	if isJSONOutput(cmd) {
+	if ctx.IsJSONOutput() {
 		response := HooksResponse{
 			Operation: "install-samples",
 			HooksDir:  hooksDir,
 			Summary: HooksSummary{
 				SampleHooks: 4, // Number of sample hooks we create
 			},
-			Metadata: createJSONMetadata(cmd, true, startTime),
+			Metadata: cmdutil.CreateJSONMetadata(ctx.Cmd, true, ctx.StartTime),
 		}
 		return outputJSON(response)
 	}
@@ -261,7 +253,7 @@ func installSampleHooks(cmd *cobra.Command, ws *workspace.Workspace, startTime t
 }
 
 // testHook tests a specific hook type with sample data
-func testHook(cmd *cobra.Command, ws *workspace.Workspace, hookType string, startTime time.Time) error {
+func testHook(ctx *cmdutil.CommandContext, ws *workspace.Workspace, hookType string) error {
 	// Validate hook type
 	validTypes := []string{
 		"pre-capture", "post-capture", "pre-refile", "post-refile",
@@ -279,8 +271,8 @@ func testHook(cmd *cobra.Command, ws *workspace.Workspace, hookType string, star
 	if !valid {
 		err := fmt.Errorf("invalid hook type '%s'. Valid types: %s", 
 			hookType, strings.Join(validTypes, ", "))
-		if isJSONOutput(cmd) {
-			return outputJSONError(cmd, err, startTime)
+		if ctx.IsJSONOutput() {
+			return ctx.HandleError(err)
 		}
 		return err
 	}
@@ -291,8 +283,8 @@ func testHook(cmd *cobra.Command, ws *workspace.Workspace, hookType string, star
 	
 	if _, err := os.Stat(hookPath); os.IsNotExist(err) {
 		err := fmt.Errorf("hook '%s' not found at %s", hookType, hookPath)
-		if isJSONOutput(cmd) {
-			return outputJSONError(cmd, err, startTime)
+		if ctx.IsJSONOutput() {
+			return ctx.HandleError(err)
 		}
 		return err
 	}
@@ -327,7 +319,7 @@ func testHook(cmd *cobra.Command, ws *workspace.Workspace, hookType string, star
 	}
 
 	manager := hooks.NewManager(ws)
-	ctx := &hooks.HookContext{
+	hookCtx := &hooks.HookContext{
 		Type:        hooks.HookType(hookType),
 		Workspace:   ws,
 		Content:     testContent,
@@ -336,8 +328,8 @@ func testHook(cmd *cobra.Command, ws *workspace.Workspace, hookType string, star
 		ExtraEnv:    extraEnv,
 	}
 
-	if isJSONOutput(cmd) {
-		result, err := manager.Execute(ctx)
+	if ctx.IsJSONOutput() {
+		result, err := manager.Execute(hookCtx)
 		response := HookTestResponse{
 			Operation: "test",
 			HookType:  hookType,
@@ -346,7 +338,7 @@ func testHook(cmd *cobra.Command, ws *workspace.Workspace, hookType string, star
 				Content:  testContent,
 				ExtraEnv: extraEnv,
 			},
-			Metadata: createJSONMetadata(cmd, true, startTime),
+			Metadata: cmdutil.CreateJSONMetadata(ctx.Cmd, true, ctx.StartTime),
 		}
 
 		if err != nil {
@@ -371,7 +363,7 @@ func testHook(cmd *cobra.Command, ws *workspace.Workspace, hookType string, star
 	fmt.Printf("Test content: %s\n", testContent)
 	fmt.Println()
 
-	result, err := manager.Execute(ctx)
+	result, err := manager.Execute(hookCtx)
 	if err != nil {
 		fmt.Printf("❌ Hook failed to execute: %v\n", err)
 		return nil
@@ -400,7 +392,7 @@ type HooksResponse struct {
 	HooksDir  string       `json:"hooks_dir"`
 	Hooks     []HookInfo   `json:"hooks"`
 	Summary   HooksSummary `json:"summary"`
-	Metadata  JSONMetadata `json:"metadata"`
+	Metadata  cmdutil.JSONMetadata `json:"metadata"`
 }
 
 type HookInfo struct {
@@ -426,7 +418,7 @@ type HookTestResponse struct {
 	TestData  HookTestData `json:"test_data"`
 	Result    HookTestResult `json:"result,omitempty"`
 	Error     string       `json:"error,omitempty"`
-	Metadata  JSONMetadata `json:"metadata"`
+	Metadata  cmdutil.JSONMetadata `json:"metadata"`
 }
 
 type HookTestData struct {

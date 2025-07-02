@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/johncoder/jot/internal/cmdutil"
 	"github.com/johncoder/jot/internal/editor"
 	"github.com/johncoder/jot/internal/hooks"
 	"github.com/johncoder/jot/internal/markdown"
@@ -47,14 +48,11 @@ Examples:
   jot capture --content "Quick note"       # Direct append to inbox`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		startTime := time.Now()
+		ctx := cmdutil.StartCommand(cmd)
 
 		ws, err := getWorkspace(cmd)
 		if err != nil {
-			if isJSONOutput(cmd) {
-				return outputJSONError(cmd, err, startTime)
-			}
-			return err
+			return ctx.HandleError(err)
 		}
 
 		// Initialize hook manager
@@ -73,17 +71,11 @@ Examples:
 			
 			result, err := hookManager.Execute(hookCtx)
 			if err != nil {
-				if isJSONOutput(cmd) {
-					return outputJSONError(cmd, fmt.Errorf("pre-capture hook failed: %s", err.Error()), startTime)
-				}
-				return fmt.Errorf("pre-capture hook failed: %s", err.Error())
+				return ctx.HandleOperationError("pre-capture hook", fmt.Errorf("pre-capture hook failed: %s", err.Error()))
 			}
 			
 			if result.Aborted {
-				if isJSONOutput(cmd) {
-					return outputJSONError(cmd, fmt.Errorf("pre-capture hook aborted operation"), startTime)
-				}
-				return fmt.Errorf("pre-capture hook aborted operation")
+				return ctx.HandleOperationError("pre-capture hook", fmt.Errorf("pre-capture hook aborted operation"))
 			}
 			
 			// Update content if hook modified it
@@ -133,54 +125,35 @@ Examples:
 			tm := template.NewManager(ws)
 			t, err := tm.Get(captureTemplate)
 			if err != nil {
-				err := fmt.Errorf("template error: %w", err)
-				if isJSONOutput(cmd) {
-					return outputJSONError(cmd, err, startTime)
-				}
-				return err
+				return ctx.HandleOperationError("template", fmt.Errorf("template error: %w", err))
 			}
 
 			// Render template with shell commands and append content
 			renderedTemplate, err := tm.Render(t, appendContent)
 			if err != nil {
-				if isJSONOutput(cmd) {
-					return outputJSONError(cmd, err, startTime)
-				}
-				return err
+				return ctx.HandleOperationError("template", err)
 			}
 
 			if useEditor {
 				// Open rendered template in editor
 				tempFile, err := os.CreateTemp("", "jot-capture-*.md")
 				if err != nil {
-					err := fmt.Errorf("failed to create temp file: %w", err)
-					if isJSONOutput(cmd) {
-						return outputJSONError(cmd, err, startTime)
-					}
-					return err
+					return ctx.HandleOperationError("temp file", fmt.Errorf("failed to create temp file: %w", err))
 				}
 				defer os.Remove(tempFile.Name())
 
 				if _, err := tempFile.WriteString(renderedTemplate); err != nil {
 					tempFile.Close()
-					err := fmt.Errorf("failed to write template to temp file: %w", err)
-					if isJSONOutput(cmd) {
-						return outputJSONError(cmd, err, startTime)
-					}
-					return err
+					return ctx.HandleOperationError("temp file", fmt.Errorf("failed to write template to temp file: %w", err))
 				}
 				tempFile.Close()
 
-				if !isJSONOutput(cmd) {
+				if !ctx.IsJSONOutput() {
 					fmt.Printf("Opening template '%s' in editor...\n", captureTemplate)
 				}
 				editedContent, err := editor.OpenEditor(renderedTemplate)
 				if err != nil {
-					err := fmt.Errorf("failed to open editor: %w", err)
-					if isJSONOutput(cmd) {
-						return outputJSONError(cmd, err, startTime)
-					}
-					return err
+					return ctx.HandleOperationError("editor", fmt.Errorf("failed to open editor: %w", err))
 				}
 				finalContent = strings.TrimSpace(editedContent)
 			} else {
@@ -197,21 +170,39 @@ Examples:
 			if strings.Contains(destination, "#") {
 				// Use selector-based refile logic
 				if err := refileContentToDestination(ws, finalContent, destination, t.RefileMode); err != nil {
-					err := fmt.Errorf("failed to refile to destination '%s': %w", destination, err)
-					if isJSONOutput(cmd) {
-						return outputJSONError(cmd, err, startTime)
-					}
-					return err
+					return ctx.HandleOperationError("refile", fmt.Errorf("failed to refile to destination '%s': %w", destination, err))
 				}
 
-				if isJSONOutput(cmd) {
+				if ctx.IsJSONOutput() {
 					templateInfo := &CaptureTemplate{
 						Name:            captureTemplate,
 						RenderedContent: finalContent,
 						DestinationFile: destination,
 						RefileMode:      t.RefileMode,
 					}
-					return outputCaptureJSON(cmd, "capture_and_refile", finalContent, getContentSource(appendContent, useEditor), destination, false, true, destination, templateInfo, startTime)
+					lineCount := strings.Count(finalContent, "\n") + 1
+					if len(finalContent) == 0 {
+						lineCount = 0
+					}
+					
+					response := CaptureResponse{
+						Operation: "capture_and_refile",
+						ContentInfo: CaptureContent{
+							Content:        finalContent,
+							CharacterCount: len(finalContent),
+							LineCount:      lineCount,
+							Source:         getContentSource(appendContent, useEditor),
+						},
+						FileInfo: CaptureFile{
+							FilePath:    destination,
+							IsInbox:     false,
+							IsSelector:  true,
+							Destination: destination,
+						},
+						Template: templateInfo,
+						Metadata: cmdutil.CreateJSONMetadata(ctx.Cmd, true, ctx.StartTime),
+					}
+					return cmdutil.OutputJSON(response)
 				}
 
 				// Run post-capture hook for refile case
@@ -227,7 +218,7 @@ Examples:
 					}
 					
 					_, err := hookManager.Execute(hookCtx)
-					if err != nil && !isJSONOutput(cmd) {
+					if err != nil && !ctx.IsJSONOutput() {
 						fmt.Printf("Warning: post-capture hook failed: %s\n", err.Error())
 					}
 				}
@@ -244,21 +235,39 @@ Examples:
 				}
 
 				if err := ws.AppendToFile(destinationPath, finalContent); err != nil {
-					err := fmt.Errorf("failed to save note: %w", err)
-					if isJSONOutput(cmd) {
-						return outputJSONError(cmd, err, startTime)
-					}
-					return err
+					return ctx.HandleOperationError("save", fmt.Errorf("failed to save note: %w", err))
 				}
 
-				if isJSONOutput(cmd) {
+				if ctx.IsJSONOutput() {
 					templateInfo := &CaptureTemplate{
 						Name:            captureTemplate,
 						RenderedContent: finalContent,
 						DestinationFile: destination,
 						RefileMode:      t.RefileMode,
 					}
-					return outputCaptureJSON(cmd, "capture_to_file", finalContent, getContentSource(appendContent, useEditor), destinationPath, destination == "inbox.md", false, destination, templateInfo, startTime)
+					lineCount := strings.Count(finalContent, "\n") + 1
+					if len(finalContent) == 0 {
+						lineCount = 0
+					}
+					
+					response := CaptureResponse{
+						Operation: "capture_to_file",
+						ContentInfo: CaptureContent{
+							Content:        finalContent,
+							CharacterCount: len(finalContent),
+							LineCount:      lineCount,
+							Source:         getContentSource(appendContent, useEditor),
+						},
+						FileInfo: CaptureFile{
+							FilePath:    destinationPath,
+							IsInbox:     destination == "inbox.md",
+							IsSelector:  false,
+							Destination: destination,
+						},
+						Template: templateInfo,
+						Metadata: cmdutil.CreateJSONMetadata(ctx.Cmd, true, ctx.StartTime),
+					}
+					return cmdutil.OutputJSON(response)
 				}
 
 				// Run post-capture hook for file destination case
@@ -274,7 +283,7 @@ Examples:
 					}
 					
 					_, err := hookManager.Execute(hookCtx)
-					if err != nil && !isJSONOutput(cmd) {
+					if err != nil && !ctx.IsJSONOutput() {
 						fmt.Printf("Warning: post-capture hook failed: %s\n", err.Error())
 					}
 				}
@@ -287,16 +296,12 @@ Examples:
 			// No template - handle as before
 			if appendContent == "" && useEditor {
 				// Open editor for free-form capture
-				if !isJSONOutput(cmd) {
+				if !ctx.IsJSONOutput() {
 					fmt.Println("Opening editor for note capture...")
 				}
 				editedContent, err := editor.OpenEditor("")
 				if err != nil {
-					err := fmt.Errorf("failed to open editor: %w", err)
-					if isJSONOutput(cmd) {
-						return outputJSONError(cmd, err, startTime)
-					}
-					return err
+					return ctx.HandleOperationError("editor", fmt.Errorf("failed to open editor: %w", err))
 				}
 				finalContent = strings.TrimSpace(editedContent)
 			} else {
@@ -305,9 +310,23 @@ Examples:
 		}
 
 		if finalContent == "" {
-			if isJSONOutput(cmd) {
+			if ctx.IsJSONOutput() {
 				// For JSON, we still return success but with empty content
-				return outputCaptureJSON(cmd, "capture_empty", "", getContentSource(appendContent, useEditor), ws.InboxPath, true, false, "inbox.md", nil, startTime)
+				return ctx.Response.RespondWithSuccess(map[string]interface{}{
+					"operation": "capture_empty",
+					"content_info": map[string]interface{}{
+						"content":         "",
+						"character_count": 0,
+						"line_count":      0,
+						"source":          getContentSource(appendContent, useEditor),
+					},
+					"file_info": map[string]interface{}{
+						"file_path":   ws.InboxPath,
+						"is_inbox":    true,
+						"is_selector": false,
+						"destination": "inbox.md",
+					},
+				})
 			}
 			fmt.Println("No content captured. Note not saved.")
 			return nil
@@ -315,11 +334,7 @@ Examples:
 
 		// Append to inbox
 		if err := ws.AppendToInbox(finalContent); err != nil {
-			err := fmt.Errorf("failed to save note: %w", err)
-			if isJSONOutput(cmd) {
-				return outputJSONError(cmd, err, startTime)
-			}
-			return err
+			return ctx.HandleOperationError("save", fmt.Errorf("failed to save note: %w", err))
 		}
 
 		// Run post-capture hook unless --no-verify is set
@@ -337,14 +352,14 @@ Examples:
 			_, err := hookManager.Execute(hookCtx)
 			if err != nil {
 				// Post-capture hooks are informational only - log but don't fail
-				if !isJSONOutput(cmd) {
+				if !ctx.IsJSONOutput() {
 					fmt.Printf("Warning: post-capture hook failed: %s\n", err.Error())
 				}
 			}
 		}
 
 		// Handle JSON output
-		if isJSONOutput(cmd) {
+		if ctx.IsJSONOutput() {
 			var templateInfo *CaptureTemplate
 			if captureTemplate != "" {
 				templateInfo = &CaptureTemplate{
@@ -354,7 +369,29 @@ Examples:
 					RefileMode:      "append",
 				}
 			}
-			return outputCaptureJSON(cmd, "capture", finalContent, getContentSource(appendContent, useEditor), ws.InboxPath, true, false, "inbox.md", templateInfo, startTime)
+			lineCount := strings.Count(finalContent, "\n") + 1
+			if len(finalContent) == 0 {
+				lineCount = 0
+			}
+			
+			response := CaptureResponse{
+				Operation: "capture",
+				ContentInfo: CaptureContent{
+					Content:        finalContent,
+					CharacterCount: len(finalContent),
+					LineCount:      lineCount,
+					Source:         getContentSource(appendContent, useEditor),
+				},
+				FileInfo: CaptureFile{
+					FilePath:    ws.InboxPath,
+					IsInbox:     true,
+					IsSelector:  false,
+					Destination: "inbox.md",
+				},
+				Template: templateInfo,
+				Metadata: cmdutil.CreateJSONMetadata(ctx.Cmd, true, ctx.StartTime),
+			}
+			return cmdutil.OutputJSON(response)
 		}
 
 		// Human-readable output
@@ -461,7 +498,7 @@ type CaptureResponse struct {
 	ContentInfo CaptureContent   `json:"content_info"`
 	FileInfo    CaptureFile      `json:"file_info"`
 	Template    *CaptureTemplate `json:"template,omitempty"`
-	Metadata    JSONMetadata     `json:"metadata"`
+	Metadata    cmdutil.JSONMetadata     `json:"metadata"`
 }
 
 type CaptureContent struct {
@@ -483,37 +520,6 @@ type CaptureTemplate struct {
 	RenderedContent string `json:"rendered_content,omitempty"`
 	DestinationFile string `json:"destination_file,omitempty"`
 	RefileMode      string `json:"refile_mode,omitempty"`
-}
-
-// outputCaptureJSON outputs JSON response for capture command
-func outputCaptureJSON(cmd *cobra.Command, operation string, finalContent string, contentSource string,
-	destinationPath string, isInbox bool, isSelector bool, destination string,
-	templateInfo *CaptureTemplate, startTime time.Time) error {
-
-	lineCount := strings.Count(finalContent, "\n") + 1
-	if len(finalContent) == 0 {
-		lineCount = 0
-	}
-
-	response := CaptureResponse{
-		Operation: operation,
-		ContentInfo: CaptureContent{
-			Content:        finalContent,
-			CharacterCount: len(finalContent),
-			LineCount:      lineCount,
-			Source:         contentSource,
-		},
-		FileInfo: CaptureFile{
-			FilePath:    destinationPath,
-			IsInbox:     isInbox,
-			IsSelector:  isSelector,
-			Destination: destination,
-		},
-		Template: templateInfo,
-		Metadata: createJSONMetadata(cmd, true, startTime),
-	}
-
-	return outputJSON(response)
 }
 
 // getContentSource determines the source of content for JSON output

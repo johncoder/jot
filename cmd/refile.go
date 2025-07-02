@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/johncoder/jot/internal/cmdutil"
 	"github.com/johncoder/jot/internal/fzf"
 	"github.com/johncoder/jot/internal/hooks"
 	"github.com/johncoder/jot/internal/markdown"
@@ -253,14 +254,11 @@ Examples:
   jot refile --to "work.md#projects/frontend"          # Inspect destination`,
 
 	RunE: func(cmd *cobra.Command, args []string) error {
-		startTime := time.Now()
+		ctx := cmdutil.StartCommand(cmd)
 
 		ws, err := workspace.RequireWorkspace()
 		if err != nil {
-			if isJSONOutput(cmd) {
-				return outputJSONError(cmd, err, startTime)
-			}
-			return err
+			return ctx.HandleError(err)
 		}
 
 		// Get flags
@@ -271,16 +269,13 @@ Examples:
 
 		// Check for interactive mode
 		if fzf.ShouldUseFZF(interactive) {
-			return runInteractiveRefile(cmd, args, ws)
+			return runInteractiveRefile(ctx, args, ws)
 		}
 
 		// No source and no destination: show usage help
 		if len(args) == 0 && to == "" {
 			err := fmt.Errorf("provide a source file or --to destination")
-			if isJSONOutput(cmd) {
-				return outputJSONError(cmd, err, startTime)
-			}
-			return err
+			return ctx.HandleError(err)
 		}
 
 		if to == "" {
@@ -289,8 +284,8 @@ Examples:
 				return showSelectorsForFile(ws, args[0])
 			}
 			err := fmt.Errorf("destination path required: use --to flag")
-			if isJSONOutput(cmd) {
-				return outputJSONError(cmd, err, startTime)
+			if ctx.IsJSONOutput() {
+				return ctx.HandleError(err)
 			}
 			return err
 		}
@@ -299,16 +294,16 @@ Examples:
 		destPath, err := markdown.ParsePath(to)
 		if err != nil {
 			err := fmt.Errorf("invalid destination path '%s': %w", to, err)
-			if isJSONOutput(cmd) {
-				return outputJSONError(cmd, err, startTime)
+			if ctx.IsJSONOutput() {
+				return ctx.HandleError(err)
 			}
 			return err
 		}
 
 		// Source-less mode: inspect destination
 		if len(args) == 0 {
-			if isJSONOutput(cmd) {
-				return inspectDestinationJSON(cmd, ws, destPath, startTime)
+			if ctx.IsJSONOutput() {
+				return inspectDestinationJSON(ctx, ws, destPath)
 			}
 			return inspectDestination(ws, destPath)
 		}
@@ -317,8 +312,8 @@ Examples:
 		sourcePath, err := markdown.ParsePath(args[0])
 		if err != nil {
 			err := fmt.Errorf("invalid source path '%s': %w", args[0], err)
-			if isJSONOutput(cmd) {
-				return outputJSONError(cmd, err, startTime)
+			if ctx.IsJSONOutput() {
+				return ctx.HandleError(err)
 			}
 			return err
 		}
@@ -327,13 +322,13 @@ Examples:
 		subtree, err := ExtractSubtree(ws, sourcePath)
 		if err != nil {
 			err := fmt.Errorf("failed to extract subtree: %w", err)
-			if isJSONOutput(cmd) {
-				return outputJSONError(cmd, err, startTime)
+			if ctx.IsJSONOutput() {
+				return ctx.HandleError(err)
 			}
 			return err
 		}
 
-		if verbose && !isJSONOutput(cmd) {
+		if verbose && !ctx.IsJSONOutput() {
 			printVerboseSubtreeInfo(subtree, sourcePath.File)
 		}
 
@@ -341,13 +336,13 @@ Examples:
 		dest, err := ResolveDestination(ws, destPath, prepend)
 		if err != nil {
 			err := fmt.Errorf("failed to resolve destination: %w", err)
-			if isJSONOutput(cmd) {
-				return outputJSONError(cmd, err, startTime)
+			if ctx.IsJSONOutput() {
+				return ctx.HandleError(err)
 			}
 			return err
 		}
 
-		if verbose && !isJSONOutput(cmd) {
+		if verbose && !ctx.IsJSONOutput() {
 			printVerboseDestinationInfo(dest)
 		}
 
@@ -369,16 +364,16 @@ Examples:
 			result, err := hookManager.Execute(hookCtx)
 			if err != nil {
 				err := fmt.Errorf("pre-refile hook failed: %s", err.Error())
-				if isJSONOutput(cmd) {
-					return outputJSONError(cmd, err, startTime)
+				if ctx.IsJSONOutput() {
+					return ctx.HandleError(err)
 				}
 				return err
 			}
 			
 			if result.Aborted {
 				err := fmt.Errorf("pre-refile hook aborted operation")
-				if isJSONOutput(cmd) {
-					return outputJSONError(cmd, err, startTime)
+				if ctx.IsJSONOutput() {
+					return ctx.HandleError(err)
 				}
 				return err
 			}
@@ -387,8 +382,8 @@ Examples:
 		// Perform the refile operation
 		if err := performRefile(ws, sourcePath, subtree, dest, transformedContent); err != nil {
 			err := fmt.Errorf("refile operation failed: %w", err)
-			if isJSONOutput(cmd) {
-				return outputJSONError(cmd, err, startTime)
+			if ctx.IsJSONOutput() {
+				return ctx.HandleError(err)
 			}
 			return err
 		}
@@ -405,14 +400,14 @@ Examples:
 			}
 			
 			_, hookErr := hookManager.Execute(hookCtx)
-			if hookErr != nil && !isJSONOutput(cmd) {
+			if hookErr != nil && !ctx.IsJSONOutput() {
 				fmt.Printf("Warning: post-refile hook failed: %s\n", hookErr.Error())
 			}
 		}
 
 		// Handle JSON output
-		if isJSONOutput(cmd) {
-			return outputRefileJSON(cmd, sourcePath, destPath, subtree, dest, transformedContent, startTime)
+		if ctx.IsJSONOutput() {
+			return outputRefileJSON(ctx, sourcePath, destPath, subtree, dest, transformedContent)
 		}
 
 		// Human-readable output
@@ -627,7 +622,7 @@ func performRefile(ws *workspace.Workspace, sourcePath *markdown.HeadingPath, su
 }
 
 // executeRefile executes the refile operation using existing logic
-func executeRefile(sourceSelector, targetSelector string, cmd *cobra.Command, ws *workspace.Workspace) error {
+func executeRefile(sourceSelector, targetSelector string, ctx *cmdutil.CommandContext, ws *workspace.Workspace) error {
 	// Initialize hook manager
 	hookManager := hooks.NewManager(ws)
 	
@@ -670,8 +665,8 @@ func executeRefile(sourceSelector, targetSelector string, cmd *cobra.Command, ws
 	}
 
 	// Get flags
-	prepend, _ := cmd.Flags().GetBool("prepend")
-	verbose, _ := cmd.Flags().GetBool("verbose")
+	prepend, _ := ctx.Cmd.Flags().GetBool("prepend")
+	verbose, _ := ctx.Cmd.Flags().GetBool("verbose")
 
 	// Resolve destination
 	destTarget, err := ResolveDestination(ws, destPath, prepend)
@@ -702,7 +697,7 @@ func executeRefile(sourceSelector, targetSelector string, cmd *cobra.Command, ws
 		_, hookErr := hookManager.Execute(hookCtx)
 		if hookErr != nil {
 			// Check for JSON output to determine if we should show warnings
-			if !isJSONOutput(cmd) {
+			if !ctx.IsJSONOutput() {
 				fmt.Printf("Warning: post-refile hook failed: %s\n", hookErr.Error())
 			}
 		}
@@ -992,7 +987,7 @@ type RefileResponse struct {
 	Source      RefileSource      `json:"source"`
 	Destination RefileDestination `json:"destination"`
 	Content     RefileContent     `json:"content"`
-	Metadata    JSONMetadata      `json:"metadata"`
+	Metadata    cmdutil.JSONMetadata      `json:"metadata"`
 }
 
 type RefileSource struct {
@@ -1022,7 +1017,7 @@ type InspectDestinationResponse struct {
 	Operation   string                     `json:"operation"`
 	Destination InspectDestinationInfo     `json:"destination"`
 	Analysis    InspectDestinationAnalysis `json:"analysis"`
-	Metadata    JSONMetadata               `json:"metadata"`
+	Metadata    cmdutil.JSONMetadata               `json:"metadata"`
 }
 
 type InspectDestinationInfo struct {
@@ -1045,8 +1040,8 @@ type InspectHeadingCreation struct {
 }
 
 // outputRefileJSON outputs JSON response for refile operation
-func outputRefileJSON(cmd *cobra.Command, sourcePath *markdown.HeadingPath, destPath *markdown.HeadingPath,
-	subtree *markdown.Subtree, dest *DestinationTarget, transformedContent []byte, startTime time.Time) error {
+func outputRefileJSON(ctx *cmdutil.CommandContext, sourcePath *markdown.HeadingPath, destPath *markdown.HeadingPath,
+	subtree *markdown.Subtree, dest *DestinationTarget, transformedContent []byte) error {
 
 	// Get source file path
 	sourceFilePath := sourcePath.File
@@ -1092,14 +1087,14 @@ func outputRefileJSON(cmd *cobra.Command, sourcePath *markdown.HeadingPath, dest
 			LineCount:        lineCount,
 			TransformedLevel: dest.TargetLevel,
 		},
-		Metadata: createJSONMetadata(cmd, true, startTime),
+		Metadata: cmdutil.CreateJSONMetadata(ctx.Cmd, true, ctx.StartTime),
 	}
 
 	return outputJSON(response)
 }
 
 // inspectDestinationJSON outputs JSON response for destination inspection
-func inspectDestinationJSON(cmd *cobra.Command, ws *workspace.Workspace, destPath *markdown.HeadingPath, startTime time.Time) error {
+func inspectDestinationJSON(ctx *cmdutil.CommandContext, ws *workspace.Workspace, destPath *markdown.HeadingPath) error {
 	// Check if file exists
 	var filePath string
 	if destPath.File == "inbox.md" {
@@ -1128,7 +1123,7 @@ func inspectDestinationJSON(cmd *cobra.Command, ws *workspace.Workspace, destPat
 			MissingSegments: destPath.Segments,
 			TargetLevel:     destPath.SkipLevels + len(destPath.Segments) + 1,
 		},
-		Metadata: createJSONMetadata(cmd, true, startTime),
+		Metadata: cmdutil.CreateJSONMetadata(ctx.Cmd, true, ctx.StartTime),
 	}
 
 	// If file doesn't exist, return early with basic analysis
@@ -1149,13 +1144,13 @@ func inspectDestinationJSON(cmd *cobra.Command, ws *workspace.Workspace, destPat
 	content, err := os.ReadFile(filePath)
 	if err != nil {
 		// Return error as JSON
-		return outputJSONError(cmd, fmt.Errorf("error reading file: %w", err), startTime)
+		return ctx.HandleError(fmt.Errorf("error reading file: %w", err))
 	}
 
 	doc := markdown.ParseDocument(content)
 	pathResolution, err := navigateHeadingPath(doc, content, destPath)
 	if err != nil {
-		return outputJSONError(cmd, fmt.Errorf("error analyzing path: %w", err), startTime)
+		return ctx.HandleError(fmt.Errorf("error analyzing path: %w", err))
 	}
 
 	if pathResolution.TargetHeading != nil {
@@ -1276,13 +1271,13 @@ type SubtreeItem struct {
 }
 
 // runInteractiveRefile handles the interactive refile workflow using FZF
-func runInteractiveRefile(cmd *cobra.Command, args []string, ws *workspace.Workspace) error {
+func runInteractiveRefile(ctx *cmdutil.CommandContext, args []string, ws *workspace.Workspace) error {
 	var sourceSelector, targetSelector string
 	var err error
 
 	// Get flags
-	to, _ := cmd.Flags().GetString("to")
-	verbose, _ := cmd.Flags().GetBool("verbose")
+	to, _ := ctx.Cmd.Flags().GetString("to")
+	verbose, _ := ctx.Cmd.Flags().GetBool("verbose")
 
 	// Stage 1 & 2: Select source (if not provided)
 	if len(args) > 0 {
@@ -1347,7 +1342,7 @@ func runInteractiveRefile(cmd *cobra.Command, args []string, ws *workspace.Works
 	}
 
 	// Execute refile using existing logic
-	return executeRefile(sourceSelector, targetSelector, cmd, ws)
+	return executeRefile(sourceSelector, targetSelector, ctx, ws)
 }
 
 // selectSource handles source file and subtree selection

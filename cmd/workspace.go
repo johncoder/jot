@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/johncoder/jot/internal/cmdutil"
 	"github.com/johncoder/jot/internal/config"
 	"github.com/johncoder/jot/internal/workspace"
 	"github.com/spf13/cobra"
@@ -95,14 +96,16 @@ func init() {
 // Workspace management command implementations
 
 func workspaceShowPath(cmd *cobra.Command) error {
+	ctx := cmdutil.StartCommand(cmd)
+
 	// Initialize config system
 	if err := config.Initialize(cfgFile); err != nil {
-		return fmt.Errorf("failed to initialize config: %w", err)
+		return ctx.HandleError(fmt.Errorf("failed to initialize config: %w", err))
 	}
 
 	ws, err := workspace.FindWorkspace()
 	if err != nil {
-		return fmt.Errorf("no workspace found: %w\nRun 'jot init' to initialize a workspace or 'jot workspace list' to see registered workspaces", err)
+		return ctx.HandleError(fmt.Errorf("no workspace found: %w\nRun 'jot init' to initialize a workspace or 'jot workspace list' to see registered workspaces", err))
 	}
 
 	// Output just the path for piping to other commands
@@ -111,20 +114,17 @@ func workspaceShowPath(cmd *cobra.Command) error {
 }
 
 func workspaceShowCurrent(cmd *cobra.Command) error {
-	startTime := time.Now()
+	ctx := cmdutil.StartCommand(cmd)
 
 	// Initialize config system
 	if err := config.Initialize(cfgFile); err != nil {
-		if isJSONOutput(cmd) {
-			return outputJSONError(cmd, fmt.Errorf("failed to initialize config: %w", err), startTime)
-		}
-		return fmt.Errorf("failed to initialize config: %w", err)
+		return ctx.HandleError(fmt.Errorf("failed to initialize config: %w", err))
 	}
 
 	ws, err := workspace.FindWorkspace()
 	if err != nil {
-		if isJSONOutput(cmd) {
-			return outputJSONError(cmd, fmt.Errorf("no workspace found: %w", err), startTime)
+		if cmdutil.IsJSONOutput(cmd) {
+			return ctx.HandleError(fmt.Errorf("no workspace found: %w", err))
 		}
 		return fmt.Errorf("no workspace found: %w\nRun 'jot init' to initialize a workspace or 'jot workspace list' to see registered workspaces", err)
 	}
@@ -136,7 +136,7 @@ func workspaceShowCurrent(cmd *cobra.Command) error {
 	discoveryMethod := determineDiscoveryMethod(ws)
 	workspaceName := getWorkspaceNameFromPath(ws.Root)
 
-	if isJSONOutput(cmd) {
+	if cmdutil.IsJSONOutput(cmd) {
 		response := map[string]interface{}{
 			"current_workspace": map[string]interface{}{
 				"name":            workspaceName,
@@ -149,9 +149,9 @@ func workspaceShowCurrent(cmd *cobra.Command) error {
 					"last_activity": lastActivity,
 				},
 			},
-			"metadata": createJSONMetadata(cmd, true, startTime),
+			"metadata": cmdutil.CreateJSONMetadata(ctx.Cmd, true, ctx.StartTime),
 		}
-		return outputJSON(response)
+		return cmdutil.OutputJSON(response)
 	}
 
 	fmt.Printf("Current Workspace: %s\n", workspaceName)
@@ -166,14 +166,11 @@ func workspaceShowCurrent(cmd *cobra.Command) error {
 }
 
 func workspaceList(cmd *cobra.Command) error {
-	startTime := time.Now()
+	ctx := cmdutil.StartCommand(cmd)
 
 	// Initialize config system
 	if err := config.Initialize(cfgFile); err != nil {
-		if isJSONOutput(cmd) {
-			return outputJSONError(cmd, fmt.Errorf("failed to initialize config: %w", err), startTime)
-		}
-		return fmt.Errorf("failed to initialize config: %w", err)
+		return ctx.HandleError(fmt.Errorf("failed to initialize config: %w", err))
 	}
 
 	workspaces := config.ListWorkspaces()
@@ -186,8 +183,8 @@ func workspaceList(cmd *cobra.Command) error {
 		currentPath = currentWs.Root
 	}
 
-	if isJSONOutput(cmd) {
-		return outputWorkspaceListJSON(cmd, workspaces, defaultWorkspace, currentPath, startTime)
+	if cmdutil.IsJSONOutput(cmd) {
+		return outputWorkspaceListJSON(ctx, workspaces, defaultWorkspace, currentPath)
 	}
 
 	if len(workspaces) == 0 {
@@ -256,22 +253,19 @@ func workspaceList(cmd *cobra.Command) error {
 }
 
 func workspaceAdd(cmd *cobra.Command, name, path string) error {
-	startTime := time.Now()
+	ctx := cmdutil.StartCommand(cmd)
 
 	// Initialize config system with the same config file as the main command
 	if err := config.Initialize(cfgFile); err != nil {
-		if isJSONOutput(cmd) {
-			return outputJSONError(cmd, fmt.Errorf("failed to initialize config: %w", err), startTime)
-		}
-		return fmt.Errorf("failed to initialize config: %w", err)
+		return ctx.HandleError(fmt.Errorf("failed to initialize config: %w", err))
 	}
 
 	// Resolve absolute path
 	absPath, err := filepath.Abs(path)
 	if err != nil {
 		err := fmt.Errorf("failed to resolve path: %w", err)
-		if isJSONOutput(cmd) {
-			return outputJSONError(cmd, err, startTime)
+		if cmdutil.IsJSONOutput(cmd) {
+			return ctx.HandleError(err)
 		}
 		return err
 	}
@@ -279,8 +273,8 @@ func workspaceAdd(cmd *cobra.Command, name, path string) error {
 	// Check if workspace already exists
 	if existingPath, err := config.GetWorkspace(name); err == nil {
 		err := fmt.Errorf("workspace '%s' already exists at %s\nUse 'jot workspace remove %s' first, or choose a different name", name, existingPath, name)
-		if isJSONOutput(cmd) {
-			return outputJSONError(cmd, err, startTime)
+		if cmdutil.IsJSONOutput(cmd) {
+			return ctx.HandleError(err)
 		}
 		return err
 	}
@@ -288,8 +282,8 @@ func workspaceAdd(cmd *cobra.Command, name, path string) error {
 	// Validate that path exists and is initialized
 	if !isWorkspaceValid(absPath) {
 		err := fmt.Errorf("path %s does not exist or is not initialized\nRun 'jot init %s' to initialize it first", absPath, absPath)
-		if isJSONOutput(cmd) {
-			return outputJSONError(cmd, err, startTime)
+		if cmdutil.IsJSONOutput(cmd) {
+			return ctx.HandleError(err)
 		}
 		return err
 	}
@@ -297,8 +291,8 @@ func workspaceAdd(cmd *cobra.Command, name, path string) error {
 	// Add workspace
 	err = config.AddWorkspace(name, absPath)
 	if err != nil {
-		if isJSONOutput(cmd) {
-			return outputJSONError(cmd, fmt.Errorf("failed to add workspace: %w", err), startTime)
+		if cmdutil.IsJSONOutput(cmd) {
+			return ctx.HandleError(fmt.Errorf("failed to add workspace: %w", err))
 		}
 		return fmt.Errorf("failed to add workspace: %w", err)
 	}
@@ -307,7 +301,7 @@ func workspaceAdd(cmd *cobra.Command, name, path string) error {
 	defaultWorkspace, _, _ := config.GetDefaultWorkspace()
 	setAsDefault := defaultWorkspace == name
 
-	if isJSONOutput(cmd) {
+	if cmdutil.IsJSONOutput(cmd) {
 		response := map[string]interface{}{
 			"operations": []map[string]interface{}{
 				{
@@ -321,9 +315,9 @@ func workspaceAdd(cmd *cobra.Command, name, path string) error {
 					},
 				},
 			},
-			"metadata": createJSONMetadata(cmd, true, startTime),
+			"metadata": cmdutil.CreateJSONMetadata(ctx.Cmd, true, ctx.StartTime),
 		}
-		return outputJSON(response)
+		return cmdutil.OutputJSON(response)
 	}
 
 	fmt.Printf("✓ Added workspace '%s' at %s\n", name, absPath)
@@ -336,22 +330,19 @@ func workspaceAdd(cmd *cobra.Command, name, path string) error {
 }
 
 func workspaceRemove(cmd *cobra.Command, name string) error {
-	startTime := time.Now()
+	ctx := cmdutil.StartCommand(cmd)
 
 	// Initialize config system
 	if err := config.Initialize(cfgFile); err != nil {
-		if isJSONOutput(cmd) {
-			return outputJSONError(cmd, fmt.Errorf("failed to initialize config: %w", err), startTime)
-		}
-		return fmt.Errorf("failed to initialize config: %w", err)
+		return ctx.HandleError(fmt.Errorf("failed to initialize config: %w", err))
 	}
 
 	// Check if workspace exists
 	workspacePath, err := config.GetWorkspace(name)
 	if err != nil {
 		err := fmt.Errorf("workspace '%s' not found in registry\nUse 'jot workspace list' to see available workspaces", name)
-		if isJSONOutput(cmd) {
-			return outputJSONError(cmd, err, startTime)
+		if cmdutil.IsJSONOutput(cmd) {
+			return ctx.HandleError(err)
 		}
 		return err
 	}
@@ -372,13 +363,13 @@ func workspaceRemove(cmd *cobra.Command, name string) error {
 	// Remove workspace
 	err = config.RemoveWorkspace(name)
 	if err != nil {
-		if isJSONOutput(cmd) {
-			return outputJSONError(cmd, fmt.Errorf("failed to remove workspace: %w", err), startTime)
+		if cmdutil.IsJSONOutput(cmd) {
+			return ctx.HandleError(fmt.Errorf("failed to remove workspace: %w", err))
 		}
 		return fmt.Errorf("failed to remove workspace: %w", err)
 	}
 
-	if isJSONOutput(cmd) {
+	if cmdutil.IsJSONOutput(cmd) {
 		response := map[string]interface{}{
 			"operations": []map[string]interface{}{
 				{
@@ -392,9 +383,9 @@ func workspaceRemove(cmd *cobra.Command, name string) error {
 					},
 				},
 			},
-			"metadata": createJSONMetadata(cmd, true, startTime),
+			"metadata": cmdutil.CreateJSONMetadata(ctx.Cmd, true, ctx.StartTime),
 		}
-		return outputJSON(response)
+		return cmdutil.OutputJSON(response)
 	}
 
 	if isActive {
@@ -417,22 +408,19 @@ func workspaceRemove(cmd *cobra.Command, name string) error {
 }
 
 func workspaceSetDefault(cmd *cobra.Command, name string) error {
-	startTime := time.Now()
+	ctx := cmdutil.StartCommand(cmd)
 
 	// Initialize config system
 	if err := config.Initialize(cfgFile); err != nil {
-		if isJSONOutput(cmd) {
-			return outputJSONError(cmd, fmt.Errorf("failed to initialize config: %w", err), startTime)
-		}
-		return fmt.Errorf("failed to initialize config: %w", err)
+		return ctx.HandleError(fmt.Errorf("failed to initialize config: %w", err))
 	}
 
 	// Check if workspace exists
 	_, err := config.GetWorkspace(name)
 	if err != nil {
 		err := fmt.Errorf("workspace '%s' not found in registry\nUse 'jot workspace list' to see available workspaces", name)
-		if isJSONOutput(cmd) {
-			return outputJSONError(cmd, err, startTime)
+		if cmdutil.IsJSONOutput(cmd) {
+			return ctx.HandleError(err)
 		}
 		return err
 	}
@@ -440,13 +428,13 @@ func workspaceSetDefault(cmd *cobra.Command, name string) error {
 	// Set as default
 	err = config.SetDefaultWorkspace(name)
 	if err != nil {
-		if isJSONOutput(cmd) {
-			return outputJSONError(cmd, fmt.Errorf("failed to set default workspace: %w", err), startTime)
+		if cmdutil.IsJSONOutput(cmd) {
+			return ctx.HandleError(fmt.Errorf("failed to set default workspace: %w", err))
 		}
 		return fmt.Errorf("failed to set default workspace: %w", err)
 	}
 
-	if isJSONOutput(cmd) {
+	if cmdutil.IsJSONOutput(cmd) {
 		response := map[string]interface{}{
 			"operations": []map[string]interface{}{
 				{
@@ -457,9 +445,9 @@ func workspaceSetDefault(cmd *cobra.Command, name string) error {
 					},
 				},
 			},
-			"metadata": createJSONMetadata(cmd, true, startTime),
+			"metadata": cmdutil.CreateJSONMetadata(ctx.Cmd, true, ctx.StartTime),
 		}
-		return outputJSON(response)
+		return cmdutil.OutputJSON(response)
 	}
 
 	fmt.Printf("✓ Set '%s' as default workspace\n", name)
@@ -594,7 +582,7 @@ func formatTimeAgo(t time.Time) string {
 	}
 }
 
-func outputWorkspaceListJSON(cmd *cobra.Command, workspaces map[string]string, defaultWorkspace, currentPath string, startTime time.Time) error {
+func outputWorkspaceListJSON(ctx *cmdutil.CommandContext, workspaces map[string]string, defaultWorkspace, currentPath string) error {
 	var workspaceList []map[string]interface{}
 	validCount := 0
 
@@ -649,7 +637,7 @@ func outputWorkspaceListJSON(cmd *cobra.Command, workspaces map[string]string, d
 			"default_workspace": defaultWorkspace,
 			"active_workspace": activeWorkspace,
 		},
-		"metadata": createJSONMetadata(cmd, true, startTime),
+		"metadata": cmdutil.CreateJSONMetadata(ctx.Cmd, true, ctx.StartTime),
 	}
-	return outputJSON(response)
+	return cmdutil.OutputJSON(response)
 }

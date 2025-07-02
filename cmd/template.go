@@ -5,8 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
+	"github.com/johncoder/jot/internal/cmdutil"
 	"github.com/johncoder/jot/internal/editor"
 	"github.com/johncoder/jot/internal/template"
 	"github.com/johncoder/jot/internal/workspace"
@@ -35,12 +35,12 @@ var templateListCmd = &cobra.Command{
 	Short: "List available templates",
 	Long:  `List all available templates and their approval status.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		startTime := time.Now()
+		ctx := cmdutil.StartCommand(cmd)
 
 		ws, err := workspace.RequireWorkspace()
 		if err != nil {
-			if isJSONOutput(cmd) {
-				return outputJSONError(cmd, err, startTime)
+			if ctx.IsJSONOutput() {
+				return ctx.HandleError(err)
 			}
 			return err
 		}
@@ -49,13 +49,13 @@ var templateListCmd = &cobra.Command{
 		templates, err := tm.List()
 		if err != nil {
 			err := fmt.Errorf("failed to list templates: %w", err)
-			if isJSONOutput(cmd) {
-				return outputJSONError(cmd, err, startTime)
+			if ctx.IsJSONOutput() {
+				return ctx.HandleError(err)
 			}
 			return err
 		}
 
-		if isJSONOutput(cmd) {
+		if ctx.IsJSONOutput() {
 			var templateItems []TemplateItem
 			for _, t := range templates {
 				templateItems = append(templateItems, TemplateItem{
@@ -72,10 +72,10 @@ var templateListCmd = &cobra.Command{
 					TotalTemplates:    len(templates),
 					ApprovedTemplates: countApproved(templates),
 				},
-				Metadata: createJSONMetadata(cmd, true, startTime),
+				Metadata: cmdutil.CreateJSONMetadata(ctx.Cmd, true, ctx.StartTime),
 			}
 
-			return outputJSON(response)
+			return cmdutil.OutputJSON(response)
 		}
 
 		if len(templates) == 0 {
@@ -108,12 +108,12 @@ The template can contain shell commands using $(command) syntax:
 Templates require approval before shell commands can execute.`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		startTime := time.Now()
+		ctx := cmdutil.StartCommand(cmd)
 
 		ws, err := workspace.RequireWorkspace()
 		if err != nil {
-			if isJSONOutput(cmd) {
-				return outputJSONError(cmd, err, startTime)
+			if ctx.IsJSONOutput() {
+				return ctx.HandleError(err)
 			}
 			return err
 		}
@@ -136,8 +136,8 @@ tags: [%s]
 		err = tm.Create(name, defaultContent)
 		if err != nil {
 			err := fmt.Errorf("failed to create template: %w", err)
-			if isJSONOutput(cmd) {
-				return outputJSONError(cmd, err, startTime)
+			if ctx.IsJSONOutput() {
+				return ctx.HandleError(err)
 			}
 			return err
 		}
@@ -146,18 +146,18 @@ tags: [%s]
 		editorError := ""
 		edited := false
 
-		if !isJSONOutput(cmd) {
+		if !ctx.IsJSONOutput() {
 			fmt.Printf("Created template '%s'\n", name)
 		}
 
 		// Open in editor (skip for JSON output to avoid interactive prompt)
-		if !isJSONOutput(cmd) {
+		if !ctx.IsJSONOutput() {
 			// Read the current template content
 			content, err := os.ReadFile(templatePath)
 			if err != nil {
 				err := fmt.Errorf("failed to read template file: %w", err)
-				if isJSONOutput(cmd) {
-					return outputJSONError(cmd, err, startTime)
+				if ctx.IsJSONOutput() {
+					return ctx.HandleError(err)
 				}
 				return err
 			}
@@ -173,8 +173,8 @@ tags: [%s]
 				err = os.WriteFile(templatePath, []byte(editedContent), 0644)
 				if err != nil {
 					err := fmt.Errorf("failed to save template: %w", err)
-					if isJSONOutput(cmd) {
-						return outputJSONError(cmd, err, startTime)
+					if ctx.IsJSONOutput() {
+						return ctx.HandleError(err)
 					}
 					return err
 				}
@@ -185,7 +185,7 @@ tags: [%s]
 			fmt.Printf("  jot template approve %s\n", name)
 		}
 
-		if isJSONOutput(cmd) {
+		if ctx.IsJSONOutput() {
 			nextSteps := []string{
 				fmt.Sprintf("jot template approve %s", name),
 				fmt.Sprintf("jot template edit %s", name),
@@ -199,10 +199,10 @@ tags: [%s]
 				Edited:       edited,
 				EditorError:  editorError,
 				NextSteps:    nextSteps,
-				Metadata:     createJSONMetadata(cmd, true, startTime),
+				Metadata:     cmdutil.CreateJSONMetadata(ctx.Cmd, true, ctx.StartTime),
 			}
 
-			return outputJSON(response)
+			return cmdutil.OutputJSON(response)
 		}
 
 		return nil
@@ -215,12 +215,12 @@ var templateEditCmd = &cobra.Command{
 	Long:  `Edit an existing template in your editor. Changes will require re-approval.`,
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		startTime := time.Now()
+		ctx := cmdutil.StartCommand(cmd)
 
 		ws, err := workspace.RequireWorkspace()
 		if err != nil {
-			if isJSONOutput(cmd) {
-				return outputJSONError(cmd, err, startTime)
+			if ctx.IsJSONOutput() {
+				return ctx.HandleError(err)
 			}
 			return err
 		}
@@ -231,15 +231,15 @@ var templateEditCmd = &cobra.Command{
 		// Check if template exists
 		_, err = tm.Get(name)
 		if err != nil {
-			if isJSONOutput(cmd) {
-				return outputJSONError(cmd, err, startTime)
+			if ctx.IsJSONOutput() {
+				return ctx.HandleError(err)
 			}
 			return err
 		}
 
 		templatePath := filepath.Join(ws.JotDir, "templates", name+".md")
 
-		if isJSONOutput(cmd) {
+		if ctx.IsJSONOutput() {
 			// For JSON output, skip interactive editor and return success
 			nextSteps := []string{
 				fmt.Sprintf("jot template approve %s", name),
@@ -253,10 +253,10 @@ var templateEditCmd = &cobra.Command{
 				Updated:      false,
 				EditorError:  "Editor skipped in JSON mode",
 				NextSteps:    nextSteps,
-				Metadata:     createJSONMetadata(cmd, true, startTime),
+				Metadata:     cmdutil.CreateJSONMetadata(ctx.Cmd, true, ctx.StartTime),
 			}
 
-			return outputJSON(response)
+			return cmdutil.OutputJSON(response)
 		}
 
 		// Open in editor
@@ -295,12 +295,12 @@ like $(date) or $(git status). Approval is based on the template's
 current content hash - any changes will require re-approval.`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		startTime := time.Now()
+		ctx := cmdutil.StartCommand(cmd)
 
 		ws, err := workspace.RequireWorkspace()
 		if err != nil {
-			if isJSONOutput(cmd) {
-				return outputJSONError(cmd, err, startTime)
+			if ctx.IsJSONOutput() {
+				return ctx.HandleError(err)
 			}
 			return err
 		}
@@ -311,17 +311,17 @@ current content hash - any changes will require re-approval.`,
 		// Get template to show what we're approving
 		t, err := tm.Get(name)
 		if err != nil {
-			if isJSONOutput(cmd) {
-				return outputJSONError(cmd, err, startTime)
+			if ctx.IsJSONOutput() {
+				return ctx.HandleError(err)
 			}
 			return err
 		}
 
-		if isJSONOutput(cmd) {
+		if ctx.IsJSONOutput() {
 			// For JSON output, we can't do interactive approval
 			// Return an error or require a --force flag
 			err := fmt.Errorf("interactive approval not supported in JSON mode")
-			return outputJSONError(cmd, err, startTime)
+			return ctx.HandleError(err)
 		}
 
 		// Show template content for review
@@ -359,12 +359,12 @@ var templateViewCmd = &cobra.Command{
 	Long:  `Display the raw content of a specified template.`,
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		startTime := time.Now()
+		ctx := cmdutil.StartCommand(cmd)
 
 		ws, err := workspace.RequireWorkspace()
 		if err != nil {
-			if isJSONOutput(cmd) {
-				return outputJSONError(cmd, err, startTime)
+			if ctx.IsJSONOutput() {
+				return ctx.HandleError(err)
 			}
 			return err
 		}
@@ -375,23 +375,23 @@ var templateViewCmd = &cobra.Command{
 		t, err := tm.Get(name)
 		if err != nil {
 			err := fmt.Errorf("failed to retrieve template: %w", err)
-			if isJSONOutput(cmd) {
-				return outputJSONError(cmd, err, startTime)
+			if ctx.IsJSONOutput() {
+				return ctx.HandleError(err)
 			}
 			return err
 		}
 
-		if isJSONOutput(cmd) {
+		if ctx.IsJSONOutput() {
 			response := TemplateViewResponse{
 				Operation:    "template_view",
 				TemplateName: name,
 				Content:      t.Content,
 				Approved:     t.Approved,
 				Hash:         t.Hash,
-				Metadata:     createJSONMetadata(cmd, true, startTime),
+				Metadata:     cmdutil.CreateJSONMetadata(ctx.Cmd, true, ctx.StartTime),
 			}
 
-			return outputJSON(response)
+			return cmdutil.OutputJSON(response)
 		}
 
 		fmt.Println(t.Content)
@@ -413,12 +413,12 @@ Examples:
   jot template render meeting --json  # Output rendered content as JSON`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		startTime := time.Now()
+		ctx := cmdutil.StartCommand(cmd)
 
 		ws, err := workspace.RequireWorkspace()
 		if err != nil {
-			if isJSONOutput(cmd) {
-				return outputJSONError(cmd, err, startTime)
+			if ctx.IsJSONOutput() {
+				return ctx.HandleError(err)
 			}
 			return err
 		}
@@ -429,8 +429,8 @@ Examples:
 		t, err := tm.Get(name)
 		if err != nil {
 			err := fmt.Errorf("failed to retrieve template: %w", err)
-			if isJSONOutput(cmd) {
-				return outputJSONError(cmd, err, startTime)
+			if ctx.IsJSONOutput() {
+				return ctx.HandleError(err)
 			}
 			return err
 		}
@@ -439,23 +439,23 @@ Examples:
 		renderedContent, err := tm.Render(t, "")
 		if err != nil {
 			err := fmt.Errorf("failed to render template: %w", err)
-			if isJSONOutput(cmd) {
-				return outputJSONError(cmd, err, startTime)
+			if ctx.IsJSONOutput() {
+				return ctx.HandleError(err)
 			}
 			return err
 		}
 
-		if isJSONOutput(cmd) {
+		if ctx.IsJSONOutput() {
 			response := TemplateRenderResponse{
 				Operation:        "template_render",
 				TemplateName:     name,
 				RenderedContent:  renderedContent,
 				Approved:         t.Approved,
 				ExecutionAllowed: t.Approved,
-				Metadata:         createJSONMetadata(cmd, true, startTime),
+				Metadata:         cmdutil.CreateJSONMetadata(ctx.Cmd, true, ctx.StartTime),
 			}
 
-			return outputJSON(response)
+			return cmdutil.OutputJSON(response)
 		}
 
 		fmt.Print(renderedContent)
@@ -479,7 +479,7 @@ type TemplateListResponse struct {
 	Operation string              `json:"operation"`
 	Templates []TemplateItem      `json:"templates"`
 	Summary   TemplateListSummary `json:"summary"`
-	Metadata  JSONMetadata        `json:"metadata"`
+	Metadata  cmdutil.JSONMetadata `json:"metadata"`
 }
 
 type TemplateItem struct {
@@ -501,7 +501,7 @@ type TemplateCreateResponse struct {
 	Edited       bool         `json:"edited"`
 	EditorError  string       `json:"editor_error,omitempty"`
 	NextSteps    []string     `json:"next_steps"`
-	Metadata     JSONMetadata `json:"metadata"`
+	Metadata     cmdutil.JSONMetadata `json:"metadata"`
 }
 
 type TemplateEditResponse struct {
@@ -511,7 +511,7 @@ type TemplateEditResponse struct {
 	Updated      bool         `json:"updated"`
 	EditorError  string       `json:"editor_error,omitempty"`
 	NextSteps    []string     `json:"next_steps"`
-	Metadata     JSONMetadata `json:"metadata"`
+	Metadata     cmdutil.JSONMetadata `json:"metadata"`
 }
 
 type TemplateApproveResponse struct {
@@ -520,7 +520,7 @@ type TemplateApproveResponse struct {
 	Approved      bool         `json:"approved"`
 	Hash          string       `json:"hash"`
 	UserConfirmed bool         `json:"user_confirmed"`
-	Metadata      JSONMetadata `json:"metadata"`
+	Metadata      cmdutil.JSONMetadata `json:"metadata"`
 }
 
 type TemplateViewResponse struct {
@@ -529,7 +529,7 @@ type TemplateViewResponse struct {
 	Content      string       `json:"content"`
 	Approved     bool         `json:"approved"`
 	Hash         string       `json:"hash"`
-	Metadata     JSONMetadata `json:"metadata"`
+	Metadata     cmdutil.JSONMetadata `json:"metadata"`
 }
 
 type TemplateRenderResponse struct {
@@ -538,7 +538,7 @@ type TemplateRenderResponse struct {
 	RenderedContent  string       `json:"rendered_content"`
 	Approved         bool         `json:"approved"`
 	ExecutionAllowed bool         `json:"execution_allowed"`
-	Metadata         JSONMetadata `json:"metadata"`
+	Metadata         cmdutil.JSONMetadata `json:"metadata"`
 }
 
 func init() {

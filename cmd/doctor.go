@@ -5,8 +5,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"time"
 
+	"github.com/johncoder/jot/internal/cmdutil"
 	"github.com/johncoder/jot/internal/workspace"
 	"github.com/spf13/cobra"
 )
@@ -31,9 +31,9 @@ Examples:
   jot doctor                     # Diagnose issues
   jot doctor --fix               # Diagnose and fix issues`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		startTime := time.Now()
+		ctx := cmdutil.StartCommand(cmd)
 
-		if !isJSONOutput(cmd) {
+		if !ctx.IsJSONOutput() {
 			fmt.Println("Running jot workspace diagnostics...")
 			fmt.Println()
 		}
@@ -58,7 +58,7 @@ Examples:
 				Message: "Not in a jot workspace",
 			})
 
-			if !isJSONOutput(cmd) {
+			if !ctx.IsJSONOutput() {
 				fmt.Println("✗ Not in a jot workspace")
 				fmt.Println("  Run 'jot init' to initialize a workspace")
 				fmt.Println()
@@ -81,14 +81,14 @@ Examples:
 						FixesApplied:  len(fixes),
 						OverallHealth: "critical",
 					},
-					Metadata: createJSONMetadata(cmd, true, startTime),
+					Metadata: cmdutil.CreateJSONMetadata(ctx.Cmd, true, ctx.StartTime),
 				}
-				return outputJSON(response)
+				return cmdutil.OutputJSON(response)
 			}
 			return nil
 		}
 
-		if !isJSONOutput(cmd) {
+		if !ctx.IsJSONOutput() {
 			fmt.Printf("✓ Found workspace at: %s\n", ws.Root)
 		}
 		checks = append(checks, DoctorCheck{
@@ -111,7 +111,7 @@ Examples:
 				Status:  "failed",
 				Message: "inbox.md is missing",
 			})
-			if !isJSONOutput(cmd) {
+			if !ctx.IsJSONOutput() {
 				fmt.Println("✗ inbox.md is missing")
 			}
 		} else {
@@ -120,7 +120,7 @@ Examples:
 				Status:  "passed",
 				Message: "inbox.md exists",
 			})
-			if !isJSONOutput(cmd) {
+			if !ctx.IsJSONOutput() {
 				fmt.Println("✓ inbox.md exists")
 			}
 		}
@@ -138,7 +138,7 @@ Examples:
 				Status:  "failed",
 				Message: "lib/ directory is missing",
 			})
-			if !isJSONOutput(cmd) {
+			if !ctx.IsJSONOutput() {
 				fmt.Println("✗ lib/ directory is missing")
 			}
 		} else {
@@ -147,7 +147,7 @@ Examples:
 				Status:  "passed",
 				Message: "lib/ directory exists",
 			})
-			if !isJSONOutput(cmd) {
+			if !ctx.IsJSONOutput() {
 				fmt.Println("✓ lib/ directory exists")
 			}
 		}
@@ -166,7 +166,7 @@ Examples:
 				Status:  "failed",
 				Message: ".jot/ directory is missing",
 			})
-			if !isJSONOutput(cmd) {
+			if !ctx.IsJSONOutput() {
 				fmt.Println("✗ .jot/ directory is missing")
 			}
 		} else {
@@ -175,7 +175,7 @@ Examples:
 				Status:  "passed",
 				Message: ".jot/ directory exists",
 			})
-			if !isJSONOutput(cmd) {
+			if !ctx.IsJSONOutput() {
 				fmt.Println("✓ .jot/ directory exists")
 			}
 		}
@@ -195,7 +195,7 @@ Examples:
 					Status:  "failed",
 					Message: "inbox.md is not writable",
 				})
-				if !isJSONOutput(cmd) {
+				if !ctx.IsJSONOutput() {
 					fmt.Println("✗ inbox.md is not writable")
 				}
 			} else {
@@ -205,7 +205,7 @@ Examples:
 					Status:  "passed",
 					Message: "inbox.md is writable",
 				})
-				if !isJSONOutput(cmd) {
+				if !ctx.IsJSONOutput() {
 					fmt.Println("✓ inbox.md is writable")
 				}
 			}
@@ -229,7 +229,7 @@ Examples:
 				Status:  "passed",
 				Message: fmt.Sprintf("Editor '%s' is available", foundEditor),
 			})
-			if !isJSONOutput(cmd) {
+			if !ctx.IsJSONOutput() {
 				fmt.Printf("✓ Editor '%s' is available\n", foundEditor)
 			}
 		} else {
@@ -245,7 +245,7 @@ Examples:
 				Status:  "warning",
 				Message: "No common editor found in PATH",
 			})
-			if !isJSONOutput(cmd) {
+			if !ctx.IsJSONOutput() {
 				fmt.Println("! No common editor found in PATH")
 			}
 		}
@@ -264,7 +264,7 @@ Examples:
 				Status:  "passed",
 				Message: fmt.Sprintf("Pager '%s' is available", foundPager),
 			})
-			if !isJSONOutput(cmd) {
+			if !ctx.IsJSONOutput() {
 				fmt.Printf("✓ Pager '%s' is available\n", foundPager)
 			}
 		} else {
@@ -280,18 +280,18 @@ Examples:
 				Status:  "warning",
 				Message: "No pager found in PATH",
 			})
-			if !isJSONOutput(cmd) {
+			if !ctx.IsJSONOutput() {
 				fmt.Println("! No pager found in PATH")
 			}
 		}
 
-		if !isJSONOutput(cmd) {
+		if !ctx.IsJSONOutput() {
 			fmt.Println()
 		}
 
 		// Apply fixes if requested
 		if doctorFix && len(issues) > 0 {
-			if !isJSONOutput(cmd) {
+			if !ctx.IsJSONOutput() {
 				fmt.Println("Applying fixes...")
 			}
 
@@ -311,7 +311,7 @@ This is your inbox for capturing new notes quickly. Use 'jot capture' to add new
 							Description: "Created inbox.md",
 							Success:     true,
 						})
-						if !isJSONOutput(cmd) {
+						if !ctx.IsJSONOutput() {
 							fmt.Println("✓ Created inbox.md")
 						}
 					} else {
@@ -321,7 +321,7 @@ This is your inbox for capturing new notes quickly. Use 'jot capture' to add new
 							Success:     false,
 							Error:       err.Error(),
 						})
-						if !isJSONOutput(cmd) {
+						if !ctx.IsJSONOutput() {
 							fmt.Printf("✗ Failed to create inbox.md: %v\n", err)
 						}
 					}
@@ -349,7 +349,7 @@ Use 'jot refile' to move notes from your inbox to organized files here.
 							Description: "Created lib/ directory",
 							Success:     true,
 						})
-						if !isJSONOutput(cmd) {
+						if !ctx.IsJSONOutput() {
 							fmt.Println("✓ Created lib/ directory")
 						}
 					} else {
@@ -359,7 +359,7 @@ Use 'jot refile' to move notes from your inbox to organized files here.
 							Success:     false,
 							Error:       err.Error(),
 						})
-						if !isJSONOutput(cmd) {
+						if !ctx.IsJSONOutput() {
 							fmt.Printf("✗ Failed to create lib/ directory: %v\n", err)
 						}
 					}
@@ -373,7 +373,7 @@ Use 'jot refile' to move notes from your inbox to organized files here.
 							Description: "Created .jot/ directory",
 							Success:     true,
 						})
-						if !isJSONOutput(cmd) {
+						if !ctx.IsJSONOutput() {
 							fmt.Println("✓ Created .jot/ directory")
 						}
 					} else {
@@ -383,7 +383,7 @@ Use 'jot refile' to move notes from your inbox to organized files here.
 							Success:     false,
 							Error:       err.Error(),
 						})
-						if !isJSONOutput(cmd) {
+						if !ctx.IsJSONOutput() {
 							fmt.Printf("✗ Failed to create .jot/ directory: %v\n", err)
 						}
 					}
@@ -419,7 +419,7 @@ Use 'jot refile' to move notes from your inbox to organized files here.
 		}
 
 		// Output results
-		if isJSONOutput(cmd) {
+		if ctx.IsJSONOutput() {
 			response := DoctorResponse{
 				Operation:      "doctor",
 				WorkspaceFound: true,
@@ -438,9 +438,9 @@ Use 'jot refile' to move notes from your inbox to organized files here.
 					FixesApplied:  len(fixes),
 					OverallHealth: healthStatus,
 				},
-				Metadata: createJSONMetadata(cmd, true, startTime),
+				Metadata: cmdutil.CreateJSONMetadata(ctx.Cmd, true, ctx.StartTime),
 			}
-			return outputJSON(response)
+			return cmdutil.OutputJSON(response)
 		}
 
 		// Summary for non-JSON output
@@ -491,7 +491,7 @@ type DoctorResponse struct {
 	Warnings       []DoctorIssue `json:"warnings"`
 	FixesApplied   []DoctorFix   `json:"fixes_applied"`
 	Summary        DoctorSummary `json:"summary"`
-	Metadata       JSONMetadata  `json:"metadata"`
+	Metadata       cmdutil.JSONMetadata  `json:"metadata"`
 }
 
 type DoctorCheck struct {

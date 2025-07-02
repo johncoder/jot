@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/johncoder/jot/internal/cmdutil"
 	"github.com/johncoder/jot/internal/hooks"
 	"github.com/johncoder/jot/internal/workspace"
 	"github.com/spf13/cobra"
@@ -29,14 +30,11 @@ Examples:
   jot archive --set-location "archive/2025.md#Archived"  # Set archive location`,
 
 	RunE: func(cmd *cobra.Command, args []string) error {
-		startTime := time.Now()
+		ctx := cmdutil.StartCommand(cmd)
 
 		ws, err := workspace.RequireWorkspace()
 		if err != nil {
-			if isJSONOutput(cmd) {
-				return outputJSONError(cmd, err, startTime)
-			}
-			return err
+			return ctx.HandleError(err)
 		}
 
 		// Handle configuration flags
@@ -44,35 +42,35 @@ Examples:
 		setLocation, _ := cmd.Flags().GetString("set-location")
 
 		if showConfig {
-			return showArchiveConfig(cmd, ws, startTime)
+			return showArchiveConfig(ctx, ws)
 		}
 
 		if setLocation != "" {
-			return setArchiveLocation(cmd, ws, setLocation, startTime)
+			return setArchiveLocation(ctx, ws, setLocation)
 		}
 
 		// If no source provided, initialize archive structure
 		if len(args) == 0 {
-			return initializeArchiveStructure(cmd, ws, startTime)
+			return initializeArchiveStructure(ctx, ws)
 		}
 
 		// Archive the specified source using refile
-		return archiveWithRefile(cmd, ws, args[0], startTime)
+		return archiveWithRefile(ctx, ws, args[0])
 	},
 }
 
 // showArchiveConfig displays the current archive configuration
-func showArchiveConfig(cmd *cobra.Command, ws *workspace.Workspace, startTime time.Time) error {
+func showArchiveConfig(ctx *cmdutil.CommandContext, ws *workspace.Workspace) error {
 	archiveLocation := ws.GetArchiveLocation()
 	
-	if isJSONOutput(cmd) {
+	if ctx.IsJSONOutput() {
 		response := ArchiveConfigResponse{
 			Operation:       "show_config",
 			ArchiveLocation: archiveLocation,
 			ResolvedPath:    archiveLocation,
-			Metadata:        createJSONMetadata(cmd, true, startTime),
+			Metadata:        cmdutil.CreateJSONMetadata(ctx.Cmd, true, ctx.StartTime),
 		}
-		return outputJSON(response)
+		return cmdutil.OutputJSON(response)
 	}
 
 	fmt.Printf("Archive Configuration:\n")
@@ -84,23 +82,20 @@ func showArchiveConfig(cmd *cobra.Command, ws *workspace.Workspace, startTime ti
 }
 
 // setArchiveLocation updates the archive location configuration
-func setArchiveLocation(cmd *cobra.Command, ws *workspace.Workspace, location string, startTime time.Time) error {
+func setArchiveLocation(ctx *cmdutil.CommandContext, ws *workspace.Workspace, location string) error {
 	ws.Config.ArchiveLocation = location
 	if err := ws.SaveWorkspaceConfig(); err != nil {
-		if isJSONOutput(cmd) {
-			return outputJSONError(cmd, err, startTime)
-		}
-		return fmt.Errorf("failed to save configuration: %w", err)
+		return ctx.HandleOperationError("save configuration", err)
 	}
 
-	if isJSONOutput(cmd) {
+	if ctx.IsJSONOutput() {
 		response := ArchiveConfigResponse{
 			Operation:       "set_location",
 			ArchiveLocation: location,
 			ResolvedPath:    location,
-			Metadata:        createJSONMetadata(cmd, true, startTime),
+			Metadata:        cmdutil.CreateJSONMetadata(ctx.Cmd, true, ctx.StartTime),
 		}
-		return outputJSON(response)
+		return cmdutil.OutputJSON(response)
 	}
 
 	fmt.Printf("✓ Archive location updated to: %s\n", location)
@@ -109,7 +104,7 @@ func setArchiveLocation(cmd *cobra.Command, ws *workspace.Workspace, location st
 }
 
 // initializeArchiveStructure creates the archive directory and file structure
-func initializeArchiveStructure(cmd *cobra.Command, ws *workspace.Workspace, startTime time.Time) error {
+func initializeArchiveStructure(ctx *cmdutil.CommandContext, ws *workspace.Workspace) error {
 	archiveLocation := ws.GetArchiveLocation()
 	
 	// Parse the archive location to extract file path and section
@@ -124,11 +119,7 @@ func initializeArchiveStructure(cmd *cobra.Command, ws *workspace.Workspace, sta
 	// Create archive directory if it doesn't exist
 	if _, err := os.Stat(archiveDir); os.IsNotExist(err) {
 		if err := os.MkdirAll(archiveDir, 0755); err != nil {
-			err := fmt.Errorf("failed to create archive directory: %w", err)
-			if isJSONOutput(cmd) {
-				return outputJSONError(cmd, err, startTime)
-			}
-			return err
+			return ctx.HandleOperationError("create archive directory", err)
 		}
 		
 		relativeDir, _ := filepath.Rel(ws.Root, archiveDir)
@@ -152,11 +143,7 @@ func initializeArchiveStructure(cmd *cobra.Command, ws *workspace.Workspace, sta
 		archiveContent := fmt.Sprintf("# %s\n\nArchived notes.\n\n", sectionName)
 		
 		if err := os.WriteFile(archiveFile, []byte(archiveContent), 0644); err != nil {
-			err := fmt.Errorf("failed to create archive file: %w", err)
-			if isJSONOutput(cmd) {
-				return outputJSONError(cmd, err, startTime)
-			}
-			return err
+			return ctx.HandleOperationError("create archive file", err)
 		}
 		
 		fileCreated = true
@@ -172,7 +159,7 @@ func initializeArchiveStructure(cmd *cobra.Command, ws *workspace.Workspace, sta
 	}
 
 	// Output results
-	if isJSONOutput(cmd) {
+	if ctx.IsJSONOutput() {
 		var totalCreated, totalExisting int
 		for _, item := range createdItems {
 			if item.Created {
@@ -193,9 +180,9 @@ func initializeArchiveStructure(cmd *cobra.Command, ws *workspace.Workspace, sta
 				ItemsExisting:  totalExisting,
 				DirectoryReady: true,
 			},
-			Metadata: createJSONMetadata(cmd, true, startTime),
+			Metadata: cmdutil.CreateJSONMetadata(ctx.Cmd, true, ctx.StartTime),
 		}
-		return outputJSON(response)
+		return cmdutil.OutputJSON(response)
 	}
 
 	if !fileCreated && len(createdItems) == 0 {
@@ -213,7 +200,7 @@ func initializeArchiveStructure(cmd *cobra.Command, ws *workspace.Workspace, sta
 }
 
 // archiveWithRefile delegates to refile command with archive destination
-func archiveWithRefile(cmd *cobra.Command, ws *workspace.Workspace, source string, startTime time.Time) error {
+func archiveWithRefile(ctx *cmdutil.CommandContext, ws *workspace.Workspace, source string) error {
 	archiveLocation := ws.GetArchiveLocation()
 	
 	// Parse the archive location to extract file path
@@ -222,7 +209,7 @@ func archiveWithRefile(cmd *cobra.Command, ws *workspace.Workspace, source strin
 	
 	// Ensure archive file exists first
 	if _, err := os.Stat(archiveFile); os.IsNotExist(err) {
-		if err := initializeArchiveStructure(cmd, ws, startTime); err != nil {
+		if err := initializeArchiveStructure(ctx, ws); err != nil {
 			return err
 		}
 	}
@@ -241,26 +228,20 @@ func archiveWithRefile(cmd *cobra.Command, ws *workspace.Workspace, source strin
 		
 		result, err := hookManager.Execute(hookCtx)
 		if err != nil {
-			if isJSONOutput(cmd) {
-				return outputJSONError(cmd, fmt.Errorf("pre-archive hook failed: %s", err.Error()), startTime)
-			}
-			return fmt.Errorf("pre-archive hook failed: %s", err.Error())
+			return ctx.HandleErrorf("pre-archive hook failed: %s", err.Error())
 		}
 		
 		if result.Aborted {
-			if isJSONOutput(cmd) {
-				return outputJSONError(cmd, fmt.Errorf("pre-archive hook aborted operation"), startTime)
-			}
-			return fmt.Errorf("pre-archive hook aborted operation")
+			return ctx.HandleErrorf("pre-archive hook aborted operation")
 		}
 	}
 	
-	if !isJSONOutput(cmd) {
+	if !ctx.IsJSONOutput() {
 		fmt.Printf("Archiving '%s' to '%s'...\n", source, archiveLocation)
 	}
 	
 	// Call the internal refile function directly to avoid recursion
-	err := executeRefile(source, archiveLocation, cmd, ws)
+	err := executeRefile(source, archiveLocation, ctx, ws)
 	
 	// Run post-archive hook (informational only)
 	if !archiveNoVerify && err == nil {
@@ -274,7 +255,7 @@ func archiveWithRefile(cmd *cobra.Command, ws *workspace.Workspace, source strin
 		}
 		
 		_, hookErr := hookManager.Execute(hookCtx)
-		if hookErr != nil && !isJSONOutput(cmd) {
+		if hookErr != nil && !ctx.IsJSONOutput() {
 			fmt.Printf("Warning: post-archive hook failed: %s\n", hookErr.Error())
 		}
 	}
@@ -289,14 +270,14 @@ type ArchiveResponse struct {
 	CreatedItems []ArchiveItem  `json:"created_items"`
 	Operations   []string       `json:"operations"`
 	Summary      ArchiveSummary `json:"summary"`
-	Metadata     JSONMetadata   `json:"metadata"`
+	Metadata     cmdutil.JSONMetadata   `json:"metadata"`
 }
 
 type ArchiveConfigResponse struct {
 	Operation       string       `json:"operation"`
 	ArchiveLocation string       `json:"archive_location"`
 	ResolvedPath    string       `json:"resolved_path"`
-	Metadata        JSONMetadata `json:"metadata"`
+	Metadata        cmdutil.JSONMetadata `json:"metadata"`
 }
 
 type ArchiveItem struct {

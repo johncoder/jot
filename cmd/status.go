@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/johncoder/jot/internal/cmdutil"
 	"github.com/spf13/cobra"
 )
 
@@ -26,13 +27,10 @@ Examples:
   jot status                     # Show workspace status
   jot status --verbose           # Show detailed information`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		startTime := time.Now()
+		ctx := cmdutil.StartCommand(cmd)
 		ws, err := getWorkspace(cmd)
 		if err != nil {
-			if isJSONOutput(cmd) {
-				return outputJSONError(cmd, err, startTime)
-			}
-			return err
+			return ctx.HandleError(err)
 		}
 
 		// Collect all status data
@@ -64,7 +62,7 @@ Examples:
 		}
 
 		// Output JSON if requested
-		if isJSONOutput(cmd) {
+		if cmdutil.IsJSONOutput(ctx.Cmd) {
 			response := StatusResponse{
 				Workspace: StatusWorkspace{
 					Root:      ws.Root,
@@ -82,7 +80,7 @@ Examples:
 					Status: healthStatus,
 					Issues: issues,
 				},
-				Metadata: createJSONMetadata(cmd, true, startTime),
+				Metadata: cmdutil.CreateJSONMetadata(ctx.Cmd, true, ctx.StartTime),
 			}
 
 			if lastActivity != nil {
@@ -92,7 +90,7 @@ Examples:
 				}
 			}
 
-			return outputJSON(response)
+			return cmdutil.OutputJSON(response)
 		}
 
 		// Get workspace discovery information
@@ -140,7 +138,7 @@ type StatusResponse struct {
 	Files     StatusFiles     `json:"files"`
 	Health    StatusHealth    `json:"health"`
 	Activity  StatusActivity  `json:"activity,omitempty"`
-	Metadata  JSONMetadata    `json:"metadata"`
+	Metadata  cmdutil.JSONMetadata `json:"metadata"`
 }
 
 type StatusWorkspace struct {

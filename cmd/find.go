@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"time"
 
+	"github.com/johncoder/jot/internal/cmdutil"
 	"github.com/johncoder/jot/internal/fzf"
 	"github.com/johncoder/jot/internal/markdown"
 	"github.com/johncoder/jot/internal/workspace"
@@ -36,28 +36,25 @@ Examples:
   JOT_FZF=1 jot find todo --interactive  # Interactive search with FZF`,
 	Args: cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		startTime := time.Now()
+		ctx := cmdutil.StartCommand(cmd)
 
 		ws, err := getWorkspace(cmd)
 		if err != nil {
-			if isJSONOutput(cmd) {
-				return outputJSONError(cmd, err, startTime)
-			}
-			return err
+			return ctx.HandleError(err)
 		}
 
 		query := strings.Join(args, " ")
 		
 		// Check for interactive mode with FZF (not available in JSON mode)
 		if fzf.ShouldUseFZF(findInteractive) {
-			if isJSONOutput(cmd) {
+			if cmdutil.IsJSONOutput(ctx.Cmd) {
 				err := fmt.Errorf("interactive mode not available with JSON output")
-				return outputJSONError(cmd, err, startTime)
+				return ctx.HandleError(err)
 			}
 			return runInteractiveFind(ws, query)
 		}
 
-		if !isJSONOutput(cmd) {
+		if !cmdutil.IsJSONOutput(ctx.Cmd) {
 			fmt.Printf("Searching for: %s\n", query)
 			if findInArchive {
 				fmt.Println("Including archived notes in search...")
@@ -68,8 +65,8 @@ Examples:
 		results := collectSearchResults(ws, query)
 
 		// Handle JSON output
-		if isJSONOutput(cmd) {
-			return outputFindJSON(cmd, results, query, startTime)
+		if cmdutil.IsJSONOutput(ctx.Cmd) {
+			return outputFindJSON(ctx, results, query)
 		}
 
 		// Display results in text format
@@ -224,7 +221,7 @@ func collectSearchResults(ws *workspace.Workspace, query string) []SearchResult 
 }
 
 // outputFindJSON outputs search results in JSON format
-func outputFindJSON(cmd *cobra.Command, results []SearchResult, query string, startTime time.Time) error {
+func outputFindJSON(ctx *cmdutil.CommandContext, results []SearchResult, query string) error {
 	// Convert search results to JSON-friendly format
 	jsonResults := make([]map[string]interface{}, len(results))
 	for i, result := range results {
@@ -246,10 +243,10 @@ func outputFindJSON(cmd *cobra.Command, results []SearchResult, query string, st
 			"limit":          findLimit,
 			"limited":        len(results) >= findLimit,
 		},
-		"metadata": createJSONMetadata(cmd, true, startTime),
+		"metadata": cmdutil.CreateJSONMetadata(ctx.Cmd, true, ctx.StartTime),
 	}
 
-	return outputJSON(response)
+	return cmdutil.OutputJSON(response)
 }
 
 // searchInFile searches for query in a file and returns matches

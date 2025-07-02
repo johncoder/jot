@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"time"
 
+	"github.com/johncoder/jot/internal/cmdutil"
 	"github.com/spf13/cobra"
 )
 
@@ -29,7 +29,7 @@ Examples:
   jot init ~/my-notes         # Initialize in specific directory`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		startTime := time.Now()
+		ctx := cmdutil.StartCommand(cmd)
 
 		// Determine target directory
 		targetDir := "."
@@ -39,25 +39,17 @@ Examples:
 
 		absPath, err := filepath.Abs(targetDir)
 		if err != nil {
-			err := fmt.Errorf("failed to resolve path: %w", err)
-			if isJSONOutput(cmd) {
-				return outputJSONError(cmd, err, startTime)
-			}
-			return err
+			return ctx.HandleOperationError("resolve path", err)
 		}
 
-		if !isJSONOutput(cmd) {
+		if !ctx.IsJSONOutput() {
 			fmt.Printf("Initializing jot workspace in: %s\n", absPath)
 		}
 
 		// Check if workspace already exists
 		jotDir := filepath.Join(absPath, ".jot")
 		if _, err := os.Stat(jotDir); err == nil {
-			err := fmt.Errorf("jot workspace already exists in %s", absPath)
-			if isJSONOutput(cmd) {
-				return outputJSONError(cmd, err, startTime)
-			}
-			return err
+			return ctx.HandleError(fmt.Errorf("jot workspace already exists in %s", absPath))
 		}
 
 		// Track created files for JSON output
@@ -73,11 +65,7 @@ This is your inbox for capturing new notes quickly. Use 'jot capture' to add new
 
 `
 		if err := os.WriteFile(inboxPath, []byte(inboxContent), 0644); err != nil {
-			err := fmt.Errorf("failed to create inbox.md: %w", err)
-			if isJSONOutput(cmd) {
-				return outputJSONError(cmd, err, startTime)
-			}
-			return err
+			return ctx.HandleOperationError("create inbox.md", err)
 		}
 		createdFiles = append(createdFiles, InitFile{
 			Path:        "inbox.md",
@@ -89,11 +77,7 @@ This is your inbox for capturing new notes quickly. Use 'jot capture' to add new
 		// Create lib/ directory
 		libDir := filepath.Join(absPath, "lib")
 		if err := os.MkdirAll(libDir, 0755); err != nil {
-			err := fmt.Errorf("failed to create lib directory: %w", err)
-			if isJSONOutput(cmd) {
-				return outputJSONError(cmd, err, startTime)
-			}
-			return err
+			return ctx.HandleOperationError("create lib directory", err)
 		}
 		createdFiles = append(createdFiles, InitFile{
 			Path:        "lib/",
@@ -103,11 +87,7 @@ This is your inbox for capturing new notes quickly. Use 'jot capture' to add new
 
 		// Create .jot/ directory
 		if err := os.MkdirAll(jotDir, 0755); err != nil {
-			err := fmt.Errorf("failed to create .jot directory: %w", err)
-			if isJSONOutput(cmd) {
-				return outputJSONError(cmd, err, startTime)
-			}
-			return err
+			return ctx.HandleOperationError("create .jot directory", err)
 		}
 		createdFiles = append(createdFiles, InitFile{
 			Path:        ".jot/",
@@ -123,11 +103,7 @@ This is your inbox for capturing new notes quickly. Use 'jot capture' to add new
 tmp/
 `
 		if err := os.WriteFile(gitignorePath, []byte(gitignoreContent), 0644); err != nil {
-			err := fmt.Errorf("failed to create .gitignore: %w", err)
-			if isJSONOutput(cmd) {
-				return outputJSONError(cmd, err, startTime)
-			}
-			return err
+			return ctx.HandleOperationError("create .gitignore", err)
 		}
 		createdFiles = append(createdFiles, InitFile{
 			Path:        ".jot/.gitignore",
@@ -143,11 +119,7 @@ tmp/
 }
 `
 		if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
-			err := fmt.Errorf("failed to create workspace config: %w", err)
-			if isJSONOutput(cmd) {
-				return outputJSONError(cmd, err, startTime)
-			}
-			return err
+			return ctx.HandleOperationError("create workspace config", err)
 		}
 		createdFiles = append(createdFiles, InitFile{
 			Path:        ".jot/config.json",
@@ -170,11 +142,7 @@ This directory contains your organized notes. You can structure them however you
 Use 'jot refile' to move notes from your inbox to organized files here.
 `
 		if err := os.WriteFile(libReadmePath, []byte(libReadmeContent), 0644); err != nil {
-			err := fmt.Errorf("failed to create lib/README.md: %w", err)
-			if isJSONOutput(cmd) {
-				return outputJSONError(cmd, err, startTime)
-			}
-			return err
+			return ctx.HandleOperationError("create lib/README.md", err)
 		}
 		createdFiles = append(createdFiles, InitFile{
 			Path:        "lib/README.md",
@@ -184,7 +152,7 @@ Use 'jot refile' to move notes from your inbox to organized files here.
 		})
 
 		// Output results
-		if isJSONOutput(cmd) {
+		if ctx.IsJSONOutput() {
 			// Calculate summary
 			var totalFiles, totalDirectories int
 			for _, file := range createdFiles {
@@ -203,10 +171,10 @@ Use 'jot refile' to move notes from your inbox to organized files here.
 					TotalFiles:       totalFiles,
 					TotalDirectories: totalDirectories,
 				},
-				Metadata: createJSONMetadata(cmd, true, startTime),
+				Metadata: cmdutil.CreateJSONMetadata(ctx.Cmd, true, ctx.StartTime),
 			}
 
-			return outputJSON(response)
+			return cmdutil.OutputJSON(response)
 		}
 
 		fmt.Println("✓ Created inbox.md")
@@ -235,7 +203,7 @@ type InitResponse struct {
 	WorkspacePath string       `json:"workspace_path"`
 	CreatedFiles  []InitFile   `json:"created_files"`
 	Summary       InitSummary  `json:"summary"`
-	Metadata      JSONMetadata `json:"metadata"`
+	Metadata      cmdutil.JSONMetadata `json:"metadata"`
 }
 
 type InitFile struct {

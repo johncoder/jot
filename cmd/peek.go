@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/johncoder/jot/internal/cmdutil"
 	"github.com/johncoder/jot/internal/markdown"
 	"github.com/johncoder/jot/internal/workspace"
 	"github.com/spf13/cobra"
@@ -42,14 +43,11 @@ This is useful for quickly reviewing files or specific sections without opening 
 
 	Args: cobra.RangeArgs(0, 1), // Allow 0 or 1 arguments for --toc mode
 	RunE: func(cmd *cobra.Command, args []string) error {
-		startTime := time.Now()
+		ctx := cmdutil.StartCommand(cmd)
 		noWorkspace, _ := cmd.Flags().GetBool("no-workspace")
 		ws, err := workspace.GetWorkspaceContext(noWorkspace)
 		if err != nil {
-			if isJSONOutput(cmd) {
-				return outputJSONError(cmd, err, startTime)
-			}
-			return err
+			return ctx.HandleError(err)
 		}
 
 		// Get flags
@@ -62,14 +60,11 @@ This is useful for quickly reviewing files or specific sections without opening 
 		if toc {
 			if len(args) == 0 {
 				err := fmt.Errorf("table of contents requires a file or selector (e.g., 'inbox.md' or 'work.md#projects')")
-				if isJSONOutput(cmd) {
-					return outputJSONError(cmd, err, startTime)
-				}
-				return err
+				return ctx.HandleError(err)
 			}
 
-			if isJSONOutput(cmd) {
-				return showTableOfContentsJSON(cmd, ws, args[0], short, startTime)
+			if cmdutil.IsJSONOutput(ctx.Cmd) {
+				return showTableOfContentsJSON(ctx, ws, args[0], short)
 			}
 			return showTableOfContents(ws, args[0], short, noWorkspace)
 		}
@@ -77,10 +72,7 @@ This is useful for quickly reviewing files or specific sections without opening 
 		// Regular peek mode requires exactly one argument
 		if len(args) != 1 {
 			err := fmt.Errorf("peek requires a selector argument (e.g., 'inbox.md#meeting' or 'filename.md' for whole file)")
-			if isJSONOutput(cmd) {
-				return outputJSONError(cmd, err, startTime)
-			}
-			return err
+			return ctx.HandleError(err)
 		}
 
 		selector := args[0]
@@ -94,8 +86,8 @@ This is useful for quickly reviewing files or specific sections without opening 
 		// Check if this is a whole file request (no # selector) or a subtree request
 		if !strings.Contains(selector, "#") {
 			// Handle whole file display
-			if isJSONOutput(cmd) {
-				return showWholeFileJSON(cmd, ws, selector, noWorkspace, startTime)
+			if cmdutil.IsJSONOutput(ctx.Cmd) {
+				return showWholeFileJSON(ctx, ws, selector, noWorkspace)
 			}
 			return showWholeFile(ws, selector, raw, info, noWorkspace)
 		}
@@ -104,25 +96,19 @@ This is useful for quickly reviewing files or specific sections without opening 
 		sourcePath, err := markdown.ParsePath(selector)
 		if err != nil {
 			err := fmt.Errorf("invalid selector: %w", err)
-			if isJSONOutput(cmd) {
-				return outputJSONError(cmd, err, startTime)
-			}
-			return err
+			return ctx.HandleError(err)
 		}
 
 		// Extract the subtree
 		subtree, err := ExtractSubtreeWithOptions(ws, sourcePath, noWorkspace)
 		if err != nil {
 			err := fmt.Errorf("failed to extract subtree: %w", err)
-			if isJSONOutput(cmd) {
-				return outputJSONError(cmd, err, startTime)
-			}
-			return err
+			return ctx.HandleError(err)
 		}
 
 		// Handle JSON output for regular peek
-		if isJSONOutput(cmd) {
-			return outputPeekJSON(cmd, args[0], sourcePath, subtree, ws, startTime)
+		if cmdutil.IsJSONOutput(ctx.Cmd) {
+			return outputPeekJSON(ctx, args[0], sourcePath, subtree, ws)
 		}
 
 		// Display subtree information if requested
@@ -191,7 +177,7 @@ func showWholeFile(ws *workspace.Workspace, filename string, raw bool, info bool
 }
 
 // showWholeFileJSON outputs the whole file content in JSON format
-func showWholeFileJSON(cmd *cobra.Command, ws *workspace.Workspace, filename string, noWorkspace bool, startTime time.Time) error {
+func showWholeFileJSON(ctx *cmdutil.CommandContext, ws *workspace.Workspace, filename string, noWorkspace bool) error {
 	// Use the same file resolution logic as the non-JSON path
 	filePath := resolvePeekFilePath(ws, filename, noWorkspace)
 
@@ -199,7 +185,7 @@ func showWholeFileJSON(cmd *cobra.Command, ws *workspace.Workspace, filename str
 	content, err := os.ReadFile(filePath)
 	if err != nil {
 		err := fmt.Errorf("failed to read file %s: %w", filename, err)
-		return outputJSONError(cmd, err, startTime)
+		return ctx.HandleError(err)
 	}
 
 	response := map[string]interface{}{
@@ -212,10 +198,10 @@ func showWholeFileJSON(cmd *cobra.Command, ws *workspace.Workspace, filename str
 			"content_length": len(content),
 			"line_count":     strings.Count(string(content), "\n") + 1,
 		},
-		"metadata": createJSONMetadata(cmd, true, startTime),
+		"metadata": cmdutil.CreateJSONMetadata(ctx.Cmd, true, ctx.StartTime),
 	}
 
-	return outputJSON(response)
+	return cmdutil.OutputJSON(response)
 }
 
 // printSubtreeInfo displays metadata about the subtree
@@ -1133,7 +1119,7 @@ type PeekResponse struct {
 	FileInfo        PeekFileInfo    `json:"file_info"`
 	Extraction      *PeekExtraction `json:"extraction,omitempty"`
 	TableOfContents *PeekTOC        `json:"table_of_contents,omitempty"`
-	Metadata        JSONMetadata    `json:"metadata"`
+	Metadata        cmdutil.JSONMetadata    `json:"metadata"`
 }
 
 type PeekSubtree struct {
@@ -1169,7 +1155,7 @@ type PeekTOCHeading struct {
 }
 
 // outputPeekJSON outputs JSON response for regular peek mode
-func outputPeekJSON(cmd *cobra.Command, selector string, sourcePath *markdown.HeadingPath, subtree *markdown.Subtree, ws *workspace.Workspace, startTime time.Time) error {
+func outputPeekJSON(ctx *cmdutil.CommandContext, selector string, sourcePath *markdown.HeadingPath, subtree *markdown.Subtree, ws *workspace.Workspace) error {
 	// Build file info
 	filePath := filepath.Join(ws.Root, sourcePath.File)
 	if sourcePath.File == "inbox.md" {
@@ -1219,14 +1205,14 @@ func outputPeekJSON(cmd *cobra.Command, selector string, sourcePath *markdown.He
 			EndLine:       0, // We don't have line info from markdown.Subtree
 			ContentOffset: [2]int{subtree.StartOffset, subtree.EndOffset},
 		},
-		Metadata: createJSONMetadata(cmd, true, startTime),
+		Metadata: cmdutil.CreateJSONMetadata(ctx.Cmd, true, ctx.StartTime),
 	}
 
-	return outputJSON(response)
+	return cmdutil.OutputJSON(response)
 }
 
 // showTableOfContentsJSON outputs JSON response for TOC mode
-func showTableOfContentsJSON(cmd *cobra.Command, ws *workspace.Workspace, selector string, useShortSelectors bool, startTime time.Time) error {
+func showTableOfContentsJSON(ctx *cmdutil.CommandContext, ws *workspace.Workspace, selector string, useShortSelectors bool) error {
 	// Parse selector to determine if it's file-only or includes path
 	var content []byte
 	var baseFilename string
@@ -1239,12 +1225,12 @@ func showTableOfContentsJSON(cmd *cobra.Command, ws *workspace.Workspace, select
 		// This is a path selector - extract the subtree first
 		sourcePath, parseErr := markdown.ParsePath(selector)
 		if parseErr != nil {
-			return outputJSONError(cmd, fmt.Errorf("invalid selector: %w", parseErr), startTime)
+			return ctx.HandleError(fmt.Errorf("invalid selector: %w", parseErr))
 		}
 
 		subtree, extractErr := ExtractSubtreeWithOptions(ws, sourcePath, false) // TODO: Add noWorkspace support to JSON functions
 		if extractErr != nil {
-			return outputJSONError(cmd, fmt.Errorf("failed to extract subtree: %w", extractErr), startTime)
+			return ctx.HandleError(fmt.Errorf("failed to extract subtree: %w", extractErr))
 		}
 
 		content = subtree.Content
@@ -1274,13 +1260,13 @@ func showTableOfContentsJSON(cmd *cobra.Command, ws *workspace.Workspace, select
 
 		// Check if file exists
 		if _, err := os.Stat(filePath); os.IsNotExist(err) {
-			return outputJSONError(cmd, fmt.Errorf("file not found: %s", selector), startTime)
+			return ctx.HandleError(fmt.Errorf("file not found: %s", selector))
 		}
 
 		// Read file content
 		content, err = os.ReadFile(filePath)
 		if err != nil {
-			return outputJSONError(cmd, fmt.Errorf("failed to read file %s: %w", selector, err), startTime)
+			return ctx.HandleError(err)
 		}
 	}
 
@@ -1297,9 +1283,9 @@ func showTableOfContentsJSON(cmd *cobra.Command, ws *workspace.Workspace, select
 				RootSelector: subtreePath,
 				Headings:     []PeekTOCHeading{},
 			},
-			Metadata: createJSONMetadata(cmd, true, startTime),
+			Metadata: cmdutil.CreateJSONMetadata(ctx.Cmd, true, ctx.StartTime),
 		}
-		return outputJSON(response)
+		return cmdutil.OutputJSON(response)
 	}
 
 	// Parse document and extract headings
@@ -1319,9 +1305,9 @@ func showTableOfContentsJSON(cmd *cobra.Command, ws *workspace.Workspace, select
 				RootSelector: subtreePath,
 				Headings:     []PeekTOCHeading{},
 			},
-			Metadata: createJSONMetadata(cmd, true, startTime),
+			Metadata: cmdutil.CreateJSONMetadata(ctx.Cmd, true, ctx.StartTime),
 		}
-		return outputJSON(response)
+		return cmdutil.OutputJSON(response)
 	}
 
 	// Build TOC headings
@@ -1358,10 +1344,10 @@ func showTableOfContentsJSON(cmd *cobra.Command, ws *workspace.Workspace, select
 			RootSelector: subtreePath,
 			Headings:     tocHeadings,
 		},
-		Metadata: createJSONMetadata(cmd, true, startTime),
+		Metadata: cmdutil.CreateJSONMetadata(ctx.Cmd, true, ctx.StartTime),
 	}
 
-	return outputJSON(response)
+	return cmdutil.OutputJSON(response)
 }
 
 // buildPathToHeading builds a hierarchical path array for a heading based on the document structure
