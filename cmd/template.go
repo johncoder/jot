@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -152,10 +151,9 @@ tags: [%s]
 
 		// Open in editor (skip for JSON output to avoid interactive prompt)
 		if !ctx.IsJSONOutput() {
-			// Read the current template content
-			content, err := os.ReadFile(templatePath)
+			// Read the current template content using unified content utilities
+			content, err := cmdutil.ReadFileContent(templatePath)
 			if err != nil {
-				err := fmt.Errorf("failed to read template file: %w", err)
 				if ctx.IsJSONOutput() {
 					return ctx.HandleError(err)
 				}
@@ -169,10 +167,9 @@ tags: [%s]
 				fmt.Printf("Template created but failed to open editor: %v\n", err)
 				fmt.Printf("Edit manually: %s\n", templatePath)
 			} else {
-				// Write back the edited content
-				err = os.WriteFile(templatePath, []byte(editedContent), 0644)
+				// Write back the edited content using unified content utilities
+				err = cmdutil.WriteFileContent(templatePath, []byte(editedContent))
 				if err != nil {
-					err := fmt.Errorf("failed to save template: %w", err)
 					if ctx.IsJSONOutput() {
 						return ctx.HandleError(err)
 					}
@@ -260,10 +257,10 @@ var templateEditCmd = &cobra.Command{
 		}
 
 		// Open in editor
-		// Read the current template content
-		content, err := os.ReadFile(templatePath)
+		// Read the current template content using unified content utilities
+		content, err := cmdutil.ReadFileContent(templatePath)
 		if err != nil {
-			return fmt.Errorf("failed to read template file: %w", err)
+			return err
 		}
 
 		// Open in editor
@@ -272,8 +269,8 @@ var templateEditCmd = &cobra.Command{
 			return fmt.Errorf("failed to open editor: %w", err)
 		}
 
-		// Write back the edited content
-		err = os.WriteFile(templatePath, []byte(editedContent), 0644)
+		// Write back the edited content using unified content utilities
+		err = cmdutil.WriteFileContent(templatePath, []byte(editedContent))
 		if err != nil {
 			return fmt.Errorf("failed to save template: %w", err)
 		}

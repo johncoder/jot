@@ -457,10 +457,10 @@ func performDirectInsertion(ws *workspace.Workspace, dest *DestinationTarget, tr
 		destFilePath = filepath.Join(ws.Root, dest.File)
 	}
 
-	// Read destination file
-	destContent, err := os.ReadFile(destFilePath)
+	// Read destination file using unified content utilities
+	destContent, err := cmdutil.ReadFileContent(destFilePath)
 	if err != nil {
-		return fmt.Errorf("failed to read destination file: %w", err)
+		return err
 	}
 
 	// Prepare content to insert

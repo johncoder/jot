@@ -62,17 +62,17 @@ func (op *RefileOperation) Execute() error {
 
 // executeSameFile handles same-file refile using simple, safe text manipulation
 func (op *RefileOperation) executeSameFile() error {
-	// Read the file content
-	content, err := os.ReadFile(op.SourcePath)
+	// Read the file content using unified content utilities
+	content, err := cmdutil.ReadFileContent(op.SourcePath)
 	if err != nil {
-		return fmt.Errorf("failed to read file: %w", err)
+		return err
 	}
 
 	// Perform simple same-file refile
 	newContent := op.performSimpleSameFileRefile(content)
 
-	// Write the modified content back to file
-	return os.WriteFile(op.SourcePath, newContent, 0644)
+	// Write the modified content back to file using unified content utilities
+	return cmdutil.WriteFileContent(op.SourcePath, newContent)
 }
 
 // performSimpleSameFileRefile performs safe same-file refile with consistent formatting
@@ -120,21 +120,21 @@ func (op *RefileOperation) performSimpleSameFileRefile(content []byte) []byte {
 
 // executeCrossFile handles cross-file refile operations
 func (op *RefileOperation) executeCrossFile() error {
-	// Step 1: Read and update source file
-	sourceContent, err := os.ReadFile(op.SourcePath)
+	// Step 1: Read and update source file using unified content utilities
+	sourceContent, err := cmdutil.ReadFileContent(op.SourcePath)
 	if err != nil {
-		return fmt.Errorf("failed to read source file: %w", err)
+		return err
 	}
 
 	newSourceContent := append(sourceContent[:op.Subtree.StartOffset], sourceContent[op.Subtree.EndOffset:]...)
-	if err := os.WriteFile(op.SourcePath, newSourceContent, 0644); err != nil {
-		return fmt.Errorf("failed to write source file: %w", err)
+	if err := cmdutil.WriteFileContent(op.SourcePath, newSourceContent); err != nil {
+		return err
 	}
 
-	// Step 2: Read and update destination file
-	destContent, err := os.ReadFile(op.DestPath)
+	// Step 2: Read and update destination file using unified content utilities
+	destContent, err := cmdutil.ReadFileContent(op.DestPath)
 	if err != nil {
-		return fmt.Errorf("failed to read destination file: %w", err)
+		return err
 	}
 
 	insertContent := op.prepareInsertContent(destContent, op.InsertOffset)

@@ -3,9 +3,10 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"strconv"
+	"time"
 
+	"github.com/johncoder/jot/internal/cmdutil"
 	"github.com/johncoder/jot/internal/config"
 	"github.com/johncoder/jot/internal/workspace"
 	"github.com/spf13/cobra"
@@ -150,27 +151,29 @@ func (ctx *ExternalCommandContext) BuildEnvironment() []string {
 
 // ExecuteExternalCommand finds and executes an external jot command with proper context
 func ExecuteExternalCommand(ctx *ExternalCommandContext) error {
+	// Check if command is available using unified utilities
 	externalCmd := "jot-" + ctx.Subcommand
-
-	// Look for the external command in PATH
-	externalPath, err := exec.LookPath(externalCmd)
-	if err != nil {
+	if !cmdutil.IsCommandAvailable(externalCmd) {
 		return fmt.Errorf("external command '%s' not found in PATH", externalCmd)
 	}
 
-	// Create the command with remaining arguments
-	cmd := exec.Command(externalPath, ctx.RemainingArgs...)
-
-	// Set up I/O
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	// Set environment with jot context
-	cmd.Env = ctx.BuildEnvironment()
-
-	// Execute the command
-	return cmd.Run()
+	// Create external command using unified utilities
+	cmd := cmdutil.NewExternalJotCommand(ctx.Subcommand, ctx.RemainingArgs, ctx.Workspace, ctx.JSONOutput, ctx.ConfigFile)
+	
+	// Execute using unified command executor
+	executor := cmdutil.NewCommandExecutor(ctx.Workspace, 30*time.Second)
+	result, err := executor.Execute(cmd)
+	
+	if err != nil {
+		return err
+	}
+	
+	// Handle non-zero exit codes
+	if result.ExitCode != 0 {
+		return fmt.Errorf("external command '%s' exited with code %d", externalCmd, result.ExitCode)
+	}
+	
+	return nil
 }
 
 // IsBuiltinCommand checks if a command is handled by jot's built-in commands

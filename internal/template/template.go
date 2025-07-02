@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/johncoder/jot/internal/cmdutil"
 	"github.com/johncoder/jot/internal/markdown"
 	"github.com/johncoder/jot/internal/workspace"
 	"gopkg.in/yaml.v3"
@@ -55,7 +56,7 @@ func (m *Manager) List() ([]Template, error) {
 
 		if !info.IsDir() && strings.HasSuffix(strings.ToLower(path), ".md") {
 			name := strings.TrimSuffix(info.Name(), ".md")
-			content, err := os.ReadFile(path)
+			content, err := cmdutil.ReadFileContent(path)
 			if err != nil {
 				return nil // Skip files we can't read
 			}
@@ -87,9 +88,9 @@ func (m *Manager) Get(name string) (*Template, error) {
 		return nil, fmt.Errorf("template '%s' not found", name)
 	}
 
-	content, err := os.ReadFile(templatePath)
+	content, err := cmdutil.ReadFileContent(templatePath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read template: %w", err)
+		return nil, err
 	}
 
 	hash := calculateHash(string(content))
