@@ -158,7 +158,7 @@ Examples:
 			
 			result, err := hookManager.Execute(hookCtx)
 			if err != nil {
-				return ctx.HandleOperationError("pre-eval hook", fmt.Errorf("pre-eval hook failed: %s", err.Error()))
+				return ctx.HandleExternalCommand("pre-eval hook", nil, err)
 			}
 			
 			if result.Aborted {

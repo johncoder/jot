@@ -42,3 +42,47 @@ func (ctx *CommandContext) HandleOperationError(operation string, err error) err
 func (ctx *CommandContext) IsJSONOutput() bool {
 	return IsJSONOutput(ctx.Cmd)
 }
+
+// Modern error handling context methods
+
+// WrapFileError wraps file operation errors with context
+func (ctx *CommandContext) WrapFileError(op, path string, err error) error {
+	fileErr := NewFileError(op, path, err)
+	return ctx.HandleError(fileErr)
+}
+
+// WrapValidationError wraps validation errors with context
+func (ctx *CommandContext) WrapValidationError(field, value string, err error) error {
+	validationErr := NewValidationError(field, value, err)
+	return ctx.HandleError(validationErr)
+}
+
+// WrapExternalError wraps external command errors with context
+func (ctx *CommandContext) WrapExternalError(command string, args []string, err error) error {
+	extErr := NewExternalError(command, args, err)
+	return ctx.HandleError(extErr)
+}
+
+// HandleFileOperation provides specialized file operation error handling
+func (ctx *CommandContext) HandleFileOperation(op, path string, err error) error {
+	if err == nil {
+		return nil
+	}
+	return ctx.WrapFileError(op, path, err)
+}
+
+// HandleValidation provides specialized validation error handling
+func (ctx *CommandContext) HandleValidation(field, value string, err error) error {
+	if err == nil {
+		return nil
+	}
+	return ctx.WrapValidationError(field, value, err)
+}
+
+// HandleExternalCommand provides specialized external command error handling
+func (ctx *CommandContext) HandleExternalCommand(command string, args []string, err error) error {
+	if err == nil {
+		return nil
+	}
+	return ctx.WrapExternalError(command, args, err)
+}

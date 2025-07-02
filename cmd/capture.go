@@ -71,7 +71,7 @@ Examples:
 			
 			result, err := hookManager.Execute(hookCtx)
 			if err != nil {
-				return ctx.HandleOperationError("pre-capture hook", fmt.Errorf("pre-capture hook failed: %s", err.Error()))
+				return ctx.HandleExternalCommand("pre-capture hook", nil, err)
 			}
 			
 			if result.Aborted {
@@ -418,7 +418,7 @@ func refileContentToDestination(ws *workspace.Workspace, content, destination, m
 	// Parse the destination
 	destPath, err := markdown.ParsePath(destination)
 	if err != nil {
-		return fmt.Errorf("invalid destination '%s': %w", destination, err)
+		return cmdutil.NewValidationError("destination", destination, err)
 	}
 
 	// Create a temporary subtree from the captured content

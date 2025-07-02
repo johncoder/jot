@@ -144,7 +144,7 @@ func showWholeFile(ws *workspace.Workspace, filename string, raw bool, info bool
 	// Read file content
 	content, err := os.ReadFile(filePath)
 	if err != nil {
-		return fmt.Errorf("failed to read file %s: %w", filename, err)
+		return cmdutil.NewFileError("read", filename, err)
 	}
 
 	// Display file information if requested
@@ -184,7 +184,7 @@ func showWholeFileJSON(ctx *cmdutil.CommandContext, ws *workspace.Workspace, fil
 	// Read file content
 	content, err := os.ReadFile(filePath)
 	if err != nil {
-		err := fmt.Errorf("failed to read file %s: %w", filename, err)
+		err := cmdutil.NewFileError("read", filename, err)
 		return ctx.HandleError(err)
 	}
 
@@ -320,7 +320,7 @@ func showTableOfContents(ws *workspace.Workspace, selector string, useShortSelec
 		// Read file content
 		content, err = os.ReadFile(filePath)
 		if err != nil {
-			return fmt.Errorf("failed to read file %s: %w", selector, err)
+			return cmdutil.NewFileError("read", selector, err)
 		}
 	}
 

@@ -269,7 +269,7 @@ Examples:
 		// Parse destination path
 		destPath, err := markdown.ParsePath(to)
 		if err != nil {
-			err := fmt.Errorf("invalid destination path '%s': %w", to, err)
+			err := cmdutil.NewValidationError("destination path", to, err)
 			if ctx.IsJSONOutput() {
 				return ctx.HandleError(err)
 			}
@@ -287,7 +287,7 @@ Examples:
 		// Parse source path
 		sourcePath, err := markdown.ParsePath(args[0])
 		if err != nil {
-			err := fmt.Errorf("invalid source path '%s': %w", args[0], err)
+			err := cmdutil.NewValidationError("source path", args[0], err)
 			if ctx.IsJSONOutput() {
 				return ctx.HandleError(err)
 			}
@@ -339,7 +339,7 @@ Examples:
 			
 			result, err := hookManager.Execute(hookCtx)
 			if err != nil {
-				err := fmt.Errorf("pre-refile hook failed: %s", err.Error())
+				err := cmdutil.NewExternalError("pre-refile hook", nil, err)
 				if ctx.IsJSONOutput() {
 					return ctx.HandleError(err)
 				}
@@ -415,8 +415,12 @@ func inspectDestination(ws *workspace.Workspace, destPath *markdown.HeadingPath)
 		filePath = pathUtil.WorkspaceJoin(destPath.File)
 	}
 
-	if _, err := os.Stat(filePath); os.IsNotExist(err) {
-		cmdutil.ShowError("✗ File not found: %s", destPath.File)
+	if _, err := os.Stat(filePath); err != nil {
+		if cmdutil.IsFileNotFound(err) {
+			cmdutil.ShowError("✗ File not found: %s", destPath.File)
+			return nil
+		}
+		cmdutil.ShowError("✗ Error accessing file: %s", err.Error())
 		return nil
 	}
 	cmdutil.ShowSuccess("✓ File exists: %s", destPath.File)
@@ -424,7 +428,12 @@ func inspectDestination(ws *workspace.Workspace, destPath *markdown.HeadingPath)
 	// Read and parse the file to analyze the path
 	content, err := os.ReadFile(filePath)
 	if err != nil {
-		cmdutil.ShowError("✗ Error reading file: %s", err.Error())
+		// Use structured error inspection for better error handling
+		if fileErr, ok := cmdutil.GetFileError(err); ok {
+			cmdutil.ShowError("✗ Error reading file %s: %s", fileErr.Path, fileErr.Err.Error())
+		} else {
+			cmdutil.ShowError("✗ Error reading file: %s", err.Error())
+		}
 		return nil
 	}
 
@@ -485,7 +494,7 @@ func ExtractSubtreeWithOptions(ws *workspace.Workspace, sourcePath *markdown.Hea
 	// Read file content
 	content, err := os.ReadFile(filePath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read file %s: %w", sourcePath.File, err)
+		return nil, cmdutil.NewFileError("read", sourcePath.File, err)
 	}
 
 	// Parse document and find subtree
@@ -617,7 +626,7 @@ func executeRefile(sourceSelector, targetSelector string, ctx *cmdutil.CommandCo
 		
 		result, err := hookManager.Execute(hookCtx)
 		if err != nil {
-			return fmt.Errorf("pre-refile hook failed: %s", err.Error())
+			return cmdutil.NewExternalError("pre-refile hook", nil, err)
 		}
 		
 		if result.Aborted {
@@ -628,7 +637,7 @@ func executeRefile(sourceSelector, targetSelector string, ctx *cmdutil.CommandCo
 	// Parse paths
 	sourcePath, err := markdown.ParsePath(sourceSelector)
 	if err != nil {
-		return fmt.Errorf("invalid source selector '%s': %w", sourceSelector, err)
+		return cmdutil.NewValidationError("source selector", sourceSelector, err)
 	}
 
 	destPath, err := markdown.ParsePath(targetSelector)
@@ -761,7 +770,7 @@ func showSelectorsForFile(ws *workspace.Workspace, filename string) error {
 	// Read and parse the file
 	content, err := os.ReadFile(filePath)
 	if err != nil {
-		return fmt.Errorf("failed to read file %s: %w", filename, err)
+		return cmdutil.NewFileError("read", filename, err)
 	}
 
 	if len(content) == 0 {
@@ -1529,7 +1538,7 @@ func extractSubtreesFromFile(ws *workspace.Workspace, filename string) ([]Subtre
 	// Read file content
 	content, err := os.ReadFile(filePath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read file %s: %w", filePath, err)
+		return nil, cmdutil.NewFileError("read", filePath, err)
 	}
 
 	// Parse markdown document
