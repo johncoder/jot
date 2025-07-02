@@ -2,7 +2,6 @@ package editor
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -15,7 +14,7 @@ import (
 // Returns the edited content and any error
 func OpenEditor(initialContent string) (string, error) {
 	// Create temporary file
-	tempFile, err := ioutil.TempFile("", "jot-*.md")
+	tempFile, err := os.CreateTemp("", "jot-*.md")
 	if err != nil {
 		return "", fmt.Errorf("failed to create temp file: %w", err)
 	}
@@ -52,7 +51,7 @@ func OpenEditor(initialContent string) (string, error) {
 	}
 
 	// Read edited content
-	content, err := ioutil.ReadFile(tempFile.Name())
+	content, err := os.ReadFile(tempFile.Name())
 	if err != nil {
 		return "", fmt.Errorf("failed to read edited content: %w", err)
 	}

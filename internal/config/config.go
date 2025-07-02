@@ -3,7 +3,6 @@ package config
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -97,7 +96,7 @@ func Initialize(cfgFile string) error {
 func readConfigFile(v *viper.Viper) ([]byte, error) {
 	if configFilePath != "" {
 		// Use explicit config file path
-		return ioutil.ReadFile(configFilePath)
+		return os.ReadFile(configFilePath)
 	}
 
 	// Try to find config file in search paths
@@ -114,7 +113,7 @@ func readConfigFile(v *viper.Viper) ([]byte, error) {
 	for _, path := range searchPaths {
 		if _, err := os.Stat(path); err == nil {
 			configFilePath = path
-			return ioutil.ReadFile(path)
+			return os.ReadFile(path)
 		}
 	}
 
@@ -192,15 +191,6 @@ func Get() *Config {
 		}
 	}
 	return globalConfig
-}
-
-// getDefaultNotesPath returns the default notes directory path
-func getDefaultNotesPath() string {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "."
-	}
-	return filepath.Join(home, "Documents", "notes")
 }
 
 // GetWorkspace returns the path for a named workspace
@@ -335,7 +325,7 @@ func SaveConfig() error {
 	}
 
 	// Write the config file
-	if err := ioutil.WriteFile(configFilePath, []byte(configJSON5), 0644); err != nil {
+	if err := os.WriteFile(configFilePath, []byte(configJSON5), 0644); err != nil {
 		return fmt.Errorf("unable to write config file: %w", err)
 	}
 
@@ -556,7 +546,7 @@ func generateConfigJSON5(cfg *Config) string {
 
 	if cfg.Default != "" {
 		builder.WriteString(",\n\n")
-		builder.WriteString(fmt.Sprintf("  // Default workspace to use when not in a local workspace\n"))
+		builder.WriteString("  // Default workspace to use when not in a local workspace\n")
 		builder.WriteString(fmt.Sprintf("  \"default\": \"%s\"", cfg.Default))
 	}
 

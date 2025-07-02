@@ -129,7 +129,7 @@ tags: [%s]
 ## %s - $(date '+%%Y-%%m-%%d %%H:%%M')
 
 
-`, strings.ToLower(name), strings.Title(name))
+`, strings.ToLower(name), strings.ToTitle(name))
 
 		// Create template
 		pathUtil := cmdutil.NewPathUtil(ws)

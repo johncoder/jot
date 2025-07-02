@@ -19,14 +19,6 @@ import (
 	"github.com/yuin/goldmark/text"
 )
 
-// abs returns the absolute value of an integer
-func abs(x int) int {
-	if x < 0 {
-		return -x
-	}
-	return x
-}
-
 // DestinationTarget represents a resolved destination
 type DestinationTarget struct {
 	File         string   // Target file path
@@ -142,27 +134,6 @@ func (op *RefileOperation) executeCrossFile() error {
 	newDestContent = append(newDestContent, destContent[op.InsertOffset:]...)
 
 	return cmdutil.WriteFileContent(op.DestPath, newDestContent)
-}
-
-// performInMemoryRefile performs the entire refile operation in memory for same-file operations
-func (op *RefileOperation) performInMemoryRefile(content []byte) []byte {
-	// Step 1: Remove the subtree from its original location
-	contentWithoutSubtree := append(content[:op.Subtree.StartOffset], content[op.Subtree.EndOffset:]...)
-
-	// Step 2: Adjust insertion offset if it's after the removed content
-	adjustedOffset := op.InsertOffset
-	if op.InsertOffset > op.Subtree.StartOffset {
-		adjustedOffset = op.InsertOffset - (op.Subtree.EndOffset - op.Subtree.StartOffset)
-	}
-
-	// Step 3: Prepare insertion content
-	insertContent := op.prepareInsertContent(contentWithoutSubtree, adjustedOffset)
-
-	// Step 4: Insert content at the adjusted offset
-	result := append(contentWithoutSubtree[:adjustedOffset], insertContent...)
-	result = append(result, contentWithoutSubtree[adjustedOffset:]...)
-
-	return result
 }
 
 // prepareInsertContent prepares the content to be inserted, including missing headings and spacing
@@ -1197,47 +1168,6 @@ func (op *RefileOperation) ensureConsistentFormatting(content []byte) []byte {
 	return []byte(trimmed)
 }
 
-// preserveSpacingAfterRemoval ensures proper spacing after removing a subtree
-func (op *RefileOperation) preserveSpacingAfterRemoval(beforeSubtree, afterSubtree []byte) []byte {
-	// If either part is empty, just return the other
-	if len(beforeSubtree) == 0 {
-		return afterSubtree
-	}
-	if len(afterSubtree) == 0 {
-		return beforeSubtree
-	}
-
-	// Check if afterSubtree starts with a heading (## or #)
-	// Skip leading newlines to check actual content
-	afterStart := 0
-	for afterStart < len(afterSubtree) && afterSubtree[afterStart] == '\n' {
-		afterStart++
-	}
-
-	isNextHeading := false
-	if afterStart < len(afterSubtree) && afterSubtree[afterStart] == '#' {
-		isNextHeading = true
-	}
-
-	// Check how beforeSubtree ends
-	beforeEndsWithNewline := len(beforeSubtree) > 0 && beforeSubtree[len(beforeSubtree)-1] == '\n'
-
-	// If the next content is a heading and beforeSubtree doesn't end with newline,
-	// or if we need to ensure proper spacing between sections
-	if isNextHeading {
-		if beforeEndsWithNewline {
-			// Add exactly one blank line between sections
-			return append(append(beforeSubtree, '\n'), afterSubtree...)
-		} else {
-			// Add newline + blank line
-			return append(append(beforeSubtree, '\n', '\n'), afterSubtree...)
-		}
-	}
-
-	// Default: just concatenate
-	return append(beforeSubtree, afterSubtree...)
-}
-
 // normalizeMarkdownSpacing ensures consistent spacing throughout the content
 func (op *RefileOperation) normalizeMarkdownSpacing(content []byte) []byte {
 	// Simple approach: replace any sequence of 3+ newlines with exactly 2 newlines (one blank line)
@@ -1844,56 +1774,6 @@ func validateAndDisambiguateSelector(ws *workspace.Workspace, selector string, s
 	fmt.Printf("   Preview showed: %s\n", matches[0].Preview)
 
 	return selector, nil
-}
-
-// improvePreviewFormatting enhances the preview content extraction
-func improvePreviewFormatting(content []byte, startPos, endPos int) string {
-	if startPos >= len(content) || endPos > len(content) || startPos >= endPos {
-		return "(empty content)"
-	}
-
-	lines := strings.Split(string(content[startPos:endPos]), "\n")
-
-	var preview strings.Builder
-	lineCount := 0
-
-	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
-
-		// Skip empty lines at the beginning
-		if preview.Len() == 0 && trimmed == "" {
-			continue
-		}
-
-		// Stop at next heading
-		if strings.HasPrefix(trimmed, "#") && preview.Len() > 0 {
-			break
-		}
-
-		// Add line with proper formatting
-		if trimmed != "" {
-			if preview.Len() > 0 {
-				preview.WriteString(" ")
-			}
-			preview.WriteString(trimmed)
-			lineCount++
-
-			// Limit preview length
-			if preview.Len() > 120 || lineCount >= 3 {
-				break
-			}
-		}
-	}
-
-	result := preview.String()
-	if len(result) > 120 {
-		result = result[:117] + "..."
-	}
-	if result == "" {
-		result = "(empty content)"
-	}
-
-	return result
 }
 
 // extractPreviewContent gets some preview text after a heading

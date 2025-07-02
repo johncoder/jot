@@ -3,6 +3,7 @@ package cmdutil
 import (
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/johncoder/jot/internal/workspace"
 )
@@ -218,7 +219,7 @@ func (p *PathUtil) IsWithinWorkspace(path string) bool {
 	}
 
 	// If relative path starts with "..", it's outside the workspace
-	return !filepath.IsAbs(relPath) && !filepath.HasPrefix(relPath, "..")
+	return !filepath.IsAbs(relPath) && !strings.HasPrefix(relPath, "..")
 }
 
 // SplitPath splits a path into directory, base name, and extension

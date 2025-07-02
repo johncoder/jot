@@ -4,10 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"strings"
 	"time"
-
-	"github.com/spf13/cobra"
 )
 
 // JSONMetadata contains standard metadata for all JSON responses
@@ -159,51 +156,9 @@ func BuildOperationsSummary(operations []JSONOperation) JSONOperationSummary {
 	return summary
 }
 
-// Utility functions for JSON output
-
-// isJSONOutput checks if the --json flag is set
-func isJSONOutput(cmd *cobra.Command) bool {
-	jsonFlag, _ := cmd.Flags().GetBool("json")
-	return jsonFlag
-}
-
-// createJSONMetadata creates metadata for JSON responses
-func createJSONMetadata(cmd *cobra.Command, success bool, startTime time.Time) JSONMetadata {
-	return JSONMetadata{
-		Success:       success,
-		Command:       fmt.Sprintf("jot %s", cmd.CommandPath()[4:]), // Remove "jot " prefix
-		ExecutionTime: time.Since(startTime).Milliseconds(),
-		Timestamp:     time.Now(),
-	}
-}
-
 // outputJSON outputs a JSON response
 func outputJSON(data interface{}) error {
 	encoder := json.NewEncoder(os.Stdout)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(data)
-}
-
-// outputJSONError outputs a JSON error response
-func outputJSONError(cmd *cobra.Command, err error, startTime time.Time) error {
-	errorCode := "unknown_error"
-	details := map[string]interface{}{}
-
-	// Extract error details based on error type
-	if strings.Contains(err.Error(), "not found") {
-		errorCode = "not_found"
-	} else if strings.Contains(err.Error(), "workspace") {
-		errorCode = "workspace_error"
-	}
-
-	response := map[string]interface{}{
-		"error": JSONError{
-			Message: err.Error(),
-			Code:    errorCode,
-			Details: details,
-		},
-		"metadata": createJSONMetadata(cmd, false, startTime),
-	}
-
-	return outputJSON(response)
 }

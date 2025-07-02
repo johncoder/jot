@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"path/filepath"
-	"time"
 
 	"github.com/johncoder/jot/internal/cmdutil"
 	"github.com/johncoder/jot/internal/config"
@@ -108,58 +107,6 @@ func workspaceShowPath(cmd *cobra.Command) error {
 
 	// Output just the path for piping to other commands
 	fmt.Println(ws.Root)
-	return nil
-}
-
-func workspaceShowCurrent(cmd *cobra.Command) error {
-	ctx := cmdutil.StartCommand(cmd)
-
-	// Initialize config system
-	if err := cmdutil.InitializeConfigWithError(ctx); err != nil {
-		return err
-	}
-
-	ws, err := workspace.FindWorkspace()
-	if err != nil {
-		if cmdutil.IsJSONOutput(cmd) {
-			return ctx.HandleError(fmt.Errorf("no workspace found: %w", err))
-		}
-		return fmt.Errorf("no workspace found: %w\nRun 'jot init' to initialize a workspace or 'jot workspace list' to see registered workspaces", err)
-	}
-
-	// Get workspace stats
-	stats := workspace.GetStats(ws)
-
-	// Determine discovery method and workspace name
-	discoveryMethod := workspace.GetDiscoveryMethod(ws)
-	workspaceName := workspace.GetNameFromPath(ws.Root)
-
-	if cmdutil.IsJSONOutput(cmd) {
-		response := map[string]interface{}{
-			"current_workspace": map[string]interface{}{
-				"name":             workspaceName,
-				"path":             ws.Root,
-				"discovery_method": discoveryMethod,
-				"status":           "active",
-				"stats": map[string]interface{}{
-					"inbox_notes":   stats.InboxNotes,
-					"lib_notes":     stats.LibNotes,
-					"last_activity": stats.LastActivity,
-				},
-			},
-			"metadata": cmdutil.CreateJSONMetadata(ctx.Cmd, true, ctx.StartTime),
-		}
-		return cmdutil.OutputJSON(response)
-	}
-
-	fmt.Printf("Current Workspace: %s\n", workspaceName)
-	fmt.Printf("Path: %s\n", ws.Root)
-	fmt.Printf("Status: Active (%s)\n", discoveryMethod)
-	fmt.Printf("\nNotes: %d in inbox, %d in library\n", stats.InboxNotes, stats.LibNotes)
-	if !stats.LastActivity.IsZero() {
-		fmt.Printf("Last activity: %s\n", formatTimeAgo(stats.LastActivity))
-	}
-
 	return nil
 }
 
@@ -450,32 +397,6 @@ func workspaceSetDefault(cmd *cobra.Command, name string) error {
 
 	cmdutil.ShowSuccess("✓ Set '%s' as default workspace", name)
 	return nil
-}
-
-func formatTimeAgo(t time.Time) string {
-	duration := time.Since(t)
-
-	if duration < time.Minute {
-		return "just now"
-	} else if duration < time.Hour {
-		minutes := int(duration.Minutes())
-		if minutes == 1 {
-			return "1 minute ago"
-		}
-		return fmt.Sprintf("%d minutes ago", minutes)
-	} else if duration < 24*time.Hour {
-		hours := int(duration.Hours())
-		if hours == 1 {
-			return "1 hour ago"
-		}
-		return fmt.Sprintf("%d hours ago", hours)
-	} else {
-		days := int(duration.Hours() / 24)
-		if days == 1 {
-			return "1 day ago"
-		}
-		return fmt.Sprintf("%d days ago", days)
-	}
 }
 
 func outputWorkspaceListJSON(ctx *cmdutil.CommandContext, workspaces map[string]string, defaultWorkspace, currentPath string) error {
