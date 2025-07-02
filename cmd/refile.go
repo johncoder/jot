@@ -27,30 +27,6 @@ func abs(x int) int {
 	return x
 }
 
-// resolveFilePath consolidates file path resolution logic used throughout refile operations
-func resolveFilePath(ws *workspace.Workspace, filename string, noWorkspace bool) string {
-	if noWorkspace {
-		// Non-workspace mode: resolve relative to current directory
-		if filepath.IsAbs(filename) {
-			return filename
-		}
-		cwd, _ := os.Getwd()
-		return filepath.Join(cwd, filename)
-	}
-	
-	// Workspace mode: existing logic
-	if filename == "inbox.md" && ws != nil {
-		return ws.InboxPath
-	}
-	if filepath.IsAbs(filename) {
-		return filename
-	}
-	if ws != nil {
-		return filepath.Join(ws.Root, filename)
-	}
-	return filename // Fallback
-}
-
 // DestinationTarget represents a resolved destination
 type DestinationTarget struct {
 	File         string   // Target file path
@@ -503,7 +479,7 @@ func ExtractSubtree(ws *workspace.Workspace, sourcePath *markdown.HeadingPath) (
 // ExtractSubtreeWithOptions extracts a subtree with optional no-workspace mode
 func ExtractSubtreeWithOptions(ws *workspace.Workspace, sourcePath *markdown.HeadingPath, noWorkspace bool) (*markdown.Subtree, error) {
 	// Construct full file path using the shared resolution logic
-	filePath := resolveFilePath(ws, sourcePath.File, noWorkspace)
+	filePath := cmdutil.ResolvePath(ws, sourcePath.File, noWorkspace)
 
 	// Read file content
 	content, err := os.ReadFile(filePath)
@@ -608,8 +584,8 @@ func TransformSubtreeLevel(subtree *markdown.Subtree, newBaseLevel int) []byte {
 func performRefile(ws *workspace.Workspace, sourcePath *markdown.HeadingPath, subtree *markdown.Subtree, dest *DestinationTarget, transformedContent []byte) error {
 	// Create a RefileOperation with all necessary data
 	operation := &RefileOperation{
-		SourcePath:         resolveFilePath(ws, sourcePath.File, false),
-		DestPath:           resolveFilePath(ws, dest.File, false),
+		SourcePath:         cmdutil.ResolveWorkspaceRelativePath(ws, sourcePath.File),
+		DestPath:           cmdutil.ResolveWorkspaceRelativePath(ws, dest.File),
 		Subtree:           subtree,
 		TransformedContent: transformedContent,
 		InsertOffset:      dest.InsertOffset,
@@ -1549,7 +1525,7 @@ func confirmRefile(sourceSelector, targetSelector string, ws *workspace.Workspac
 // extractSubtreesFromFile extracts all headings from a markdown file
 func extractSubtreesFromFile(ws *workspace.Workspace, filename string) ([]SubtreeItem, error) {
 	// Determine full file path
-	filePath := resolveFilePath(ws, filename, false)
+	filePath := cmdutil.ResolveWorkspaceRelativePath(ws, filename)
 
 	// Read file content
 	content, err := os.ReadFile(filePath)

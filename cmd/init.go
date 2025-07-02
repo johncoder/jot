@@ -113,12 +113,8 @@ tmp/
 		})
 
 		// Create default workspace configuration
-		configPath := filepath.Join(jotDir, "config.json")
-		configContent := `{
-  "archive_location": "archive/archive.md#Archive"
-}
-`
-		if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+		_, configContent, err := cmdutil.CreateDefaultWorkspaceConfig(jotDir)
+		if err != nil {
 			return ctx.HandleOperationError("create workspace config", err)
 		}
 		createdFiles = append(createdFiles, InitFile{

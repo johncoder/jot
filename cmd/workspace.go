@@ -2,9 +2,7 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/johncoder/jot/internal/cmdutil"
@@ -99,8 +97,8 @@ func workspaceShowPath(cmd *cobra.Command) error {
 	ctx := cmdutil.StartCommand(cmd)
 
 	// Initialize config system
-	if err := config.Initialize(cfgFile); err != nil {
-		return ctx.HandleError(fmt.Errorf("failed to initialize config: %w", err))
+	if err := cmdutil.InitializeConfigWithError(ctx); err != nil {
+		return err
 	}
 
 	ws, err := workspace.FindWorkspace()
@@ -117,8 +115,8 @@ func workspaceShowCurrent(cmd *cobra.Command) error {
 	ctx := cmdutil.StartCommand(cmd)
 
 	// Initialize config system
-	if err := config.Initialize(cfgFile); err != nil {
-		return ctx.HandleError(fmt.Errorf("failed to initialize config: %w", err))
+	if err := cmdutil.InitializeConfigWithError(ctx); err != nil {
+		return err
 	}
 
 	ws, err := workspace.FindWorkspace()
@@ -130,11 +128,11 @@ func workspaceShowCurrent(cmd *cobra.Command) error {
 	}
 
 	// Get workspace stats
-	inboxNotes, libNotes, lastActivity := getWorkspaceStats(ws)
+	stats := workspace.GetStats(ws)
 
 	// Determine discovery method and workspace name
-	discoveryMethod := determineDiscoveryMethod(ws)
-	workspaceName := getWorkspaceNameFromPath(ws.Root)
+	discoveryMethod := workspace.GetDiscoveryMethod(ws)
+	workspaceName := workspace.GetNameFromPath(ws.Root)
 
 	if cmdutil.IsJSONOutput(cmd) {
 		response := map[string]interface{}{
@@ -144,9 +142,9 @@ func workspaceShowCurrent(cmd *cobra.Command) error {
 				"discovery_method": discoveryMethod,
 				"status":          "active",
 				"stats": map[string]interface{}{
-					"inbox_notes":   inboxNotes,
-					"lib_notes":     libNotes,
-					"last_activity": lastActivity,
+					"inbox_notes":   stats.InboxNotes,
+					"lib_notes":     stats.LibNotes,
+					"last_activity": stats.LastActivity,
 				},
 			},
 			"metadata": cmdutil.CreateJSONMetadata(ctx.Cmd, true, ctx.StartTime),
@@ -157,9 +155,9 @@ func workspaceShowCurrent(cmd *cobra.Command) error {
 	fmt.Printf("Current Workspace: %s\n", workspaceName)
 	fmt.Printf("Path: %s\n", ws.Root)
 	fmt.Printf("Status: Active (%s)\n", discoveryMethod)
-	fmt.Printf("\nNotes: %d in inbox, %d in library\n", inboxNotes, libNotes)
-	if !lastActivity.IsZero() {
-		fmt.Printf("Last activity: %s\n", formatTimeAgo(lastActivity))
+	fmt.Printf("\nNotes: %d in inbox, %d in library\n", stats.InboxNotes, stats.LibNotes)
+	if !stats.LastActivity.IsZero() {
+		fmt.Printf("Last activity: %s\n", formatTimeAgo(stats.LastActivity))
 	}
 
 	return nil
@@ -203,7 +201,7 @@ func workspaceList(cmd *cobra.Command) error {
 		isDefault := name == defaultWorkspace
 
 		// Check if path exists and is initialized
-		if !isWorkspaceValid(path) {
+		if !workspace.IsValid(path) {
 			status = "invalid - path missing or not initialized"
 		} else {
 			validCount++
@@ -280,7 +278,7 @@ func workspaceAdd(cmd *cobra.Command, name, path string) error {
 	}
 
 	// Validate that path exists and is initialized
-	if !isWorkspaceValid(absPath) {
+	if !workspace.IsValid(absPath) {
 		err := fmt.Errorf("path %s does not exist or is not initialized\nRun 'jot init %s' to initialize it first", absPath, absPath)
 		if cmdutil.IsJSONOutput(cmd) {
 			return ctx.HandleError(err)
@@ -454,108 +452,6 @@ func workspaceSetDefault(cmd *cobra.Command, name string) error {
 	return nil
 }
 
-// Helper functions
-
-func getWorkspaceStats(ws *workspace.Workspace) (inboxNotes, libNotes int, lastActivity time.Time) {
-	// Count inbox notes (sections starting with ##)
-	if content, err := os.ReadFile(ws.InboxPath); err == nil {
-		inboxNotes = strings.Count(string(content), "\n## ")
-	}
-
-	// Count lib notes (markdown files in lib directory)
-	if entries, err := os.ReadDir(ws.LibDir); err == nil {
-		for _, entry := range entries {
-			if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".md") {
-				libNotes++
-			}
-		}
-	}
-
-	// Get last activity time (most recent modification in workspace)
-	lastActivity = getLastModificationTime(ws.Root)
-
-	return
-}
-
-func getLastModificationTime(root string) time.Time {
-	var latest time.Time
-
-	// Check inbox.md
-	if info, err := os.Stat(filepath.Join(root, "inbox.md")); err == nil {
-		if info.ModTime().After(latest) {
-			latest = info.ModTime()
-		}
-	}
-
-	// Check lib directory
-	libDir := filepath.Join(root, "lib")
-	if entries, err := os.ReadDir(libDir); err == nil {
-		for _, entry := range entries {
-			if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".md") {
-				if info, err := entry.Info(); err == nil {
-					if info.ModTime().After(latest) {
-						latest = info.ModTime()
-					}
-				}
-			}
-		}
-	}
-
-	return latest
-}
-
-func determineDiscoveryMethod(ws *workspace.Workspace) string {
-	// Check if we're in a workspace directory
-	currentDir, _ := os.Getwd()
-	if currentDir == ws.Root {
-		return "local directory"
-	}
-
-	// Check if we're in a subdirectory of the workspace
-	if strings.HasPrefix(currentDir, ws.Root) {
-		return "local directory"
-	}
-
-	// Check if there's a local .jotrc
-	if _, err := os.Stat(".jotrc"); err == nil {
-		return "local config"
-	}
-
-	return "global default"
-}
-
-func getWorkspaceNameFromPath(path string) string {
-	// Try to find workspace name in registry
-	workspaces := config.ListWorkspaces()
-	for name, wsPath := range workspaces {
-		if absPath, err := filepath.Abs(wsPath); err == nil {
-			if wsAbsPath, err := filepath.Abs(path); err == nil {
-				if absPath == wsAbsPath {
-					return name
-				}
-			}
-		}
-	}
-
-	// Fall back to directory name
-	return filepath.Base(path)
-}
-
-func isWorkspaceValid(path string) bool {
-	// Check if path exists
-	if _, err := os.Stat(path); err != nil {
-		return false
-	}
-
-	// Check if .jot directory exists
-	jotDir := filepath.Join(path, ".jot")
-	if info, err := os.Stat(jotDir); err != nil || !info.IsDir() {
-		return false
-	}
-
-	return true
-}
-
 func formatTimeAgo(t time.Time) string {
 	duration := time.Since(t)
 
@@ -587,7 +483,7 @@ func outputWorkspaceListJSON(ctx *cmdutil.CommandContext, workspaces map[string]
 	validCount := 0
 
 	for name, path := range workspaces {
-		isValid := isWorkspaceValid(path)
+		isValid := workspace.IsValid(path)
 		if isValid {
 			validCount++
 		}

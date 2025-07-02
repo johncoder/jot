@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/johncoder/jot/internal/cmdutil"
+	"github.com/johncoder/jot/internal/workspace"
 	"github.com/spf13/cobra"
 )
 
@@ -94,8 +95,8 @@ Examples:
 		}
 
 		// Get workspace discovery information
-		discoveryMethod := determineDiscoveryMethod(ws)
-		workspaceName := getWorkspaceNameFromPath(ws.Root)
+		discoveryMethod := workspace.GetDiscoveryMethod(ws)
+		workspaceName := workspace.GetNameFromPath(ws.Root)
 
 		// Human-readable output
 		fmt.Println("Jot Workspace Status")

@@ -2,8 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 
 	"github.com/johncoder/jot/internal/cmdutil"
 	"github.com/johncoder/jot/internal/tangle"
@@ -37,7 +35,7 @@ Examples:
 
 		filename := args[0]
 		// Resolve file path relative to workspace or current directory
-		resolvedFilename := resolveTangleFilePath(ws, filename, noWorkspace)
+		resolvedFilename := cmdutil.ResolvePath(ws, filename, noWorkspace)
 		
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
 		verbose, _ := cmd.Flags().GetBool("verbose")
@@ -127,28 +125,4 @@ func outputTangleJSON(ctx *cmdutil.CommandContext, groups []map[string]interface
 	}
 
 	return cmdutil.OutputJSON(response)
-}
-
-// resolveTangleFilePath consolidates file path resolution logic for tangle operations
-func resolveTangleFilePath(ws *workspace.Workspace, filename string, noWorkspace bool) string {
-	if noWorkspace {
-		// Non-workspace mode: resolve relative to current directory
-		if filepath.IsAbs(filename) {
-			return filename
-		}
-		cwd, _ := os.Getwd()
-		return filepath.Join(cwd, filename)
-	}
-	
-	// Workspace mode: existing logic
-	if filename == "inbox.md" && ws != nil {
-		return ws.InboxPath
-	}
-	if filepath.IsAbs(filename) {
-		return filename
-	}
-	if ws != nil {
-		return filepath.Join(ws.Root, filename)
-	}
-	return filename // Fallback
 }

@@ -25,30 +25,6 @@ var evalApproveDocument bool
 var evalRevokeDocument bool
 var evalNoVerify bool
 
-// resolveEvalFilePath consolidates file path resolution logic for eval operations
-func resolveEvalFilePath(ws *workspace.Workspace, filename string, noWorkspace bool) string {
-	if noWorkspace {
-		// Non-workspace mode: resolve relative to current directory
-		if filepath.IsAbs(filename) {
-			return filename
-		}
-		cwd, _ := os.Getwd()
-		return filepath.Join(cwd, filename)
-	}
-	
-	// Workspace mode: existing logic
-	if filename == "inbox.md" && ws != nil {
-		return ws.InboxPath
-	}
-	if filepath.IsAbs(filename) {
-		return filename
-	}
-	if ws != nil {
-		return filepath.Join(ws.Root, filename)
-	}
-	return filename // Fallback
-}
-
 var evalCmd = &cobra.Command{
 	Use:   "eval [file] [block_name]",
 	Short: "Evaluate code blocks in markdown files",
@@ -116,7 +92,7 @@ Examples:
 
 		filename := args[0]
 		// Resolve file path relative to workspace or current directory
-		resolvedFilename := resolveEvalFilePath(ws, filename, noWorkspace)
+		resolvedFilename := cmdutil.ResolvePath(ws, filename, noWorkspace)
 
 		// Handle revoke operations
 		if evalRevokeDocument {

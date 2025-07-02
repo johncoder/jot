@@ -104,8 +104,8 @@ func (ctx *ExternalCommandContext) resolveWorkspaceContext(workspaceOverride str
 		if err != nil {
 			return fmt.Errorf("no workspace found: %w", err)
 		}
-		ctx.DiscoveryMethod = determineDiscoveryMethod(ws)
-		ctx.WorkspaceName = getWorkspaceNameFromPath(ws.Root)
+		ctx.DiscoveryMethod = workspace.GetDiscoveryMethod(ws)
+		ctx.WorkspaceName = workspace.GetNameFromPath(ws.Root)
 	}
 
 	ctx.Workspace = ws
