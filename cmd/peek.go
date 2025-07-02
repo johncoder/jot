@@ -1114,12 +1114,12 @@ func min(a, b int) int {
 
 // PeekResponse represents the JSON response for peek command
 type PeekResponse struct {
-	Selector        string          `json:"selector"`
-	Subtree         *PeekSubtree    `json:"subtree,omitempty"`
-	FileInfo        PeekFileInfo    `json:"file_info"`
-	Extraction      *PeekExtraction `json:"extraction,omitempty"`
-	TableOfContents *PeekTOC        `json:"table_of_contents,omitempty"`
-	Metadata        cmdutil.JSONMetadata    `json:"metadata"`
+	Selector        string               `json:"selector"`
+	Subtree         *PeekSubtree         `json:"subtree,omitempty"`
+	FileInfo        PeekFileInfo         `json:"file_info"`
+	Extraction      *PeekExtraction      `json:"extraction,omitempty"`
+	TableOfContents *PeekTOC             `json:"table_of_contents,omitempty"`
+	Metadata        cmdutil.JSONMetadata `json:"metadata"`
 }
 
 type PeekSubtree struct {
@@ -1397,7 +1397,7 @@ func parseEnhancedSelector(ws *workspace.Workspace, selector string) (string, er
 	}
 
 	hashIndex := strings.Index(selector, "#")
-	
+
 	var filename string
 	var lineNumStr string
 	var headingPart string
@@ -1407,9 +1407,9 @@ func parseEnhancedSelector(ws *workspace.Workspace, selector string) (string, er
 		filename = selector[:colonIndex]
 		lineNumStr = selector[colonIndex+1:]
 	} else if hashIndex > colonIndex {
-		// Format: "file:42#heading/path" 
+		// Format: "file:42#heading/path"
 		filename = selector[:colonIndex]
-		lineNumStr = selector[colonIndex+1:hashIndex]
+		lineNumStr = selector[colonIndex+1 : hashIndex]
 		headingPart = selector[hashIndex:] // includes the #
 	} else {
 		// Hash comes before colon, this is invalid for our enhanced format
@@ -1450,7 +1450,7 @@ func parseEnhancedSelector(ws *workspace.Workspace, selector string) (string, er
 	// Find heading for this line
 	headingMap, err := markdown.FindNearestHeadingsForLines(content, []int{lineNum})
 	if err != nil {
-		// Can't parse markdown, return original selector  
+		// Can't parse markdown, return original selector
 		return selector, nil
 	}
 
@@ -1473,7 +1473,7 @@ func resolvePeekFilePath(ws *workspace.Workspace, filename string, noWorkspace b
 		cwd, _ := os.Getwd()
 		return filepath.Join(cwd, filename)
 	}
-	
+
 	// Workspace mode: existing logic
 	if filename == "inbox.md" && ws != nil {
 		return ws.InboxPath

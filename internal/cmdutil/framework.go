@@ -26,12 +26,12 @@ type ExecutionContext struct {
 
 // CommandOptions configures command execution behavior
 type CommandOptions struct {
-	RequireWorkspace    bool
-	AllowNoWorkspace    bool
-	WorkspaceOverride   string
-	NoVerify           bool
-	EnablePreHooks     bool
-	EnablePostHooks    bool
+	RequireWorkspace  bool
+	AllowNoWorkspace  bool
+	WorkspaceOverride string
+	NoVerify          bool
+	EnablePreHooks    bool
+	EnablePostHooks   bool
 }
 
 // BaseCommandRunner provides a default implementation of CommandRunner
@@ -116,7 +116,7 @@ func RunCommand(cmd *cobra.Command, args []string, runner CommandRunner) error {
 		return ctx.HandleError(fmt.Errorf("workspace resolution failed: %w", err))
 	}
 	ctx.Workspace = ws
-	
+
 	// Initialize hook runner
 	ctx.HookRunner = NewHookRunner(ws, ctx.Options.NoVerify)
 
@@ -202,10 +202,10 @@ func WithWorkspaceRequired() *CommandOptions {
 // WithWorkspaceOptional creates command options that allow operation without a workspace
 func WithWorkspaceOptional() *CommandOptions {
 	return &CommandOptions{
-		RequireWorkspace:  false,
-		AllowNoWorkspace:  true,
-		EnablePreHooks:    true,
-		EnablePostHooks:   true,
+		RequireWorkspace: false,
+		AllowNoWorkspace: true,
+		EnablePreHooks:   true,
+		EnablePostHooks:  true,
 	}
 }
 

@@ -48,7 +48,7 @@ Examples:
 
 		// Initialize path utilities for workspace creation
 		pathUtil := cmdutil.NewPathUtil(nil) // No workspace context yet
-		
+
 		// Check if workspace already exists
 		jotDir := filepath.Join(absPath, ".jot")
 		if _, err := os.Stat(jotDir); err == nil {
@@ -198,10 +198,10 @@ func init() {
 
 // JSON response structures for init command
 type InitResponse struct {
-	Operation     string       `json:"operation"`
-	WorkspacePath string       `json:"workspace_path"`
-	CreatedFiles  []InitFile   `json:"created_files"`
-	Summary       InitSummary  `json:"summary"`
+	Operation     string               `json:"operation"`
+	WorkspacePath string               `json:"workspace_path"`
+	CreatedFiles  []InitFile           `json:"created_files"`
+	Summary       InitSummary          `json:"summary"`
 	Metadata      cmdutil.JSONMetadata `json:"metadata"`
 }
 

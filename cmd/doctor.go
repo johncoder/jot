@@ -486,16 +486,16 @@ func init() {
 
 // JSON response structures for doctor command
 type DoctorResponse struct {
-	Operation      string        `json:"operation"`
-	WorkspaceFound bool          `json:"workspace_found"`
-	WorkspaceRoot  string        `json:"workspace_root,omitempty"`
-	HealthStatus   string        `json:"health_status"` // "excellent", "good", "issues", "critical"
-	Checks         []DoctorCheck `json:"checks"`
-	Issues         []DoctorIssue `json:"issues"`
-	Warnings       []DoctorIssue `json:"warnings"`
-	FixesApplied   []DoctorFix   `json:"fixes_applied"`
-	Summary        DoctorSummary `json:"summary"`
-	Metadata       cmdutil.JSONMetadata  `json:"metadata"`
+	Operation      string               `json:"operation"`
+	WorkspaceFound bool                 `json:"workspace_found"`
+	WorkspaceRoot  string               `json:"workspace_root,omitempty"`
+	HealthStatus   string               `json:"health_status"` // "excellent", "good", "issues", "critical"
+	Checks         []DoctorCheck        `json:"checks"`
+	Issues         []DoctorIssue        `json:"issues"`
+	Warnings       []DoctorIssue        `json:"warnings"`
+	FixesApplied   []DoctorFix          `json:"fixes_applied"`
+	Summary        DoctorSummary        `json:"summary"`
+	Metadata       cmdutil.JSONMetadata `json:"metadata"`
 }
 
 type DoctorCheck struct {

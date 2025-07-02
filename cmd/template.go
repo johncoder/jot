@@ -336,7 +336,7 @@ current content hash - any changes will require re-approval.`,
 		if err != nil {
 			return err
 		}
-		
+
 		if !confirmed {
 			cmdutil.ShowInfo("Template not approved.")
 			return nil
@@ -476,9 +476,9 @@ func countApproved(templates []template.Template) int {
 
 // JSON response structures for template commands
 type TemplateListResponse struct {
-	Operation string              `json:"operation"`
-	Templates []TemplateItem      `json:"templates"`
-	Summary   TemplateListSummary `json:"summary"`
+	Operation string               `json:"operation"`
+	Templates []TemplateItem       `json:"templates"`
+	Summary   TemplateListSummary  `json:"summary"`
 	Metadata  cmdutil.JSONMetadata `json:"metadata"`
 }
 
@@ -494,50 +494,50 @@ type TemplateListSummary struct {
 }
 
 type TemplateCreateResponse struct {
-	Operation    string       `json:"operation"`
-	TemplateName string       `json:"template_name"`
-	TemplatePath string       `json:"template_path"`
-	Created      bool         `json:"created"`
-	Edited       bool         `json:"edited"`
-	EditorError  string       `json:"editor_error,omitempty"`
-	NextSteps    []string     `json:"next_steps"`
+	Operation    string               `json:"operation"`
+	TemplateName string               `json:"template_name"`
+	TemplatePath string               `json:"template_path"`
+	Created      bool                 `json:"created"`
+	Edited       bool                 `json:"edited"`
+	EditorError  string               `json:"editor_error,omitempty"`
+	NextSteps    []string             `json:"next_steps"`
 	Metadata     cmdutil.JSONMetadata `json:"metadata"`
 }
 
 type TemplateEditResponse struct {
-	Operation    string       `json:"operation"`
-	TemplateName string       `json:"template_name"`
-	TemplatePath string       `json:"template_path"`
-	Updated      bool         `json:"updated"`
-	EditorError  string       `json:"editor_error,omitempty"`
-	NextSteps    []string     `json:"next_steps"`
+	Operation    string               `json:"operation"`
+	TemplateName string               `json:"template_name"`
+	TemplatePath string               `json:"template_path"`
+	Updated      bool                 `json:"updated"`
+	EditorError  string               `json:"editor_error,omitempty"`
+	NextSteps    []string             `json:"next_steps"`
 	Metadata     cmdutil.JSONMetadata `json:"metadata"`
 }
 
 type TemplateApproveResponse struct {
-	Operation     string       `json:"operation"`
-	TemplateName  string       `json:"template_name"`
-	Approved      bool         `json:"approved"`
-	Hash          string       `json:"hash"`
-	UserConfirmed bool         `json:"user_confirmed"`
+	Operation     string               `json:"operation"`
+	TemplateName  string               `json:"template_name"`
+	Approved      bool                 `json:"approved"`
+	Hash          string               `json:"hash"`
+	UserConfirmed bool                 `json:"user_confirmed"`
 	Metadata      cmdutil.JSONMetadata `json:"metadata"`
 }
 
 type TemplateViewResponse struct {
-	Operation    string       `json:"operation"`
-	TemplateName string       `json:"template_name"`
-	Content      string       `json:"content"`
-	Approved     bool         `json:"approved"`
-	Hash         string       `json:"hash"`
+	Operation    string               `json:"operation"`
+	TemplateName string               `json:"template_name"`
+	Content      string               `json:"content"`
+	Approved     bool                 `json:"approved"`
+	Hash         string               `json:"hash"`
 	Metadata     cmdutil.JSONMetadata `json:"metadata"`
 }
 
 type TemplateRenderResponse struct {
-	Operation        string       `json:"operation"`
-	TemplateName     string       `json:"template_name"`
-	RenderedContent  string       `json:"rendered_content"`
-	Approved         bool         `json:"approved"`
-	ExecutionAllowed bool         `json:"execution_allowed"`
+	Operation        string               `json:"operation"`
+	TemplateName     string               `json:"template_name"`
+	RenderedContent  string               `json:"rendered_content"`
+	Approved         bool                 `json:"approved"`
+	ExecutionAllowed bool                 `json:"execution_allowed"`
 	Metadata         cmdutil.JSONMetadata `json:"metadata"`
 }
 

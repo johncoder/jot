@@ -137,7 +137,7 @@ func listHooks(ctx *cmdutil.CommandContext, ws *workspace.Workspace) error {
 
 		name := entry.Name()
 		path := filepath.Join(hooksDir, name)
-		
+
 		info, err := entry.Info()
 		if err != nil {
 			continue
@@ -199,7 +199,7 @@ func listHooks(ctx *cmdutil.CommandContext, ws *workspace.Workspace) error {
 		fmt.Printf("  %-20s %s\n", hook.Name, status)
 	}
 
-	fmt.Printf("\nSummary: %d total, %d active, %d samples\n", 
+	fmt.Printf("\nSummary: %d total, %d active, %d samples\n",
 		len(hooksList), executableCount, sampleCount)
 
 	if sampleCount > 0 {
@@ -215,7 +215,7 @@ func listHooks(ctx *cmdutil.CommandContext, ws *workspace.Workspace) error {
 // installSampleHooks installs sample hook scripts
 func installSampleHooks(ctx *cmdutil.CommandContext, ws *workspace.Workspace) error {
 	manager := hooks.NewManager(ws)
-	
+
 	if err := manager.CreateSampleHooks(); err != nil {
 		if ctx.IsJSONOutput() {
 			return ctx.HandleError(err)
@@ -259,7 +259,7 @@ func testHook(ctx *cmdutil.CommandContext, ws *workspace.Workspace, hookType str
 		"pre-capture", "post-capture", "pre-refile", "post-refile",
 		"pre-archive", "post-archive", "workspace-change",
 	}
-	
+
 	valid := false
 	for _, validType := range validTypes {
 		if hookType == validType {
@@ -269,7 +269,7 @@ func testHook(ctx *cmdutil.CommandContext, ws *workspace.Workspace, hookType str
 	}
 
 	if !valid {
-		err := fmt.Errorf("invalid hook type '%s'. Valid types: %s", 
+		err := fmt.Errorf("invalid hook type '%s'. Valid types: %s",
 			hookType, strings.Join(validTypes, ", "))
 		if ctx.IsJSONOutput() {
 			return ctx.HandleError(err)
@@ -280,7 +280,7 @@ func testHook(ctx *cmdutil.CommandContext, ws *workspace.Workspace, hookType str
 	// Check if hook exists
 	hooksDir := filepath.Join(ws.JotDir, "hooks")
 	hookPath := filepath.Join(hooksDir, hookType)
-	
+
 	if _, err := os.Stat(hookPath); os.IsNotExist(err) {
 		err := fmt.Errorf("hook '%s' not found at %s", hookType, hookPath)
 		if ctx.IsJSONOutput() {
@@ -388,10 +388,10 @@ func testHook(ctx *cmdutil.CommandContext, ws *workspace.Workspace, hookType str
 
 // JSON response structures
 type HooksResponse struct {
-	Operation string       `json:"operation"`
-	HooksDir  string       `json:"hooks_dir"`
-	Hooks     []HookInfo   `json:"hooks"`
-	Summary   HooksSummary `json:"summary"`
+	Operation string               `json:"operation"`
+	HooksDir  string               `json:"hooks_dir"`
+	Hooks     []HookInfo           `json:"hooks"`
+	Summary   HooksSummary         `json:"summary"`
 	Metadata  cmdutil.JSONMetadata `json:"metadata"`
 }
 
@@ -411,13 +411,13 @@ type HooksSummary struct {
 }
 
 type HookTestResponse struct {
-	Operation string       `json:"operation"`
-	HookType  string       `json:"hook_type"`
-	HookPath  string       `json:"hook_path"`
-	Success   bool         `json:"success"`
-	TestData  HookTestData `json:"test_data"`
-	Result    HookTestResult `json:"result,omitempty"`
-	Error     string       `json:"error,omitempty"`
+	Operation string               `json:"operation"`
+	HookType  string               `json:"hook_type"`
+	HookPath  string               `json:"hook_path"`
+	Success   bool                 `json:"success"`
+	TestData  HookTestData         `json:"test_data"`
+	Result    HookTestResult       `json:"result,omitempty"`
+	Error     string               `json:"error,omitempty"`
 	Metadata  cmdutil.JSONMetadata `json:"metadata"`
 }
 

@@ -31,7 +31,7 @@ func (r *PathResolver) Resolve(filename string) string {
 		cwd, _ := os.Getwd()
 		return filepath.Join(cwd, filename)
 	}
-	
+
 	// Workspace mode: apply workspace-specific logic
 	if filename == "inbox.md" && r.workspace != nil {
 		return r.workspace.InboxPath
@@ -92,20 +92,20 @@ func ResolveWithOptions(filename string, opts *PathResolutionOptions) string {
 	if opts == nil {
 		opts = &PathResolutionOptions{}
 	}
-	
+
 	if opts.NoWorkspace {
 		// Non-workspace mode with optional base directory override
 		if filepath.IsAbs(filename) {
 			return filename
 		}
-		
+
 		baseDir := opts.BaseDir
 		if baseDir == "" {
 			baseDir, _ = os.Getwd()
 		}
 		return filepath.Join(baseDir, filename)
 	}
-	
+
 	// Workspace mode
 	if filename == "inbox.md" && opts.Workspace != nil {
 		return opts.Workspace.InboxPath
@@ -177,13 +177,13 @@ func (p *PathUtil) SafeAppendFile(filePath string, content []byte) error {
 	if err := p.EnsureDirForFile(filePath); err != nil {
 		return err
 	}
-	
+
 	file, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return err
 	}
 	defer file.Close()
-	
+
 	_, err = file.Write(content)
 	return err
 }
@@ -206,17 +206,17 @@ func (p *PathUtil) IsWithinWorkspace(path string) bool {
 	if p.workspace == nil {
 		return false
 	}
-	
+
 	absPath, err := filepath.Abs(path)
 	if err != nil {
 		return false
 	}
-	
+
 	relPath, err := filepath.Rel(p.workspace.Root, absPath)
 	if err != nil {
 		return false
 	}
-	
+
 	// If relative path starts with "..", it's outside the workspace
 	return !filepath.IsAbs(relPath) && !filepath.HasPrefix(relPath, "..")
 }
@@ -238,12 +238,12 @@ func (p *PathUtil) CreateBackupFile(filePath string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	
+
 	backupPath := filePath + ".backup"
 	err = p.SafeWriteFile(backupPath, content)
 	if err != nil {
 		return "", err
 	}
-	
+
 	return backupPath, nil
 }

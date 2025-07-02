@@ -135,10 +135,10 @@ Examples:
 
 // StatusResponse represents the JSON response for status command
 type StatusResponse struct {
-	Workspace StatusWorkspace `json:"workspace"`
-	Files     StatusFiles     `json:"files"`
-	Health    StatusHealth    `json:"health"`
-	Activity  StatusActivity  `json:"activity,omitempty"`
+	Workspace StatusWorkspace      `json:"workspace"`
+	Files     StatusFiles          `json:"files"`
+	Health    StatusHealth         `json:"health"`
+	Activity  StatusActivity       `json:"activity,omitempty"`
 	Metadata  cmdutil.JSONMetadata `json:"metadata"`
 }
 

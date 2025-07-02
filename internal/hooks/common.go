@@ -16,61 +16,61 @@ import (
 type HookType string
 
 const (
-	PreCapture     HookType = "pre-capture"
-	PostCapture    HookType = "post-capture"
-	PreRefile      HookType = "pre-refile"
-	PostRefile     HookType = "post-refile"
-	PreArchive     HookType = "pre-archive"
-	PostArchive    HookType = "post-archive"
-	PreEval        HookType = "pre-eval"
-	PostEval       HookType = "post-eval"
+	PreCapture      HookType = "pre-capture"
+	PostCapture     HookType = "post-capture"
+	PreRefile       HookType = "pre-refile"
+	PostRefile      HookType = "post-refile"
+	PreArchive      HookType = "pre-archive"
+	PostArchive     HookType = "post-archive"
+	PreEval         HookType = "pre-eval"
+	PostEval        HookType = "post-eval"
 	WorkspaceChange HookType = "workspace-change"
 )
 
 // HookContext contains the context information passed to hooks
 type HookContext struct {
-	Type          HookType
-	Workspace     *workspace.Workspace
-	Content       string // Content to be processed (for content hooks)
-	SourceFile    string // Source file for operations
-	DestPath      string // Destination path for operations
-	TemplateName  string // Template name for capture
-	ExtraEnv      map[string]string // Additional environment variables
-	Timeout       time.Duration
-	AllowBypass   bool // Whether --no-verify flag was used
+	Type         HookType
+	Workspace    *workspace.Workspace
+	Content      string            // Content to be processed (for content hooks)
+	SourceFile   string            // Source file for operations
+	DestPath     string            // Destination path for operations
+	TemplateName string            // Template name for capture
+	ExtraEnv     map[string]string // Additional environment variables
+	Timeout      time.Duration
+	AllowBypass  bool // Whether --no-verify flag was used
 }
 
 // HookResult contains the result of hook execution
 type HookResult struct {
-	Content   string // Modified content (for content hooks)
-	ExitCode  int    // Hook exit code
-	Output    string // Hook stdout/stderr output
-	Aborted   bool   // Whether the operation should be aborted
-	Error     error  // Any execution error
+	Content  string // Modified content (for content hooks)
+	ExitCode int    // Hook exit code
+	Output   string // Hook stdout/stderr output
+	Aborted  bool   // Whether the operation should be aborted
+	Error    error  // Any execution error
 }
 
 // Manager handles hook discovery and execution
 type Manager struct {
-	workspace   *workspace.Workspace
-	hooksDir    string
+	workspace      *workspace.Workspace
+	hooksDir       string
 	globalHooksDir string
-	enabled     bool
-	timeout     time.Duration
+	enabled        bool
+	timeout        time.Duration
 }
 
 // NewManager creates a new hook manager for the given workspace
 func NewManager(ws *workspace.Workspace) *Manager {
 	hooksDir := filepath.Join(ws.JotDir, "hooks")
-	
+
 	// Global hooks directory in user's home
 	homeDir, _ := os.UserHomeDir()
 	globalHooksDir := filepath.Join(homeDir, ".jot", "hooks")
-	
+
 	return &Manager{
 		workspace:      ws,
 		hooksDir:       hooksDir,
 		globalHooksDir: globalHooksDir,
-		enabled:        true, // TODO: Read from config
+		enabled:        true,             // TODO: Read from config
 		timeout:        30 * time.Second, // TODO: Read from config
 	}
 }
@@ -92,15 +92,15 @@ func (m *Manager) Execute(ctx *HookContext) (*HookResult, error) {
 	}
 
 	result := &HookResult{Content: ctx.Content}
-	
+
 	// Execute hooks in order
 	for _, hookPath := range hooks {
 		hookResult, err := m.executeHook(hookPath, ctx, result.Content)
 		if err != nil {
 			return &HookResult{
-				Content:  ctx.Content,
-				Error:    err,
-				Aborted:  true,
+				Content: ctx.Content,
+				Error:   err,
+				Aborted: true,
 			}, err
 		}
 
@@ -124,14 +124,14 @@ func (m *Manager) Execute(ctx *HookContext) (*HookResult, error) {
 // findHooks discovers all hooks for a given type, following git's ordering
 func (m *Manager) findHooks(hookType HookType) ([]string, error) {
 	var hooks []string
-	
+
 	// Check workspace hooks first (higher priority)
 	workspaceHooks, err := m.findHooksInDir(m.hooksDir, hookType)
 	if err != nil {
 		return nil, err
 	}
 	hooks = append(hooks, workspaceHooks...)
-	
+
 	// Check global hooks if workspace hooks don't exist
 	if len(workspaceHooks) == 0 {
 		globalHooks, err := m.findHooksInDir(m.globalHooksDir, hookType)
@@ -140,38 +140,38 @@ func (m *Manager) findHooks(hookType HookType) ([]string, error) {
 		}
 		hooks = append(hooks, globalHooks...)
 	}
-	
+
 	return hooks, nil
 }
 
 // findHooksInDir finds hooks in a specific directory
 func (m *Manager) findHooksInDir(dir string, hookType HookType) ([]string, error) {
 	var hooks []string
-	
+
 	// Check for exact match first
 	exactHook := filepath.Join(dir, string(hookType))
 	if m.isExecutableHook(exactHook) {
 		hooks = append(hooks, exactHook)
 	}
-	
+
 	// Check for numbered hooks (git style: pre-commit.01, pre-commit.02)
 	pattern := string(hookType) + ".*"
 	matches, err := filepath.Glob(filepath.Join(dir, pattern))
 	if err != nil {
 		return nil, err
 	}
-	
+
 	for _, match := range matches {
 		// Skip the exact match we already found
 		if match == exactHook {
 			continue
 		}
-		
+
 		if m.isExecutableHook(match) {
 			hooks = append(hooks, match)
 		}
 	}
-	
+
 	return hooks, nil
 }
 
@@ -181,12 +181,12 @@ func (m *Manager) isExecutableHook(path string) bool {
 	if err != nil {
 		return false
 	}
-	
+
 	// Must be a regular file
 	if !stat.Mode().IsRegular() {
 		return false
 	}
-	
+
 	// Must be executable
 	return stat.Mode()&0111 != 0
 }
@@ -196,47 +196,47 @@ func (m *Manager) executeHook(hookPath string, ctx *HookContext, content string)
 	// Create context with timeout
 	execCtx, cancel := context.WithTimeout(context.Background(), ctx.Timeout)
 	defer cancel()
-	
+
 	// Create command
 	cmd := exec.CommandContext(execCtx, hookPath)
-	
+
 	// Set up environment
 	cmd.Env = m.buildEnvironment(ctx)
-	
+
 	// Set up stdin with content for content-processing hooks
 	if m.isContentHook(ctx.Type) {
 		cmd.Stdin = strings.NewReader(content)
 	}
-	
+
 	// Capture output
 	output, err := cmd.CombinedOutput()
-	
+
 	result := &HookResult{
 		ExitCode: cmd.ProcessState.ExitCode(),
 		Output:   string(output),
 	}
-	
+
 	// For content hooks, use stdout as the new content
 	if m.isContentHook(ctx.Type) && result.ExitCode == 0 {
 		result.Content = string(output)
 	} else {
 		result.Content = content
 	}
-	
+
 	return result, err
 }
 
 // buildEnvironment creates the environment variables for hook execution
 func (m *Manager) buildEnvironment(ctx *HookContext) []string {
 	env := os.Environ()
-	
+
 	// Standard hook environment
 	env = append(env, "JOT_HOOK_TYPE="+string(ctx.Type))
 	env = append(env, "JOT_WORKSPACE_ROOT="+ctx.Workspace.Root)
 	env = append(env, "JOT_WORKSPACE_INBOX="+ctx.Workspace.InboxPath)
 	env = append(env, "JOT_WORKSPACE_LIB="+ctx.Workspace.LibDir)
 	env = append(env, "JOT_WORKSPACE_JOTDIR="+ctx.Workspace.JotDir)
-	
+
 	// Context-specific environment
 	if ctx.SourceFile != "" {
 		env = append(env, "JOT_SOURCE_FILE="+ctx.SourceFile)
@@ -247,12 +247,12 @@ func (m *Manager) buildEnvironment(ctx *HookContext) []string {
 	if ctx.TemplateName != "" {
 		env = append(env, "JOT_TEMPLATE_NAME="+ctx.TemplateName)
 	}
-	
+
 	// Extra environment variables
 	for key, value := range ctx.ExtraEnv {
 		env = append(env, key+"="+value)
 	}
-	
+
 	return env
 }
 
@@ -271,7 +271,7 @@ func (m *Manager) CreateSampleHooks() error {
 	if err := os.MkdirAll(m.hooksDir, 0755); err != nil {
 		return err
 	}
-	
+
 	samples := map[string]string{
 		"pre-capture.sample":  samplePreCaptureHook,
 		"post-capture.sample": samplePostCaptureHook,
@@ -280,7 +280,7 @@ func (m *Manager) CreateSampleHooks() error {
 		"pre-archive.sample":  samplePreArchiveHook,
 		"post-archive.sample": samplePostArchiveHook,
 	}
-	
+
 	for filename, content := range samples {
 		path := filepath.Join(m.hooksDir, filename)
 		if _, err := os.Stat(path); os.IsNotExist(err) {
@@ -289,7 +289,7 @@ func (m *Manager) CreateSampleHooks() error {
 			}
 		}
 	}
-	
+
 	return nil
 }
 

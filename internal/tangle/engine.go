@@ -82,11 +82,11 @@ func (e *Engine) GetTangleBlocks() []TangleBlock {
 // GroupBlocksByFile groups tangle blocks by their target file path
 func (e *Engine) GroupBlocksByFile() map[string][]TangleBlock {
 	groups := make(map[string][]TangleBlock)
-	
+
 	for _, block := range e.blocks {
 		groups[block.FilePath] = append(groups[block.FilePath], block)
 	}
-	
+
 	return groups
 }
 
@@ -101,7 +101,7 @@ func resolveTangleFilePath(ws *workspace.Workspace, filename string, noWorkspace
 		cwd, _ := os.Getwd()
 		return filepath.Join(cwd, filename)
 	}
-	
+
 	// Workspace mode: existing logic
 	if filepath.IsAbs(filename) {
 		return filename

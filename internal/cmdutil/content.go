@@ -85,7 +85,7 @@ func (f *FileOperator) WriteMarkdownFile(path string, content *MarkdownContent) 
 // BackupFile creates a backup of a file before modification
 func (f *FileOperator) BackupFile(path string) (string, error) {
 	resolvedPath := ResolvePath(f.workspace, path, f.noWorkspace)
-	
+
 	// Check if file exists
 	if _, err := os.Stat(resolvedPath); os.IsNotExist(err) {
 		return "", nil // No backup needed for non-existent file
@@ -144,7 +144,7 @@ func (f *FileOperator) FileExists(path string) bool {
 // ParseMarkdownMetadata extracts YAML frontmatter and body from markdown content
 func ParseMarkdownMetadata(content string) (map[string]interface{}, string) {
 	metadata := make(map[string]interface{})
-	
+
 	// Check for YAML frontmatter
 	if strings.HasPrefix(content, "---\n") {
 		parts := strings.SplitN(content, "\n---\n", 2)
@@ -160,7 +160,7 @@ func ParseMarkdownMetadata(content string) (map[string]interface{}, string) {
 	// Fallback to simple key:value parsing for backward compatibility
 	lines := strings.Split(content, "\n")
 	bodyStartIndex := 0
-	
+
 	for i, line := range lines {
 		if strings.HasPrefix(line, "#") {
 			bodyStartIndex = i

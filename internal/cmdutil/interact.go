@@ -11,13 +11,13 @@ import (
 // The prompt should be a complete question without the [y/N] suffix, which is added automatically.
 func ConfirmOperation(prompt string) (bool, error) {
 	fmt.Printf("%s [y/N]: ", prompt)
-	
+
 	reader := bufio.NewReader(os.Stdin)
 	response, err := reader.ReadString('\n')
 	if err != nil {
 		return false, fmt.Errorf("failed to read user input: %w", err)
 	}
-	
+
 	return IsConfirmationYes(response), nil
 }
 

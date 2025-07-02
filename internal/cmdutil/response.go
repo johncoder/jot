@@ -45,7 +45,7 @@ func IsJSONOutput(cmd *cobra.Command) bool {
 	if cmd == nil {
 		return false
 	}
-	
+
 	jsonFlag, err := cmd.Flags().GetBool("json")
 	if err != nil {
 		return false
@@ -92,12 +92,12 @@ func OutputJSONError(cmd *cobra.Command, err error, startTime time.Time) error {
 		},
 		"metadata": CreateJSONMetadata(cmd, false, startTime),
 	}
-	
+
 	if jsonErr := OutputJSON(response); jsonErr != nil {
 		// If JSON output fails, fall back to regular error
 		return err
 	}
-	
+
 	// Return the original error so the command exits with proper code
 	return err
 }
@@ -113,7 +113,7 @@ func (rm *ResponseManager) RespondWithSuccess(data interface{}) error {
 		}
 		return OutputJSON(data)
 	}
-	
+
 	// For non-JSON output, data should be handled by the caller
 	// since text output is command-specific
 	return nil
@@ -142,7 +142,7 @@ func (rm *ResponseManager) RespondWithOperation(operation string, result string,
 		}
 		return OutputJSON(response)
 	}
-	
+
 	// For text output, the caller should handle the specific formatting
 	return nil
 }

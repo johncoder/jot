@@ -68,16 +68,16 @@ Examples:
 				Timeout:      30 * time.Second,
 				AllowBypass:  captureNoVerify,
 			}
-			
+
 			result, err := hookManager.Execute(hookCtx)
 			if err != nil {
 				return ctx.HandleExternalCommand("pre-capture hook", nil, err)
 			}
-			
+
 			if result.Aborted {
 				return ctx.HandleOperationError("pre-capture hook", fmt.Errorf("pre-capture hook aborted operation"))
 			}
-			
+
 			// Update content if hook modified it
 			if result.Content != captureContent {
 				captureContent = result.Content
@@ -184,7 +184,7 @@ Examples:
 					if len(finalContent) == 0 {
 						lineCount = 0
 					}
-					
+
 					response := CaptureResponse{
 						Operation: "capture_and_refile",
 						ContentInfo: CaptureContent{
@@ -216,7 +216,7 @@ Examples:
 						Timeout:      30 * time.Second,
 						AllowBypass:  captureNoVerify,
 					}
-					
+
 					_, err := hookManager.Execute(hookCtx)
 					if err != nil && !ctx.IsJSONOutput() {
 						cmdutil.ShowWarning("Warning: post-capture hook failed: %s", err.Error())
@@ -250,7 +250,7 @@ Examples:
 					if len(finalContent) == 0 {
 						lineCount = 0
 					}
-					
+
 					response := CaptureResponse{
 						Operation: "capture_to_file",
 						ContentInfo: CaptureContent{
@@ -282,7 +282,7 @@ Examples:
 						Timeout:      30 * time.Second,
 						AllowBypass:  captureNoVerify,
 					}
-					
+
 					_, err := hookManager.Execute(hookCtx)
 					if err != nil && !ctx.IsJSONOutput() {
 						cmdutil.ShowWarning("Warning: post-capture hook failed: %s", err.Error())
@@ -349,7 +349,7 @@ Examples:
 				Timeout:      30 * time.Second,
 				AllowBypass:  captureNoVerify,
 			}
-			
+
 			_, err := hookManager.Execute(hookCtx)
 			if err != nil {
 				// Post-capture hooks are informational only - log but don't fail
@@ -374,7 +374,7 @@ Examples:
 			if len(finalContent) == 0 {
 				lineCount = 0
 			}
-			
+
 			response := CaptureResponse{
 				Operation: "capture",
 				ContentInfo: CaptureContent{
@@ -496,11 +496,11 @@ func performDirectInsertion(ws *workspace.Workspace, dest *DestinationTarget, tr
 
 // JSON response structures for capture command
 type CaptureResponse struct {
-	Operation   string           `json:"operation"`
-	ContentInfo CaptureContent   `json:"content_info"`
-	FileInfo    CaptureFile      `json:"file_info"`
-	Template    *CaptureTemplate `json:"template,omitempty"`
-	Metadata    cmdutil.JSONMetadata     `json:"metadata"`
+	Operation   string               `json:"operation"`
+	ContentInfo CaptureContent       `json:"content_info"`
+	FileInfo    CaptureFile          `json:"file_info"`
+	Template    *CaptureTemplate     `json:"template,omitempty"`
+	Metadata    cmdutil.JSONMetadata `json:"metadata"`
 }
 
 type CaptureContent struct {

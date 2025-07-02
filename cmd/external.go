@@ -15,13 +15,13 @@ import (
 // ExternalCommandContext holds the parsed global flags and workspace information
 // for passing to external commands via environment variables
 type ExternalCommandContext struct {
-	Workspace        *workspace.Workspace
-	WorkspaceName    string
-	ConfigFile       string
-	JSONOutput       bool
-	DiscoveryMethod  string
-	Subcommand       string
-	RemainingArgs    []string
+	Workspace       *workspace.Workspace
+	WorkspaceName   string
+	ConfigFile      string
+	JSONOutput      bool
+	DiscoveryMethod string
+	Subcommand      string
+	RemainingArgs   []string
 }
 
 // ParseGlobalFlagsForExternal parses only the global flags from the command line
@@ -159,20 +159,20 @@ func ExecuteExternalCommand(ctx *ExternalCommandContext) error {
 
 	// Create external command using unified utilities
 	cmd := cmdutil.NewExternalJotCommand(ctx.Subcommand, ctx.RemainingArgs, ctx.Workspace, ctx.JSONOutput, ctx.ConfigFile)
-	
+
 	// Execute using unified command executor
 	executor := cmdutil.NewCommandExecutor(ctx.Workspace, 30*time.Second)
 	result, err := executor.Execute(cmd)
-	
+
 	if err != nil {
 		return err
 	}
-	
+
 	// Handle non-zero exit codes
 	if result.ExitCode != 0 {
 		return fmt.Errorf("external command '%s' exited with code %d", externalCmd, result.ExitCode)
 	}
-	
+
 	return nil
 }
 

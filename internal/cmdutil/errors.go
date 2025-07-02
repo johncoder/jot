@@ -23,7 +23,7 @@ func HandleError(cmd *cobra.Command, err error, startTime time.Time) error {
 	if err == nil {
 		return nil
 	}
-	
+
 	if IsJSONOutput(cmd) {
 		return OutputJSONError(cmd, err, startTime)
 	}
@@ -71,7 +71,7 @@ func HandleOperationError(cmd *cobra.Command, startTime time.Time, operation str
 	if err == nil {
 		return nil
 	}
-	
+
 	opErr := NewOperationError(operation, err)
 	return HandleError(cmd, opErr, startTime)
 }

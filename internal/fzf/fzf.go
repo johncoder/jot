@@ -22,11 +22,11 @@ func ShouldUseFZF(interactive bool) bool {
 
 // SearchResult represents a result item for FZF display
 type SearchResult struct {
-	DisplayLine  string // What FZF shows to the user
-	FilePath     string // Full path to the file
-	LineNumber   int    // Line number in the file
-	Context      string // The actual line content
-	Score        int    // Relevance score
+	DisplayLine string // What FZF shows to the user
+	FilePath    string // Full path to the file
+	LineNumber  int    // Line number in the file
+	Context     string // The actual line content
+	Score       int    // Relevance score
 }
 
 // RunInteractiveSearch runs FZF with search results and handles user interaction
@@ -72,7 +72,7 @@ func runFZFLoop(resultsFile string, results []SearchResult, query string) error 
 	for {
 		// Build FZF command with custom bindings
 		cmd := buildFZFCommand(resultsFile, query)
-		
+
 		// Run FZF and capture selection
 		output, err := cmd.Output()
 		if err != nil {
@@ -88,7 +88,7 @@ func runFZFLoop(resultsFile string, results []SearchResult, query string) error 
 		// When using --expect, FZF outputs the key on first line, selection on second line
 		lines := strings.Split(selectedOutput, "\n")
 		var keyPressed, selectedLine string
-		
+
 		if len(lines) == 2 {
 			keyPressed = lines[0]
 			selectedLine = lines[1]
@@ -155,7 +155,7 @@ func handleAction(result *SearchResult, action string) error {
 func buildFZFCommand(resultsFile, query string) *exec.Cmd {
 	args := []string{
 		"--delimiter=|",
-		"--with-nth=2,4",  // Show displayline and context, hide index and filepath
+		"--with-nth=2,4", // Show displayline and context, hide index and filepath
 		"--preview=" + buildPreviewCommand(),
 		"--preview-window=right:50%:wrap",
 		"--bind=tab:toggle-preview",
@@ -167,7 +167,7 @@ func buildFZFCommand(resultsFile, query string) *exec.Cmd {
 	}
 
 	cmd := exec.Command("fzf", args...)
-	
+
 	// Set up input from results file
 	file, _ := os.Open(resultsFile)
 	cmd.Stdin = file

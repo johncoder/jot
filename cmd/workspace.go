@@ -137,10 +137,10 @@ func workspaceShowCurrent(cmd *cobra.Command) error {
 	if cmdutil.IsJSONOutput(cmd) {
 		response := map[string]interface{}{
 			"current_workspace": map[string]interface{}{
-				"name":            workspaceName,
-				"path":            ws.Root,
+				"name":             workspaceName,
+				"path":             ws.Root,
 				"discovery_method": discoveryMethod,
-				"status":          "active",
+				"status":           "active",
 				"stats": map[string]interface{}{
 					"inbox_notes":   stats.InboxNotes,
 					"lib_notes":     stats.LibNotes,
@@ -306,10 +306,10 @@ func workspaceAdd(cmd *cobra.Command, name, path string) error {
 					"operation": "add_workspace",
 					"result":    "success",
 					"details": map[string]interface{}{
-						"workspace_name":     name,
-						"workspace_path":     absPath,
-						"set_as_default":     setAsDefault,
-						"validation_passed":  true,
+						"workspace_name":    name,
+						"workspace_path":    absPath,
+						"set_as_default":    setAsDefault,
+						"validation_passed": true,
 					},
 				},
 			},
@@ -374,10 +374,10 @@ func workspaceRemove(cmd *cobra.Command, name string) error {
 					"operation": "remove_workspace",
 					"result":    "success",
 					"details": map[string]interface{}{
-						"workspace_name":     name,
-						"workspace_path":     workspacePath,
-						"was_default":        isDefault,
-						"was_active":         isActive,
+						"workspace_name": name,
+						"workspace_path": workspacePath,
+						"was_default":    isDefault,
+						"was_active":     isActive,
 					},
 				},
 			},
@@ -391,7 +391,7 @@ func workspaceRemove(cmd *cobra.Command, name string) error {
 	}
 	if isDefault {
 		cmdutil.ShowWarning("Warning: Removing default workspace '%s'", name)
-		
+
 		// Get new default if any workspaces remain
 		newDefault, _, _ := config.GetDefaultWorkspace()
 		if newDefault != "" {
@@ -528,10 +528,10 @@ func outputWorkspaceListJSON(ctx *cmdutil.CommandContext, workspaces map[string]
 	response := map[string]interface{}{
 		"workspaces": workspaceList,
 		"summary": map[string]interface{}{
-			"total_workspaces": len(workspaces),
-			"valid_workspaces": validCount,
+			"total_workspaces":  len(workspaces),
+			"valid_workspaces":  validCount,
 			"default_workspace": defaultWorkspace,
-			"active_workspace": activeWorkspace,
+			"active_workspace":  activeWorkspace,
 		},
 		"metadata": cmdutil.CreateJSONMetadata(ctx.Cmd, true, ctx.StartTime),
 	}

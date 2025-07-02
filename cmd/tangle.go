@@ -36,10 +36,10 @@ Examples:
 		filename := args[0]
 		// Resolve file path relative to workspace or current directory
 		resolvedFilename := cmdutil.ResolvePath(ws, filename, noWorkspace)
-		
+
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
 		verbose, _ := cmd.Flags().GetBool("verbose")
-		
+
 		if !cmdutil.IsJSONOutput(ctx.Cmd) {
 			if dryRun {
 				fmt.Printf("Dry run - analyzing file: %s\n", resolvedFilename)
@@ -47,7 +47,7 @@ Examples:
 				fmt.Printf("Tangling code blocks in file: %s\n", resolvedFilename)
 			}
 		}
-		
+
 		return tangleMarkdown(ws, resolvedFilename, dryRun, verbose, noWorkspace, ctx)
 	},
 }
@@ -67,7 +67,7 @@ func tangleMarkdown(ws *workspace.Workspace, filePath string, dryRun, verbose bo
 
 	// Group blocks by target file
 	groups := engine.GroupBlocksByFile()
-	
+
 	if len(groups) == 0 {
 		if cmdutil.IsJSONOutput(ctx.Cmd) {
 			return outputTangleJSON(ctx, []map[string]interface{}{}, filePath, dryRun)
@@ -117,11 +117,11 @@ func tangleMarkdown(ws *workspace.Workspace, filePath string, dryRun, verbose bo
 // outputTangleJSON outputs tangle results in JSON format
 func outputTangleJSON(ctx *cmdutil.CommandContext, groups []map[string]interface{}, sourceFile string, dryRun bool) error {
 	response := map[string]interface{}{
-		"source_file":   sourceFile,
-		"dry_run":       dryRun,
-		"total_groups":  len(groups),
-		"target_files":  groups,
-		"metadata":      cmdutil.CreateJSONMetadata(ctx.Cmd, true, ctx.StartTime),
+		"source_file":  sourceFile,
+		"dry_run":      dryRun,
+		"total_groups": len(groups),
+		"target_files": groups,
+		"metadata":     cmdutil.CreateJSONMetadata(ctx.Cmd, true, ctx.StartTime),
 	}
 
 	return cmdutil.OutputJSON(response)

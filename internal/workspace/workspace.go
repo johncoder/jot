@@ -75,7 +75,7 @@ func (ws *Workspace) GetArchiveLocation() string {
 	if ws.Config == nil || ws.Config.ArchiveLocation == "" {
 		return "archive/archive.md#Archive"
 	}
-	
+
 	return ws.Config.ArchiveLocation
 }
 
@@ -101,7 +101,7 @@ func FindWorkspace() (*Workspace, error) {
 			if err != nil {
 				return nil, fmt.Errorf("failed to load workspace config: %w", err)
 			}
-			
+
 			return &Workspace{
 				Root:      dir,
 				JotDir:    jotDir,

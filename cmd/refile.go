@@ -38,13 +38,13 @@ type DestinationTarget struct {
 
 // RefileOperation encapsulates a refile operation with atomic execution for same-file operations
 type RefileOperation struct {
-	SourcePath       string
-	DestPath         string
-	Subtree          *markdown.Subtree
+	SourcePath         string
+	DestPath           string
+	Subtree            *markdown.Subtree
 	TransformedContent []byte
-	InsertOffset     int
-	CreatePath       []string
-	TargetLevel      int
+	InsertOffset       int
+	CreatePath         []string
+	TargetLevel        int
 }
 
 // IsSameFile returns true if source and destination are the same file
@@ -79,41 +79,41 @@ func (op *RefileOperation) executeSameFile() error {
 func (op *RefileOperation) performSimpleSameFileRefile(content []byte) []byte {
 	// Step 1: Prepare content to move with consistent formatting
 	contentToMove := op.ensureConsistentFormatting(op.TransformedContent)
-	
+
 	// Step 2: Remove the original subtree cleanly
 	beforeSubtree := content[:op.Subtree.StartOffset]
 	afterSubtree := content[op.Subtree.EndOffset:]
 	contentWithoutSubtree := append(beforeSubtree, afterSubtree...)
-	
+
 	// Step 3: Adjust insertion offset for removed content
 	adjustedOffset := op.InsertOffset
 	if op.InsertOffset > op.Subtree.StartOffset {
 		removedLength := op.Subtree.EndOffset - op.Subtree.StartOffset
 		adjustedOffset = op.InsertOffset - removedLength
 	}
-	
+
 	// Step 4: Ensure we don't go past the content boundary
 	if adjustedOffset > len(contentWithoutSubtree) {
 		adjustedOffset = len(contentWithoutSubtree)
 	}
-	
+
 	// Step 5: Perform insertion and normalize spacing in post-processing
 	result := make([]byte, 0, len(contentWithoutSubtree)+len(contentToMove)+2)
 	result = append(result, contentWithoutSubtree[:adjustedOffset]...)
-	
+
 	// Add spacing before content
 	if adjustedOffset > 0 && contentWithoutSubtree[adjustedOffset-1] != '\n' {
 		result = append(result, '\n', '\n')
 	} else if adjustedOffset > 0 {
 		result = append(result, '\n')
 	}
-	
+
 	// Add content
 	result = append(result, contentToMove...)
-	
+
 	// Add remaining content
 	result = append(result, contentWithoutSubtree[adjustedOffset:]...)
-	
+
 	// Post-process to normalize spacing: ensure exactly one blank line between sections
 	return op.normalizeMarkdownSpacing(result)
 }
@@ -336,7 +336,7 @@ Examples:
 				Timeout:     30 * time.Second,
 				AllowBypass: refileNoVerify,
 			}
-			
+
 			result, err := hookManager.Execute(hookCtx)
 			if err != nil {
 				err := cmdutil.NewExternalError("pre-refile hook", nil, err)
@@ -345,7 +345,7 @@ Examples:
 				}
 				return err
 			}
-			
+
 			if result.Aborted {
 				err := fmt.Errorf("pre-refile hook aborted operation")
 				if ctx.IsJSONOutput() {
@@ -374,7 +374,7 @@ Examples:
 				Timeout:     30 * time.Second,
 				AllowBypass: refileNoVerify,
 			}
-			
+
 			_, hookErr := hookManager.Execute(hookCtx)
 			if hookErr != nil && !ctx.IsJSONOutput() {
 				fmt.Printf("Warning: post-refile hook failed: %s\n", hookErr.Error())
@@ -597,11 +597,11 @@ func performRefile(ws *workspace.Workspace, sourcePath *markdown.HeadingPath, su
 	operation := &RefileOperation{
 		SourcePath:         cmdutil.ResolveWorkspaceRelativePath(ws, sourcePath.File),
 		DestPath:           cmdutil.ResolveWorkspaceRelativePath(ws, dest.File),
-		Subtree:           subtree,
+		Subtree:            subtree,
 		TransformedContent: transformedContent,
-		InsertOffset:      dest.InsertOffset,
-		CreatePath:        dest.CreatePath,
-		TargetLevel:       dest.TargetLevel,
+		InsertOffset:       dest.InsertOffset,
+		CreatePath:         dest.CreatePath,
+		TargetLevel:        dest.TargetLevel,
 	}
 
 	// Execute the operation with proper same-file handling
@@ -612,7 +612,7 @@ func performRefile(ws *workspace.Workspace, sourcePath *markdown.HeadingPath, su
 func executeRefile(sourceSelector, targetSelector string, ctx *cmdutil.CommandContext, ws *workspace.Workspace) error {
 	// Initialize hook manager
 	hookManager := hooks.NewManager(ws)
-	
+
 	// Run pre-refile hook
 	if !refileNoVerify {
 		hookCtx := &hooks.HookContext{
@@ -623,12 +623,12 @@ func executeRefile(sourceSelector, targetSelector string, ctx *cmdutil.CommandCo
 			Timeout:     30 * time.Second,
 			AllowBypass: refileNoVerify,
 		}
-		
+
 		result, err := hookManager.Execute(hookCtx)
 		if err != nil {
 			return cmdutil.NewExternalError("pre-refile hook", nil, err)
 		}
-		
+
 		if result.Aborted {
 			return fmt.Errorf("pre-refile hook aborted operation")
 		}
@@ -680,7 +680,7 @@ func executeRefile(sourceSelector, targetSelector string, ctx *cmdutil.CommandCo
 			Timeout:     30 * time.Second,
 			AllowBypass: refileNoVerify,
 		}
-		
+
 		_, hookErr := hookManager.Execute(hookCtx)
 		if hookErr != nil {
 			// Check for JSON output to determine if we should show warnings
@@ -971,11 +971,11 @@ func findHeadingLineEnd(heading *ast.Heading, content []byte) int {
 
 // JSON response structures for refile command
 type RefileResponse struct {
-	Operation   string            `json:"operation"`
-	Source      RefileSource      `json:"source"`
-	Destination RefileDestination `json:"destination"`
-	Content     RefileContent     `json:"content"`
-	Metadata    cmdutil.JSONMetadata      `json:"metadata"`
+	Operation   string               `json:"operation"`
+	Source      RefileSource         `json:"source"`
+	Destination RefileDestination    `json:"destination"`
+	Content     RefileContent        `json:"content"`
+	Metadata    cmdutil.JSONMetadata `json:"metadata"`
 }
 
 type RefileSource struct {
@@ -1005,7 +1005,7 @@ type InspectDestinationResponse struct {
 	Operation   string                     `json:"operation"`
 	Destination InspectDestinationInfo     `json:"destination"`
 	Analysis    InspectDestinationAnalysis `json:"analysis"`
-	Metadata    cmdutil.JSONMetadata               `json:"metadata"`
+	Metadata    cmdutil.JSONMetadata       `json:"metadata"`
 }
 
 type InspectDestinationInfo struct {
@@ -1189,7 +1189,7 @@ func inspectDestinationJSON(ctx *cmdutil.CommandContext, ws *workspace.Workspace
 func (op *RefileOperation) ensureConsistentFormatting(content []byte) []byte {
 	// Trim any trailing whitespace/newlines
 	trimmed := strings.TrimRight(string(content), " \t\n")
-	
+
 	// Ensure content ends with exactly one newline for consistent formatting
 	if len(trimmed) > 0 {
 		return []byte(trimmed + "\n")
@@ -1206,22 +1206,22 @@ func (op *RefileOperation) preserveSpacingAfterRemoval(beforeSubtree, afterSubtr
 	if len(afterSubtree) == 0 {
 		return beforeSubtree
 	}
-	
+
 	// Check if afterSubtree starts with a heading (## or #)
 	// Skip leading newlines to check actual content
 	afterStart := 0
 	for afterStart < len(afterSubtree) && afterSubtree[afterStart] == '\n' {
 		afterStart++
 	}
-	
+
 	isNextHeading := false
 	if afterStart < len(afterSubtree) && afterSubtree[afterStart] == '#' {
 		isNextHeading = true
 	}
-	
+
 	// Check how beforeSubtree ends
 	beforeEndsWithNewline := len(beforeSubtree) > 0 && beforeSubtree[len(beforeSubtree)-1] == '\n'
-	
+
 	// If the next content is a heading and beforeSubtree doesn't end with newline,
 	// or if we need to ensure proper spacing between sections
 	if isNextHeading {
@@ -1233,7 +1233,7 @@ func (op *RefileOperation) preserveSpacingAfterRemoval(beforeSubtree, afterSubtr
 			return append(append(beforeSubtree, '\n', '\n'), afterSubtree...)
 		}
 	}
-	
+
 	// Default: just concatenate
 	return append(beforeSubtree, afterSubtree...)
 }
@@ -1242,12 +1242,12 @@ func (op *RefileOperation) preserveSpacingAfterRemoval(beforeSubtree, afterSubtr
 func (op *RefileOperation) normalizeMarkdownSpacing(content []byte) []byte {
 	// Simple approach: replace any sequence of 3+ newlines with exactly 2 newlines (one blank line)
 	result := string(content)
-	
+
 	// Replace multiple consecutive newlines with exactly two (which creates one blank line)
 	for strings.Contains(result, "\n\n\n") {
 		result = strings.ReplaceAll(result, "\n\n\n", "\n\n")
 	}
-	
+
 	return []byte(result)
 }
 
@@ -1413,7 +1413,7 @@ func selectSourceSubtree(ws *workspace.Workspace, sourceFile string, verbose boo
 	if err != nil {
 		return "", err
 	}
-	
+
 	if selector == "" {
 		return "", nil // User cancelled
 	}
@@ -1479,7 +1479,7 @@ func selectTargetLocation(ws *workspace.Workspace, targetFile string, verbose bo
 	if err != nil {
 		return "", err
 	}
-	
+
 	if selector == "" {
 		return "", nil // User cancelled
 	}
@@ -1497,11 +1497,11 @@ func selectTargetLocation(ws *workspace.Workspace, targetFile string, verbose bo
 func confirmRefile(sourceSelector, targetSelector string, ws *workspace.Workspace) (bool, error) {
 	border := strings.Repeat("=", 60)
 	separator := strings.Repeat("-", 60)
-	
+
 	fmt.Printf("\n%s\n", border)
 	fmt.Printf("📋 REFILE OPERATION SUMMARY\n")
 	fmt.Printf("%s\n", border)
-	
+
 	// Parse selectors to get more detailed info
 	sourcePath, err := markdown.ParsePath(sourceSelector)
 	if err != nil {
@@ -1513,7 +1513,7 @@ func confirmRefile(sourceSelector, targetSelector string, ws *workspace.Workspac
 			fmt.Printf("  📤 Source: %s (entire file)\n", sourcePath.File)
 		}
 	}
-	
+
 	destPath, err := markdown.ParsePath(targetSelector)
 	if err != nil {
 		fmt.Printf("  Target: %s (⚠️  parse error: %v)\n", targetSelector, err)
@@ -1524,9 +1524,9 @@ func confirmRefile(sourceSelector, targetSelector string, ws *workspace.Workspac
 			fmt.Printf("  📥 Target: %s (top level)\n", destPath.File)
 		}
 	}
-	
+
 	fmt.Printf("%s\n", separator)
-	
+
 	return cmdutil.ConfirmOperation("\n🚀 Execute refile operation?")
 }
 
@@ -1655,7 +1655,7 @@ func runFileSelectionFZF(ws *workspace.Workspace, files []string, prompt string)
 		} else {
 			absolutePath = pathUtil.WorkspaceJoin(file)
 		}
-		
+
 		// Write both the display name and absolute path (tab-separated)
 		fmt.Fprintf(tempFile, "%s\t%s\n", file, absolutePath)
 	}
@@ -1709,7 +1709,7 @@ func runFileSelectionFZF(ws *workspace.Workspace, files []string, prompt string)
 	if len(parts) > 0 {
 		return parts[0], nil
 	}
-	
+
 	return selected, nil
 }
 
@@ -1842,7 +1842,7 @@ func validateAndDisambiguateSelector(ws *workspace.Workspace, selector string, s
 	// For now, we'll use the first match but warn the user
 	fmt.Printf("⚠️  Warning: Multiple headings named '%s' found. Using the first occurrence.\n", headingName)
 	fmt.Printf("   Preview showed: %s\n", matches[0].Preview)
-	
+
 	return selector, nil
 }
 
@@ -1851,25 +1851,25 @@ func improvePreviewFormatting(content []byte, startPos, endPos int) string {
 	if startPos >= len(content) || endPos > len(content) || startPos >= endPos {
 		return "(empty content)"
 	}
-	
+
 	lines := strings.Split(string(content[startPos:endPos]), "\n")
-	
+
 	var preview strings.Builder
 	lineCount := 0
-	
+
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
-		
+
 		// Skip empty lines at the beginning
 		if preview.Len() == 0 && trimmed == "" {
 			continue
 		}
-		
+
 		// Stop at next heading
 		if strings.HasPrefix(trimmed, "#") && preview.Len() > 0 {
 			break
 		}
-		
+
 		// Add line with proper formatting
 		if trimmed != "" {
 			if preview.Len() > 0 {
@@ -1877,14 +1877,14 @@ func improvePreviewFormatting(content []byte, startPos, endPos int) string {
 			}
 			preview.WriteString(trimmed)
 			lineCount++
-			
+
 			// Limit preview length
 			if preview.Len() > 120 || lineCount >= 3 {
 				break
 			}
 		}
 	}
-	
+
 	result := preview.String()
 	if len(result) > 120 {
 		result = result[:117] + "..."
@@ -1892,7 +1892,7 @@ func improvePreviewFormatting(content []byte, startPos, endPos int) string {
 	if result == "" {
 		result = "(empty content)"
 	}
-	
+
 	return result
 }
 
@@ -1900,12 +1900,12 @@ func improvePreviewFormatting(content []byte, startPos, endPos int) string {
 func extractPreviewContent(node ast.Node, content []byte, maxLen int) string {
 	// Get the position of this heading in the content
 	startPos := markdown.GetNodeOffset(node, content)
-	
+
 	// Find the heading line and skip it
 	lines := strings.Split(string(content), "\n")
 	var headingLineIndex int
 	var currentPos int
-	
+
 	// Find which line this heading is on
 	for i, line := range lines {
 		if currentPos >= startPos {
@@ -1914,24 +1914,24 @@ func extractPreviewContent(node ast.Node, content []byte, maxLen int) string {
 		}
 		currentPos += len(line) + 1 // +1 for newline
 	}
-	
+
 	// Collect content from the next few lines after the heading
 	var preview strings.Builder
 	lineCount := 0
-	
+
 	for i := headingLineIndex + 1; i < len(lines) && lineCount < 3; i++ {
 		line := strings.TrimSpace(lines[i])
-		
+
 		// Skip empty lines at the beginning
 		if preview.Len() == 0 && line == "" {
 			continue
 		}
-		
+
 		// Stop if we hit another heading
 		if strings.HasPrefix(line, "#") {
 			break
 		}
-		
+
 		// Add meaningful content
 		if line != "" {
 			if preview.Len() > 0 {
@@ -1939,22 +1939,22 @@ func extractPreviewContent(node ast.Node, content []byte, maxLen int) string {
 			}
 			preview.WriteString(line)
 			lineCount++
-			
+
 			// Stop if we've gotten enough content
 			if preview.Len() > maxLen {
 				break
 			}
 		}
 	}
-	
+
 	result := preview.String()
 	if len(result) > maxLen {
 		result = result[:maxLen-3] + "..."
 	}
-	
+
 	if result == "" {
 		result = "No content"
 	}
-	
+
 	return result
 }

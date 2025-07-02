@@ -62,7 +62,7 @@ Examples:
 // showArchiveConfig displays the current archive configuration
 func showArchiveConfig(ctx *cmdutil.CommandContext, ws *workspace.Workspace) error {
 	archiveLocation := ws.GetArchiveLocation()
-	
+
 	if ctx.IsJSONOutput() {
 		response := ArchiveConfigResponse{
 			Operation:       "show_config",
@@ -78,7 +78,7 @@ func showArchiveConfig(ctx *cmdutil.CommandContext, ws *workspace.Workspace) err
 	fmt.Printf("  Location: %s\n", ws.Config.ArchiveLocation)
 	fmt.Printf("  Resolved: %s\n", archiveLocation)
 	fmt.Printf("  Full path: %s\n", pathUtil.WorkspaceJoin(archiveLocation))
-	
+
 	return nil
 }
 
@@ -100,7 +100,7 @@ func setArchiveLocation(ctx *cmdutil.CommandContext, ws *workspace.Workspace, lo
 	}
 
 	cmdutil.ShowSuccess("✓ Archive location updated to: %s", location)
-	
+
 	return nil
 }
 
@@ -108,13 +108,13 @@ func setArchiveLocation(ctx *cmdutil.CommandContext, ws *workspace.Workspace, lo
 func initializeArchiveStructure(ctx *cmdutil.CommandContext, ws *workspace.Workspace) error {
 	archiveLocation := ws.GetArchiveLocation()
 	pathUtil := cmdutil.NewPathUtil(ws)
-	
+
 	// Parse the archive location to extract file path and section
 	// Format: "archive/archive.md#Archive"
 	parts := strings.SplitN(archiveLocation, "#", 2)
 	archiveFile := pathUtil.WorkspaceJoin(parts[0])
 	archiveDir := filepath.Dir(archiveFile)
-	
+
 	var createdItems []ArchiveItem
 	var operations []string
 
@@ -123,7 +123,7 @@ func initializeArchiveStructure(ctx *cmdutil.CommandContext, ws *workspace.Works
 		if err := pathUtil.EnsureDir(archiveDir); err != nil {
 			return ctx.HandleOperationError("create archive directory", err)
 		}
-		
+
 		relativeDir, _ := filepath.Rel(ws.Root, archiveDir)
 		createdItems = append(createdItems, ArchiveItem{
 			Path:        relativeDir + "/",
@@ -141,18 +141,18 @@ func initializeArchiveStructure(ctx *cmdutil.CommandContext, ws *workspace.Works
 		if len(parts) > 1 {
 			sectionName = parts[1]
 		}
-		
+
 		archiveContent := fmt.Sprintf("# %s\n\nArchived notes.\n\n", sectionName)
-		
+
 		if err := pathUtil.SafeWriteFile(archiveFile, []byte(archiveContent)); err != nil {
 			return ctx.HandleOperationError("create archive file", err)
 		}
-		
+
 		fileCreated = true
 		relativeFile, _ := filepath.Rel(ws.Root, archiveFile)
 		createdItems = append(createdItems, ArchiveItem{
 			Path:        relativeFile,
-			Type:        "file", 
+			Type:        "file",
 			Description: "Archive file",
 			Created:     true,
 			Size:        int64(len(archiveContent)),
@@ -192,12 +192,12 @@ func initializeArchiveStructure(ctx *cmdutil.CommandContext, ws *workspace.Works
 	} else {
 		fmt.Println("Archive structure ready!")
 	}
-	
+
 	fmt.Printf("Archive location: %s\n", archiveLocation)
 	fmt.Printf("Full path: %s\n", archiveFile)
 	fmt.Println()
 	fmt.Println("Use 'jot archive \"source.md#section\"' to archive specific content.")
-	
+
 	return nil
 }
 
@@ -205,11 +205,11 @@ func initializeArchiveStructure(ctx *cmdutil.CommandContext, ws *workspace.Works
 func archiveWithRefile(ctx *cmdutil.CommandContext, ws *workspace.Workspace, source string) error {
 	pathUtil := cmdutil.NewPathUtil(ws)
 	archiveLocation := ws.GetArchiveLocation()
-	
+
 	// Parse the archive location to extract file path
 	parts := strings.SplitN(archiveLocation, "#", 2)
 	archiveFile := pathUtil.WorkspaceJoin(parts[0])
-	
+
 	// Ensure archive file exists first
 	if _, err := os.Stat(archiveFile); os.IsNotExist(err) {
 		if err := initializeArchiveStructure(ctx, ws); err != nil {
@@ -228,24 +228,24 @@ func archiveWithRefile(ctx *cmdutil.CommandContext, ws *workspace.Workspace, sou
 			Timeout:     30 * time.Second,
 			AllowBypass: archiveNoVerify,
 		}
-		
+
 		result, err := hookManager.Execute(hookCtx)
 		if err != nil {
 			return ctx.HandleErrorf("pre-archive hook failed: %s", err.Error())
 		}
-		
+
 		if result.Aborted {
 			return ctx.HandleErrorf("pre-archive hook aborted operation")
 		}
 	}
-	
+
 	if !ctx.IsJSONOutput() {
 		fmt.Printf("Archiving '%s' to '%s'...\n", source, archiveLocation)
 	}
-	
+
 	// Call the internal refile function directly to avoid recursion
 	err := executeRefile(source, archiveLocation, ctx, ws)
-	
+
 	// Run post-archive hook (informational only)
 	if !archiveNoVerify && err == nil {
 		hookCtx := &hooks.HookContext{
@@ -256,30 +256,30 @@ func archiveWithRefile(ctx *cmdutil.CommandContext, ws *workspace.Workspace, sou
 			Timeout:     30 * time.Second,
 			AllowBypass: archiveNoVerify,
 		}
-		
+
 		_, hookErr := hookManager.Execute(hookCtx)
 		if hookErr != nil && !ctx.IsJSONOutput() {
 			cmdutil.ShowWarning("Warning: post-archive hook failed: %s", hookErr.Error())
 		}
 	}
-	
+
 	return err
 }
 
 // JSON response structures for archive command
 type ArchiveResponse struct {
-	Operation    string         `json:"operation"`
-	ArchiveDir   string         `json:"archive_dir"`
-	CreatedItems []ArchiveItem  `json:"created_items"`
-	Operations   []string       `json:"operations"`
-	Summary      ArchiveSummary `json:"summary"`
-	Metadata     cmdutil.JSONMetadata   `json:"metadata"`
+	Operation    string               `json:"operation"`
+	ArchiveDir   string               `json:"archive_dir"`
+	CreatedItems []ArchiveItem        `json:"created_items"`
+	Operations   []string             `json:"operations"`
+	Summary      ArchiveSummary       `json:"summary"`
+	Metadata     cmdutil.JSONMetadata `json:"metadata"`
 }
 
 type ArchiveConfigResponse struct {
-	Operation       string       `json:"operation"`
-	ArchiveLocation string       `json:"archive_location"`
-	ResolvedPath    string       `json:"resolved_path"`
+	Operation       string               `json:"operation"`
+	ArchiveLocation string               `json:"archive_location"`
+	ResolvedPath    string               `json:"resolved_path"`
 	Metadata        cmdutil.JSONMetadata `json:"metadata"`
 }
 

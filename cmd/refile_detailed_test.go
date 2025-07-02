@@ -14,14 +14,14 @@ import (
 // to identify issues with subtree content handling
 func TestSubtreeExtractionAndInsertion(t *testing.T) {
 	tests := []struct {
-		name            string
-		sourceContent   string
-		sourceSelector  string
-		targetContent   string
-		targetSelector  string
-		expectedSource  string
-		expectedTarget  string
-		expectedErrors  []string
+		name           string
+		sourceContent  string
+		sourceSelector string
+		targetContent  string
+		targetSelector string
+		expectedSource string
+		expectedTarget string
+		expectedErrors []string
 	}{
 		{
 			name: "h1_and_h2_level_preservation",
@@ -344,7 +344,7 @@ Last bit of content here.
 			sourcePathCheck, _ := markdown.ParsePath(tt.sourceSelector)
 			destPathCheck, _ := markdown.ParsePath(tt.targetSelector)
 			sameFile := sourcePathCheck.File == destPathCheck.File
-			
+
 			if !sameFile {
 				if err := os.WriteFile(targetFile, []byte(tt.targetContent), 0644); err != nil {
 					t.Fatalf("Failed to write target file: %v", err)
@@ -448,31 +448,31 @@ func TestHeadingLevelTransformation(t *testing.T) {
 		expectedResult string
 	}{
 		{
-			name:        "h1_to_h3_transformation",
-			content:     "# Main\n\n## Sub\n\nContent\n\n### Deep\n\nMore content",
-			sourceLevel: 1,
-			targetLevel: 3,
+			name:           "h1_to_h3_transformation",
+			content:        "# Main\n\n## Sub\n\nContent\n\n### Deep\n\nMore content",
+			sourceLevel:    1,
+			targetLevel:    3,
 			expectedResult: "### Main\n\n#### Sub\n\nContent\n\n##### Deep\n\nMore content",
 		},
 		{
-			name:        "h2_to_h1_transformation",
-			content:     "## Title\n\n### Subtitle\n\nText content",
-			sourceLevel: 2,
-			targetLevel: 1,
+			name:           "h2_to_h1_transformation",
+			content:        "## Title\n\n### Subtitle\n\nText content",
+			sourceLevel:    2,
+			targetLevel:    1,
 			expectedResult: "# Title\n\n## Subtitle\n\nText content",
 		},
 		{
-			name:        "preserve_non_headings_with_hashes",
-			content:     "# Main\n\nText with #hashtag and #another-tag\n\n## Sub\n\nMore #tags here",
-			sourceLevel: 1,
-			targetLevel: 2,
+			name:           "preserve_non_headings_with_hashes",
+			content:        "# Main\n\nText with #hashtag and #another-tag\n\n## Sub\n\nMore #tags here",
+			sourceLevel:    1,
+			targetLevel:    2,
 			expectedResult: "## Main\n\nText with #hashtag and #another-tag\n\n### Sub\n\nMore #tags here",
 		},
 		{
-			name:        "handle_max_heading_level",
-			content:     "##### Level 5\n\n###### Level 6\n\nContent",
-			sourceLevel: 5,
-			targetLevel: 6,
+			name:           "handle_max_heading_level",
+			content:        "##### Level 5\n\n###### Level 6\n\nContent",
+			sourceLevel:    5,
+			targetLevel:    6,
 			expectedResult: "###### Level 5\n\n###### Level 6\n\nContent",
 		},
 	}
@@ -481,7 +481,7 @@ func TestHeadingLevelTransformation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			levelDiff := tt.targetLevel - tt.sourceLevel
 			result := markdown.TransformHeadingLevels([]byte(tt.content), levelDiff)
-			
+
 			if string(result) != tt.expectedResult {
 				t.Errorf("Transformation mismatch:\nGot:\n%s\n\nExpected:\n%s", string(result), tt.expectedResult)
 			}
@@ -495,12 +495,12 @@ func TestNewlineHandling(t *testing.T) {
 	content := []byte("# Target\n\nExisting content\n")
 	insertOffset := len("# Target\n")
 	insertContent := []byte("\n## Inserted\n\nContent\n")
-	
+
 	result := append(content[:insertOffset], insertContent...)
 	result = append(result, content[insertOffset:]...)
-	
+
 	expected := "# Target\n\n## Inserted\n\nContent\n\nExisting content\n"
-	
+
 	if string(result) != expected {
 		t.Errorf("Basic insertion test failed:\nGot: %q\nExpected: %q", string(result), expected)
 		t.Logf("Content before: %q", string(content[:insertOffset]))

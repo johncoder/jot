@@ -22,7 +22,7 @@ func NewHookRunner(ws *workspace.Workspace, noVerify bool) *HookRunner {
 			noVerify:  noVerify,
 		}
 	}
-	
+
 	return &HookRunner{
 		manager:   hooks.NewManager(ws),
 		workspace: ws,
@@ -35,7 +35,7 @@ func (r *HookRunner) ExecutePreHook(hookType hooks.HookType, ctx *HookExecutionC
 	if r.manager == nil || r.noVerify {
 		return &hooks.HookResult{Content: ctx.Content}, nil
 	}
-	
+
 	hookCtx := &hooks.HookContext{
 		Type:         hookType,
 		Workspace:    r.workspace,
@@ -46,16 +46,16 @@ func (r *HookRunner) ExecutePreHook(hookType hooks.HookType, ctx *HookExecutionC
 		ExtraEnv:     ctx.ExtraEnv,
 		AllowBypass:  r.noVerify,
 	}
-	
+
 	result, err := r.manager.Execute(hookCtx)
 	if err != nil {
 		return nil, fmt.Errorf("pre-hook execution failed: %w", err)
 	}
-	
+
 	if result.Aborted {
 		return result, fmt.Errorf("operation aborted by pre-hook")
 	}
-	
+
 	return result, nil
 }
 
@@ -64,7 +64,7 @@ func (r *HookRunner) ExecutePostHook(hookType hooks.HookType, ctx *HookExecution
 	if r.manager == nil || r.noVerify {
 		return nil
 	}
-	
+
 	hookCtx := &hooks.HookContext{
 		Type:         hookType,
 		Workspace:    r.workspace,
@@ -75,7 +75,7 @@ func (r *HookRunner) ExecutePostHook(hookType hooks.HookType, ctx *HookExecution
 		ExtraEnv:     ctx.ExtraEnv,
 		AllowBypass:  r.noVerify,
 	}
-	
+
 	_, err := r.manager.Execute(hookCtx)
 	// Post-hooks are informational only - don't fail the operation
 	return err
@@ -132,11 +132,11 @@ func ExecutePreCaptureHook(runner *HookRunner, content, template string) (*hooks
 	if runner == nil {
 		return &hooks.HookResult{Content: content}, nil
 	}
-	
+
 	ctx := NewHookExecutionContext().
 		WithContent(content).
 		WithTemplateName(template)
-	
+
 	return runner.ExecutePreHook(hooks.PreCapture, ctx)
 }
 
@@ -145,11 +145,11 @@ func ExecutePostCaptureHook(runner *HookRunner, content, destPath string) error 
 	if runner == nil {
 		return nil
 	}
-	
+
 	ctx := NewHookExecutionContext().
 		WithContent(content).
 		WithDestPath(destPath)
-	
+
 	return runner.ExecutePostHook(hooks.PostCapture, ctx)
 }
 
@@ -158,11 +158,11 @@ func ExecutePreRefileHook(runner *HookRunner, sourceFile, destPath string) (*hoo
 	if runner == nil {
 		return &hooks.HookResult{}, nil
 	}
-	
+
 	ctx := NewHookExecutionContext().
 		WithSourceFile(sourceFile).
 		WithDestPath(destPath)
-	
+
 	return runner.ExecutePreHook(hooks.PreRefile, ctx)
 }
 
@@ -171,11 +171,11 @@ func ExecutePostRefileHook(runner *HookRunner, sourceFile, destPath string) erro
 	if runner == nil {
 		return nil
 	}
-	
+
 	ctx := NewHookExecutionContext().
 		WithSourceFile(sourceFile).
 		WithDestPath(destPath)
-	
+
 	return runner.ExecutePostHook(hooks.PostRefile, ctx)
 }
 
@@ -184,10 +184,10 @@ func ExecutePreArchiveHook(runner *HookRunner, sourceFile string) (*hooks.HookRe
 	if runner == nil {
 		return &hooks.HookResult{}, nil
 	}
-	
+
 	ctx := NewHookExecutionContext().
 		WithSourceFile(sourceFile)
-	
+
 	return runner.ExecutePreHook(hooks.PreArchive, ctx)
 }
 
@@ -196,9 +196,9 @@ func ExecutePostArchiveHook(runner *HookRunner, sourceFile string) error {
 	if runner == nil {
 		return nil
 	}
-	
+
 	ctx := NewHookExecutionContext().
 		WithSourceFile(sourceFile)
-	
+
 	return runner.ExecutePostHook(hooks.PostArchive, ctx)
 }

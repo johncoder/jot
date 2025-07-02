@@ -44,7 +44,7 @@ Examples:
 		}
 
 		query := strings.Join(args, " ")
-		
+
 		// Check for interactive mode with FZF (not available in JSON mode)
 		if fzf.ShouldUseFZF(findInteractive) {
 			if cmdutil.IsJSONOutput(ctx.Cmd) {
@@ -105,7 +105,7 @@ func runInteractiveFind(ws *workspace.Workspace, query string) error {
 
 	// Collect search results using the same logic as normal find
 	results := collectSearchResults(ws, query)
-	
+
 	if len(results) == 0 {
 		fmt.Printf("No matches found for '%s'\n", query)
 		return nil
@@ -163,7 +163,7 @@ func enhanceResultsWithHeadings(results []SearchResult) []SearchResult {
 		for _, idx := range resultIndices {
 			result := &results[idx]
 			lineNum := result.LineNumber
-			
+
 			if headingPath, found := headingMap[lineNum]; found && headingPath != "" {
 				// Create enhanced selector: file:line#heading/path
 				result.RelativePath = fmt.Sprintf("%s:%d#%s", result.RelativePath, lineNum, headingPath)
@@ -235,13 +235,13 @@ func outputFindJSON(ctx *cmdutil.CommandContext, results []SearchResult, query s
 	}
 
 	response := map[string]interface{}{
-		"query":        query,
-		"total_found":  len(results),
-		"results":      jsonResults,
+		"query":       query,
+		"total_found": len(results),
+		"results":     jsonResults,
 		"search_info": map[string]interface{}{
 			"include_archive": findInArchive,
-			"limit":          findLimit,
-			"limited":        len(results) >= findLimit,
+			"limit":           findLimit,
+			"limited":         len(results) >= findLimit,
 		},
 		"metadata": cmdutil.CreateJSONMetadata(ctx.Cmd, true, ctx.StartTime),
 	}

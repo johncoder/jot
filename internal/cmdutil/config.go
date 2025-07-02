@@ -11,7 +11,7 @@ import (
 
 // ConfigManager provides standardized configuration management for commands
 type ConfigManager struct {
-	configFile string
+	configFile  string
 	initialized bool
 }
 
@@ -32,12 +32,12 @@ func (cm *ConfigManager) Initialize(configFile string) error {
 	if cm.initialized {
 		return nil // Already initialized
 	}
-	
+
 	cm.configFile = configFile
 	if err := config.Initialize(configFile); err != nil {
 		return fmt.Errorf("failed to initialize config: %w", err)
 	}
-	
+
 	cm.initialized = true
 	return nil
 }
@@ -93,18 +93,18 @@ func (wm *WorkspaceManager) GetDefaultWorkspace() (string, string, error) {
 // AddWorkspace adds a new workspace to the configuration
 func (wm *WorkspaceManager) AddWorkspace(name, path string) error {
 	wm.EnsureInitialized()
-	
+
 	// Convert to absolute path
 	absPath, err := filepath.Abs(path)
 	if err != nil {
 		return fmt.Errorf("failed to resolve absolute path: %w", err)
 	}
-	
+
 	// Check if workspace already exists
 	if existingPath, err := config.GetWorkspace(name); err == nil {
 		return fmt.Errorf("workspace '%s' already exists at '%s'", name, existingPath)
 	}
-	
+
 	return config.AddWorkspace(name, absPath)
 }
 
@@ -150,11 +150,11 @@ func CreateDefaultWorkspaceConfig(jotDir string) (string, []byte, error) {
   "archive_location": "archive/archive.md#Archive"
 }
 `
-	
+
 	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
 		return "", nil, fmt.Errorf("failed to create workspace config: %w", err)
 	}
-	
+
 	return configPath, []byte(configContent), nil
 }
 

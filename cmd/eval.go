@@ -155,12 +155,12 @@ Examples:
 				Timeout:     30 * time.Second,
 				AllowBypass: evalNoVerify,
 			}
-			
+
 			result, err := hookManager.Execute(hookCtx)
 			if err != nil {
 				return ctx.HandleExternalCommand("pre-eval hook", nil, err)
 			}
-			
+
 			if result.Aborted {
 				return ctx.HandleOperationError("pre-eval hook", fmt.Errorf("pre-eval hook aborted operation"))
 			}
@@ -190,7 +190,7 @@ Examples:
 				Timeout:     30 * time.Second,
 				AllowBypass: evalNoVerify,
 			}
-			
+
 			_, hookErr := hookManager.Execute(hookCtx)
 			if hookErr != nil && !ctx.IsJSONOutput() {
 				cmdutil.ShowWarning("Warning: post-eval hook failed: %s", hookErr.Error())
@@ -346,7 +346,7 @@ func approveBlock(filename, blockName, mode string) error {
 	if err != nil {
 		return err
 	}
-	
+
 	if !confirmed {
 		cmdutil.ShowInfo("Approval cancelled.")
 		return nil
@@ -422,7 +422,7 @@ func approveDocument(filename, mode string) error {
 	if err != nil {
 		return err
 	}
-	
+
 	if !confirmed {
 		cmdutil.ShowInfo("Document approval cancelled.")
 		return nil
@@ -470,12 +470,12 @@ func revokeDocumentApproval(filename string) error {
 
 // JSON response structures for eval command
 type EvalResponse struct {
-	Operation string         `json:"operation"`
-	Results   []EvalResult   `json:"results,omitempty"`
-	Blocks    []EvalBlock    `json:"blocks,omitempty"`
-	Approvals []EvalApproval `json:"approvals,omitempty"`
-	Summary   EvalSummary    `json:"summary"`
-	Metadata  cmdutil.JSONMetadata   `json:"metadata"`
+	Operation string               `json:"operation"`
+	Results   []EvalResult         `json:"results,omitempty"`
+	Blocks    []EvalBlock          `json:"blocks,omitempty"`
+	Approvals []EvalApproval       `json:"approvals,omitempty"`
+	Summary   EvalSummary          `json:"summary"`
+	Metadata  cmdutil.JSONMetadata `json:"metadata"`
 }
 
 type EvalResult struct {
