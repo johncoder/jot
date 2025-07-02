@@ -73,10 +73,11 @@ func showArchiveConfig(ctx *cmdutil.CommandContext, ws *workspace.Workspace) err
 		return cmdutil.OutputJSON(response)
 	}
 
+	pathUtil := cmdutil.NewPathUtil(ws)
 	fmt.Printf("Archive Configuration:\n")
 	fmt.Printf("  Location: %s\n", ws.Config.ArchiveLocation)
 	fmt.Printf("  Resolved: %s\n", archiveLocation)
-	fmt.Printf("  Full path: %s\n", filepath.Join(ws.Root, archiveLocation))
+	fmt.Printf("  Full path: %s\n", pathUtil.WorkspaceJoin(archiveLocation))
 	
 	return nil
 }
@@ -106,11 +107,12 @@ func setArchiveLocation(ctx *cmdutil.CommandContext, ws *workspace.Workspace, lo
 // initializeArchiveStructure creates the archive directory and file structure
 func initializeArchiveStructure(ctx *cmdutil.CommandContext, ws *workspace.Workspace) error {
 	archiveLocation := ws.GetArchiveLocation()
+	pathUtil := cmdutil.NewPathUtil(ws)
 	
 	// Parse the archive location to extract file path and section
 	// Format: "archive/archive.md#Archive"
 	parts := strings.SplitN(archiveLocation, "#", 2)
-	archiveFile := filepath.Join(ws.Root, parts[0])
+	archiveFile := pathUtil.WorkspaceJoin(parts[0])
 	archiveDir := filepath.Dir(archiveFile)
 	
 	var createdItems []ArchiveItem
@@ -118,7 +120,7 @@ func initializeArchiveStructure(ctx *cmdutil.CommandContext, ws *workspace.Works
 
 	// Create archive directory if it doesn't exist
 	if _, err := os.Stat(archiveDir); os.IsNotExist(err) {
-		if err := os.MkdirAll(archiveDir, 0755); err != nil {
+		if err := pathUtil.EnsureDir(archiveDir); err != nil {
 			return ctx.HandleOperationError("create archive directory", err)
 		}
 		
@@ -142,7 +144,7 @@ func initializeArchiveStructure(ctx *cmdutil.CommandContext, ws *workspace.Works
 		
 		archiveContent := fmt.Sprintf("# %s\n\nArchived notes.\n\n", sectionName)
 		
-		if err := os.WriteFile(archiveFile, []byte(archiveContent), 0644); err != nil {
+		if err := pathUtil.SafeWriteFile(archiveFile, []byte(archiveContent)); err != nil {
 			return ctx.HandleOperationError("create archive file", err)
 		}
 		
@@ -201,11 +203,12 @@ func initializeArchiveStructure(ctx *cmdutil.CommandContext, ws *workspace.Works
 
 // archiveWithRefile delegates to refile command with archive destination
 func archiveWithRefile(ctx *cmdutil.CommandContext, ws *workspace.Workspace, source string) error {
+	pathUtil := cmdutil.NewPathUtil(ws)
 	archiveLocation := ws.GetArchiveLocation()
 	
 	// Parse the archive location to extract file path
 	parts := strings.SplitN(archiveLocation, "#", 2)
-	archiveFile := filepath.Join(ws.Root, parts[0])
+	archiveFile := pathUtil.WorkspaceJoin(parts[0])
 	
 	// Ensure archive file exists first
 	if _, err := os.Stat(archiveFile); os.IsNotExist(err) {

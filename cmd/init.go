@@ -46,6 +46,9 @@ Examples:
 			fmt.Printf("Initializing jot workspace in: %s\n", absPath)
 		}
 
+		// Initialize path utilities for workspace creation
+		pathUtil := cmdutil.NewPathUtil(nil) // No workspace context yet
+		
 		// Check if workspace already exists
 		jotDir := filepath.Join(absPath, ".jot")
 		if _, err := os.Stat(jotDir); err == nil {
@@ -64,7 +67,7 @@ This is your inbox for capturing new notes quickly. Use 'jot capture' to add new
 ---
 
 `
-		if err := os.WriteFile(inboxPath, []byte(inboxContent), 0644); err != nil {
+		if err := pathUtil.SafeWriteFile(inboxPath, []byte(inboxContent)); err != nil {
 			return ctx.HandleOperationError("create inbox.md", err)
 		}
 		createdFiles = append(createdFiles, InitFile{
@@ -76,7 +79,7 @@ This is your inbox for capturing new notes quickly. Use 'jot capture' to add new
 
 		// Create lib/ directory
 		libDir := filepath.Join(absPath, "lib")
-		if err := os.MkdirAll(libDir, 0755); err != nil {
+		if err := pathUtil.EnsureDir(libDir); err != nil {
 			return ctx.HandleOperationError("create lib directory", err)
 		}
 		createdFiles = append(createdFiles, InitFile{
@@ -86,7 +89,7 @@ This is your inbox for capturing new notes quickly. Use 'jot capture' to add new
 		})
 
 		// Create .jot/ directory
-		if err := os.MkdirAll(jotDir, 0755); err != nil {
+		if err := pathUtil.EnsureDir(jotDir); err != nil {
 			return ctx.HandleOperationError("create .jot directory", err)
 		}
 		createdFiles = append(createdFiles, InitFile{
@@ -102,7 +105,7 @@ This is your inbox for capturing new notes quickly. Use 'jot capture' to add new
 *.log
 tmp/
 `
-		if err := os.WriteFile(gitignorePath, []byte(gitignoreContent), 0644); err != nil {
+		if err := pathUtil.SafeWriteFile(gitignorePath, []byte(gitignoreContent)); err != nil {
 			return ctx.HandleOperationError("create .gitignore", err)
 		}
 		createdFiles = append(createdFiles, InitFile{

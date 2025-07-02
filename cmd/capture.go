@@ -227,11 +227,12 @@ Examples:
 			} else {
 				// Simple file destination
 				destinationPath := destination
+				pathUtil := cmdutil.NewPathUtil(ws)
 				if destination == "inbox.md" {
 					destinationPath = ws.InboxPath
 				} else if !filepath.IsAbs(destination) {
 					// Use workspace root for relative paths, not lib/ directory
-					destinationPath = filepath.Join(ws.Root, destination)
+					destinationPath = pathUtil.WorkspaceJoin(destination)
 				}
 
 				if err := ws.AppendToFile(destinationPath, finalContent); err != nil {
@@ -447,6 +448,7 @@ func refileContentToDestination(ws *workspace.Workspace, content, destination, m
 // performDirectInsertion inserts content directly into the destination file
 func performDirectInsertion(ws *workspace.Workspace, dest *DestinationTarget, transformedContent []byte) error {
 	// Construct destination file path
+	pathUtil := cmdutil.NewPathUtil(ws)
 	var destFilePath string
 	if dest.File == "inbox.md" {
 		destFilePath = ws.InboxPath
@@ -454,7 +456,7 @@ func performDirectInsertion(ws *workspace.Workspace, dest *DestinationTarget, tr
 		destFilePath = dest.File
 	} else {
 		// Use workspace root for relative paths, not lib/ directory
-		destFilePath = filepath.Join(ws.Root, dest.File)
+		destFilePath = pathUtil.WorkspaceJoin(dest.File)
 	}
 
 	// Read destination file using unified content utilities
@@ -485,7 +487,7 @@ func performDirectInsertion(ws *workspace.Workspace, dest *DestinationTarget, tr
 	newDestContent = append(newDestContent, destContent[dest.InsertOffset:]...)
 
 	// Write back to destination file
-	if err := os.WriteFile(destFilePath, newDestContent, 0644); err != nil {
+	if err := pathUtil.SafeWriteFile(destFilePath, newDestContent); err != nil {
 		return fmt.Errorf("failed to write destination file: %w", err)
 	}
 

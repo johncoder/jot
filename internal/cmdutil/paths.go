@@ -118,3 +118,132 @@ func ResolveWithOptions(filename string, opts *PathResolutionOptions) string {
 	}
 	return filename
 }
+
+// PathUtil provides workspace-aware path utilities with common operations
+type PathUtil struct {
+	workspace *workspace.Workspace
+}
+
+// NewPathUtil creates a new path utility instance with workspace context
+func NewPathUtil(ws *workspace.Workspace) *PathUtil {
+	return &PathUtil{workspace: ws}
+}
+
+// WorkspaceJoin joins a path relative to the workspace root
+func (p *PathUtil) WorkspaceJoin(relativePath string) string {
+	if p.workspace == nil {
+		return relativePath
+	}
+	return filepath.Join(p.workspace.Root, relativePath)
+}
+
+// LibJoin joins a path relative to the workspace lib directory
+func (p *PathUtil) LibJoin(relativePath string) string {
+	if p.workspace == nil {
+		return relativePath
+	}
+	return filepath.Join(p.workspace.LibDir, relativePath)
+}
+
+// JotDirJoin joins a path relative to the workspace .jot directory
+func (p *PathUtil) JotDirJoin(relativePath string) string {
+	if p.workspace == nil {
+		return relativePath
+	}
+	return filepath.Join(p.workspace.JotDir, relativePath)
+}
+
+// EnsureDir creates a directory if it doesn't exist with standard permissions (0755)
+func (p *PathUtil) EnsureDir(dirPath string) error {
+	return os.MkdirAll(dirPath, 0755)
+}
+
+// EnsureDirForFile creates the parent directory for a file path if it doesn't exist
+func (p *PathUtil) EnsureDirForFile(filePath string) error {
+	dir := filepath.Dir(filePath)
+	return p.EnsureDir(dir)
+}
+
+// SafeWriteFile writes content to a file, creating parent directories as needed
+func (p *PathUtil) SafeWriteFile(filePath string, content []byte) error {
+	if err := p.EnsureDirForFile(filePath); err != nil {
+		return err
+	}
+	return os.WriteFile(filePath, content, 0644)
+}
+
+// SafeAppendFile appends content to a file, creating parent directories as needed
+func (p *PathUtil) SafeAppendFile(filePath string, content []byte) error {
+	if err := p.EnsureDirForFile(filePath); err != nil {
+		return err
+	}
+	
+	file, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	
+	_, err = file.Write(content)
+	return err
+}
+
+// ToAbsolute converts a path to an absolute path
+func (p *PathUtil) ToAbsolute(path string) (string, error) {
+	return filepath.Abs(path)
+}
+
+// ToWorkspaceRelative converts an absolute path to workspace-relative if possible
+func (p *PathUtil) ToWorkspaceRelative(absolutePath string) (string, error) {
+	if p.workspace == nil {
+		return absolutePath, nil
+	}
+	return filepath.Rel(p.workspace.Root, absolutePath)
+}
+
+// IsWithinWorkspace checks if a path is within the workspace
+func (p *PathUtil) IsWithinWorkspace(path string) bool {
+	if p.workspace == nil {
+		return false
+	}
+	
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return false
+	}
+	
+	relPath, err := filepath.Rel(p.workspace.Root, absPath)
+	if err != nil {
+		return false
+	}
+	
+	// If relative path starts with "..", it's outside the workspace
+	return !filepath.IsAbs(relPath) && !filepath.HasPrefix(relPath, "..")
+}
+
+// SplitPath splits a path into directory, base name, and extension
+func (p *PathUtil) SplitPath(path string) (dir, base, ext string) {
+	dir = filepath.Dir(path)
+	base = filepath.Base(path)
+	ext = filepath.Ext(base)
+	if ext != "" {
+		base = base[:len(base)-len(ext)]
+	}
+	return dir, base, ext
+}
+
+// CreateBackupFile creates a backup of a file and returns the backup path
+func (p *PathUtil) CreateBackupFile(filePath string) (string, error) {
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		return "", err
+	}
+	
+	backupPath := filePath + ".backup"
+	err = p.SafeWriteFile(backupPath, content)
+	if err != nil {
+		return "", err
+	}
+	
+	return backupPath, nil
+}

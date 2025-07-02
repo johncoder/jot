@@ -1156,8 +1156,9 @@ type PeekTOCHeading struct {
 
 // outputPeekJSON outputs JSON response for regular peek mode
 func outputPeekJSON(ctx *cmdutil.CommandContext, selector string, sourcePath *markdown.HeadingPath, subtree *markdown.Subtree, ws *workspace.Workspace) error {
+	pathUtil := cmdutil.NewPathUtil(ws)
 	// Build file info
-	filePath := filepath.Join(ws.Root, sourcePath.File)
+	filePath := pathUtil.WorkspaceJoin(sourcePath.File)
 	if sourcePath.File == "inbox.md" {
 		filePath = ws.InboxPath
 	}
@@ -1213,6 +1214,7 @@ func outputPeekJSON(ctx *cmdutil.CommandContext, selector string, sourcePath *ma
 
 // showTableOfContentsJSON outputs JSON response for TOC mode
 func showTableOfContentsJSON(ctx *cmdutil.CommandContext, ws *workspace.Workspace, selector string, useShortSelectors bool) error {
+	pathUtil := cmdutil.NewPathUtil(ws)
 	// Parse selector to determine if it's file-only or includes path
 	var content []byte
 	var baseFilename string
@@ -1238,7 +1240,7 @@ func showTableOfContentsJSON(ctx *cmdutil.CommandContext, ws *workspace.Workspac
 		subtreePath = strings.Join(sourcePath.Segments, "/")
 		isFullFile = false
 
-		filePath = filepath.Join(ws.Root, baseFilename)
+		filePath = pathUtil.WorkspaceJoin(baseFilename)
 		if baseFilename == "inbox.md" {
 			filePath = ws.InboxPath
 		}
@@ -1255,7 +1257,7 @@ func showTableOfContentsJSON(ctx *cmdutil.CommandContext, ws *workspace.Workspac
 				selector += ".md"
 				baseFilename = selector
 			}
-			filePath = filepath.Join(ws.Root, selector)
+			filePath = pathUtil.WorkspaceJoin(selector)
 		}
 
 		// Check if file exists

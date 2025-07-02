@@ -141,7 +141,7 @@ func (op *RefileOperation) executeCrossFile() error {
 	newDestContent := append(destContent[:op.InsertOffset], insertContent...)
 	newDestContent = append(newDestContent, destContent[op.InsertOffset:]...)
 
-	return os.WriteFile(op.DestPath, newDestContent, 0644)
+	return cmdutil.WriteFileContent(op.DestPath, newDestContent)
 }
 
 // performInMemoryRefile performs the entire refile operation in memory for same-file operations
@@ -400,6 +400,7 @@ Examples:
 
 // inspectDestination analyzes destination path without performing refile
 func inspectDestination(ws *workspace.Workspace, destPath *markdown.HeadingPath) error {
+	pathUtil := cmdutil.NewPathUtil(ws)
 	fmt.Printf("Destination analysis for \"%s#%s\":\n",
 		destPath.File, strings.Join(destPath.Segments, "/"))
 
@@ -411,7 +412,7 @@ func inspectDestination(ws *workspace.Workspace, destPath *markdown.HeadingPath)
 		filePath = destPath.File
 	} else {
 		// Use workspace root for relative paths, not lib/ directory
-		filePath = filepath.Join(ws.Root, destPath.File)
+		filePath = pathUtil.WorkspaceJoin(destPath.File)
 	}
 
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
@@ -499,6 +500,7 @@ func ExtractSubtreeWithOptions(ws *workspace.Workspace, sourcePath *markdown.Hea
 
 // ResolveDestination resolves a destination path and determines insertion point
 func ResolveDestination(ws *workspace.Workspace, destPath *markdown.HeadingPath, prepend bool) (*DestinationTarget, error) {
+	pathUtil := cmdutil.NewPathUtil(ws)
 	// Construct full file path
 	var filePath string
 	if destPath.File == "inbox.md" {
@@ -507,7 +509,7 @@ func ResolveDestination(ws *workspace.Workspace, destPath *markdown.HeadingPath,
 		filePath = destPath.File
 	} else {
 		// Use workspace root for relative paths, not lib/ directory
-		filePath = filepath.Join(ws.Root, destPath.File)
+		filePath = pathUtil.WorkspaceJoin(destPath.File)
 	}
 
 	// Check if file exists
@@ -735,6 +737,7 @@ func init() {
 
 // showSelectorsForFile displays available selectors for a specific file
 func showSelectorsForFile(ws *workspace.Workspace, filename string) error {
+	pathUtil := cmdutil.NewPathUtil(ws)
 	// Determine the full file path
 	var filePath string
 	if filename == "inbox.md" {
@@ -747,7 +750,7 @@ func showSelectorsForFile(ws *workspace.Workspace, filename string) error {
 			filename += ".md"
 		}
 		// Use workspace root for relative paths, not lib/ directory
-		filePath = filepath.Join(ws.Root, filename)
+		filePath = pathUtil.WorkspaceJoin(filename)
 	}
 
 	// Check if file exists
@@ -1071,6 +1074,7 @@ func outputRefileJSON(ctx *cmdutil.CommandContext, sourcePath *markdown.HeadingP
 
 // inspectDestinationJSON outputs JSON response for destination inspection
 func inspectDestinationJSON(ctx *cmdutil.CommandContext, ws *workspace.Workspace, destPath *markdown.HeadingPath) error {
+	pathUtil := cmdutil.NewPathUtil(ws)
 	// Check if file exists
 	var filePath string
 	if destPath.File == "inbox.md" {
@@ -1078,7 +1082,7 @@ func inspectDestinationJSON(ctx *cmdutil.CommandContext, ws *workspace.Workspace
 	} else if filepath.IsAbs(destPath.File) {
 		filePath = destPath.File
 	} else {
-		filePath = filepath.Join(ws.Root, destPath.File)
+		filePath = pathUtil.WorkspaceJoin(destPath.File)
 	}
 
 	fileExists := true
@@ -1617,6 +1621,7 @@ func moveToFront(files []string, target string) []string {
 
 // runFileSelectionFZF runs FZF for file selection
 func runFileSelectionFZF(ws *workspace.Workspace, files []string, prompt string) (string, error) {
+	pathUtil := cmdutil.NewPathUtil(ws)
 	// Validate FZF availability
 	if _, err := exec.LookPath("fzf"); err != nil {
 		return "", fmt.Errorf("fzf not found in PATH. Please install fzf or set JOT_FZF=0 to disable")
@@ -1639,7 +1644,7 @@ func runFileSelectionFZF(ws *workspace.Workspace, files []string, prompt string)
 		} else if filepath.IsAbs(file) {
 			absolutePath = file
 		} else {
-			absolutePath = filepath.Join(ws.Root, file)
+			absolutePath = pathUtil.WorkspaceJoin(file)
 		}
 		
 		// Write both the display name and absolute path (tab-separated)

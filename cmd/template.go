@@ -132,6 +132,7 @@ tags: [%s]
 `, strings.ToLower(name), strings.Title(name))
 
 		// Create template
+		pathUtil := cmdutil.NewPathUtil(ws)
 		err = tm.Create(name, defaultContent)
 		if err != nil {
 			err := fmt.Errorf("failed to create template: %w", err)
@@ -141,7 +142,7 @@ tags: [%s]
 			return err
 		}
 
-		templatePath := filepath.Join(ws.JotDir, "templates", name+".md")
+		templatePath := pathUtil.JotDirJoin(filepath.Join("templates", name+".md"))
 		editorError := ""
 		edited := false
 
@@ -227,6 +228,7 @@ var templateEditCmd = &cobra.Command{
 
 		// Check if template exists
 		_, err = tm.Get(name)
+		pathUtil := cmdutil.NewPathUtil(ws)
 		if err != nil {
 			if ctx.IsJSONOutput() {
 				return ctx.HandleError(err)
@@ -234,7 +236,7 @@ var templateEditCmd = &cobra.Command{
 			return err
 		}
 
-		templatePath := filepath.Join(ws.JotDir, "templates", name+".md")
+		templatePath := pathUtil.JotDirJoin(filepath.Join("templates", name+".md"))
 
 		if ctx.IsJSONOutput() {
 			// For JSON output, skip interactive editor and return success

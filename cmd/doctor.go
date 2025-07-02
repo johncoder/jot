@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 
 	"github.com/johncoder/jot/internal/cmdutil"
 	"github.com/johncoder/jot/internal/workspace"
@@ -291,6 +290,7 @@ Examples:
 
 		// Apply fixes if requested
 		if doctorFix && len(issues) > 0 {
+			var pathUtil *cmdutil.PathUtil
 			if !ctx.IsJSONOutput() {
 				fmt.Println("Applying fixes...")
 			}
@@ -329,9 +329,10 @@ This is your inbox for capturing new notes quickly. Use 'jot capture' to add new
 
 				// Fix missing lib directory
 				if issue.Type == "structure" && issue.Message == "lib/ directory is missing" && issue.Fixable {
-					if err := os.MkdirAll(ws.LibDir, 0755); err == nil {
+					pathUtil := cmdutil.NewPathUtil(ws)
+					if err := pathUtil.EnsureDir(ws.LibDir); err == nil {
 						// Add README
-						readmePath := filepath.Join(ws.LibDir, "README.md")
+						readmePath := pathUtil.LibJoin("README.md")
 						readmeContent := `# Library
 
 This directory contains your organized notes. You can structure them however you like:
@@ -343,7 +344,7 @@ This directory contains your organized notes. You can structure them however you
 
 Use 'jot refile' to move notes from your inbox to organized files here.
 `
-						os.WriteFile(readmePath, []byte(readmeContent), 0644)
+						pathUtil.SafeWriteFile(readmePath, []byte(readmeContent))
 						fixes = append(fixes, DoctorFix{
 							Type:        "structure",
 							Description: "Created lib/ directory",
@@ -367,7 +368,10 @@ Use 'jot refile' to move notes from your inbox to organized files here.
 
 				// Fix missing .jot directory
 				if issue.Type == "structure" && issue.Message == ".jot/ directory is missing" && issue.Fixable {
-					if err := os.MkdirAll(ws.JotDir, 0755); err == nil {
+					if pathUtil == nil {
+						pathUtil = cmdutil.NewPathUtil(ws)
+					}
+					if err := pathUtil.EnsureDir(ws.JotDir); err == nil {
 						fixes = append(fixes, DoctorFix{
 							Type:        "structure",
 							Description: "Created .jot/ directory",
