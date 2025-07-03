@@ -52,7 +52,7 @@ print_overview() {
     echo "  • Go project dependencies (go mod download)"
     echo "  • staticcheck linting tool (if not already installed)"
     echo ""
-    echo "Setup will verify Go 1.20+, run code checks, build the project, and test."
+    echo "Setup will verify Go is installed, then let Go enforce version requirements from go.mod."
     echo "Requires internet connection and \$GOPATH/bin in PATH."
     echo ""
     
@@ -79,21 +79,16 @@ main() {
     # Check Go installation
     info "Checking Go installation..."
     if ! command_exists go; then
-        error "Go is not installed. Install Go 1.20+ from https://golang.org/dl/"
+        error "Go is not installed. Install Go from https://golang.org/dl/"
+        error "The project requires the Go version specified in go.mod (currently $(grep '^go ' go.mod 2>/dev/null || echo 'go 1.24'))"
         exit 1
     fi
-
-    GO_VERSION=$(go version | grep -o 'go[0-9]\+\.[0-9]\+' | sed 's/go//')
-    if [[ $(echo "$GO_VERSION 1.20" | tr " " "\n" | sort -V | head -n1) != "1.20" ]]; then
-        error "Go 1.20+ required. Current: $GO_VERSION. Update from https://golang.org/dl/"
-        exit 1
-    fi
-    success "Go $GO_VERSION found"
+    success "Go found: $(go version)"
 
     # Download dependencies
-    info "Downloading dependencies..."
+    info "Downloading dependencies (Go will enforce version requirements)..."
     if ! go mod tidy >/dev/null 2>&1; then
-        error "Failed to tidy modules. Check internet connection or run 'go mod tidy' manually."
+        error "Failed to tidy modules. Check Go version compatibility or run 'go mod tidy' manually for details."
         exit 1
     fi
     if ! go mod download >/dev/null 2>&1; then
@@ -180,7 +175,7 @@ print_troubleshooting() {
     echo ""
     echo "1. GO INSTALLATION:"
     echo "   'go: command not found' → Install Go from https://golang.org/dl/"
-    echo "   'version too old' → Update to Go 1.20+ from official site"
+    echo "   'version too old' → Go will show version requirement from go.mod"
     echo ""
     echo "2. DEPENDENCIES:"
     echo "   Download fails → Check internet/proxy, try: go clean -modcache"
@@ -208,7 +203,7 @@ if [[ "$1" == "--help" || "$1" == "-h" ]]; then
     echo "🚀 jot Development Environment Setup"
     echo ""
     echo "Sets up a complete development environment for the jot project."
-    echo "Verifies Go 1.20+, downloads dependencies, installs tools, and validates everything works."
+    echo "Verifies Go is installed, downloads dependencies, installs tools, and validates everything works."
     echo ""
     echo "USAGE: $0 [--help] [--yes] [--troubleshoot]"
     echo ""
@@ -218,13 +213,13 @@ if [[ "$1" == "--help" || "$1" == "-h" ]]; then
     echo "  --troubleshoot  Show troubleshooting guide"
     echo ""
     echo "REQUIREMENTS:"
-    echo "  • Go 1.20+ installed and in PATH"
+    echo "  • Go installed and in PATH (version per go.mod)"
     echo "  • Internet connection"
     echo "  • \$GOPATH/bin in PATH (for tools)"
     echo ""
     echo "COMMON ISSUES:"
     echo "  Go not found: Install from https://golang.org/dl/"
-    echo "  Version too old: Update to Go 1.20+"
+    echo "  Version incompatible: Check go.mod requirements"
     echo "  Tools not in PATH: export PATH=\$PATH:\$(go env GOPATH)/bin"
     echo "  Network issues: Check proxy/firewall settings"
     echo ""

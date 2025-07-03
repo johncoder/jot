@@ -13,7 +13,6 @@ LDFLAGS += -X github.com/johncoder/jot/cmd.buildTime=$(BUILD_TIME)
 LDFLAGS += -X github.com/johncoder/jot/cmd.gitCommit=$(GIT_COMMIT)
 
 # Go configuration
-GO_VERSION := 1.24
 COVERAGE_OUT := coverage.out
 
 # Default target
@@ -109,5 +108,5 @@ info: ## Show build information
 	@echo "  Version:     $(VERSION)"
 	@echo "  Build Time:  $(BUILD_TIME)"
 	@echo "  Git Commit:  $(GIT_COMMIT)"
-	@echo "  Go Version:  $(GO_VERSION)"
+	@echo "  Go Version:  $(shell go version 2>/dev/null || echo 'not found')"
 	@echo "  LDFLAGS:     $(LDFLAGS)"

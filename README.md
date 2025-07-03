@@ -504,7 +504,7 @@ jot status
 
 ## Requirements
 
-- **Go 1.21+** (for building from source)
+- **Go** (version specified in go.mod - for building from source)
 - **Text Editor** (configured via `$EDITOR` or `$VISUAL`)
 - **Git** (recommended for version control)
 - **Unix-like Shell** (bash, zsh, fish - Windows compatible)

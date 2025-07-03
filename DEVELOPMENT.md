@@ -44,7 +44,7 @@ make setup                       # Same as ./scripts/setup.sh --yes
 ```
 
 **What it does:**
-Verifies Go 1.20+, downloads dependencies, installs staticcheck, runs code checks, builds, and tests.
+Verifies Go is installed, downloads dependencies, installs staticcheck, runs code checks, builds, and tests.
 
 **Features:**
 
