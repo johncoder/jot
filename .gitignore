@@ -75,6 +75,7 @@ Thumbs.db
 *.jar
 *.rar
 *.tar
+*.tar.gz
 *.zip
 
 # Go-specific

@@ -13,7 +13,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var evalList bool
 var evalAll bool
 var evalApprove bool
 var evalMode string
@@ -513,7 +512,6 @@ type EvalSummary struct {
 }
 
 func init() {
-	evalCmd.Flags().BoolVarP(&evalList, "list", "l", false, "List evaluable code blocks (deprecated, use without arguments)")
 	evalCmd.Flags().BoolVarP(&evalAll, "all", "a", false, "Execute all approved evaluable code blocks")
 	evalCmd.Flags().BoolVar(&evalApprove, "approve", false, "Approve and execute the specified block")
 	evalCmd.Flags().StringVar(&evalMode, "mode", "hash", "Approval mode: hash, prompt, or always")

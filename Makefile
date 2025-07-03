@@ -90,12 +90,6 @@ deps: ## Download and tidy dependencies
 	@if ! go mod verify; then echo "Failed to verify modules"; exit 1; fi
 	@echo "Dependencies updated successfully"
 
-release: ## DEPRECATED: Use release-build then release-publish
-	@echo "⚠️  DEPRECATED: Use 'make release-build' then 'make release-publish'"
-	@echo "This will be removed in a future version."
-	@echo ""
-	@$(MAKE) release-build
-
 release-build: clean lint test build-all ## Build release artifacts (step 1/2)
 	@echo "🚀 Release build complete!"
 	@echo "Version: $(VERSION)"

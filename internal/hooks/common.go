@@ -70,8 +70,8 @@ func NewManager(ws *workspace.Workspace) *Manager {
 		workspace:      ws,
 		hooksDir:       hooksDir,
 		globalHooksDir: globalHooksDir,
-		enabled:        true,             // TODO: Read from config
-		timeout:        30 * time.Second, // TODO: Read from config
+		enabled:        true,             // Default enabled, configurable in future releases
+		timeout:        30 * time.Second, // Default 30s timeout, configurable in future releases
 	}
 }
 

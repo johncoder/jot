@@ -1,6 +1,8 @@
 package hooks
 
 import (
+	"fmt"
+	"os"
 	"time"
 
 	"github.com/johncoder/jot/internal/workspace"
@@ -43,7 +45,7 @@ func (h *PostRefileHook) Execute(content, sourceFile, destPath string, allowBypa
 	// But we can log errors or warnings
 	if result.Aborted && result.Error != nil {
 		// Log the error but don't fail the refile
-		// TODO: Add logging framework
+		fmt.Fprintf(os.Stderr, "Warning: Post-refile hook encountered error: %v\n", result.Error)
 		return nil
 	}
 

@@ -1,6 +1,8 @@
 package hooks
 
 import (
+	"fmt"
+	"os"
 	"time"
 
 	"github.com/johncoder/jot/internal/workspace"
@@ -43,7 +45,7 @@ func (h *PostCaptureHook) Execute(content, templateName, targetFile string, allo
 	// But we can log errors or warnings
 	if result.Aborted && result.Error != nil {
 		// Log the error but don't fail the capture
-		// TODO: Add logging framework
+		fmt.Fprintf(os.Stderr, "Warning: Post-capture hook encountered error: %v\n", result.Error)
 		return nil
 	}
 
