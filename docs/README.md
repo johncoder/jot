@@ -15,6 +15,7 @@ New to jot? Start here:
 - **[Getting Started](user-guide/getting-started.md)** - Installation, setup, and your first notes
 - **[Basic Workflows](user-guide/basic-workflows.md)** - Daily patterns and common use cases
 - **[Command Reference](user-guide/commands.md)** - Complete reference for all commands
+- **[Code Evaluation](user-guide/eval.md)** - Execute code blocks in Markdown files safely
 - **[Templates](user-guide/templates.md)** - Creating and using note templates
 - **[Configuration](user-guide/configuration.md)** - Customizing jot for your workflow
 - **[Troubleshooting](user-guide/troubleshooting.md)** - Common issues and solutions

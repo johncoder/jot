@@ -20,21 +20,25 @@ tags: [daily, log]
 **Weather:** $(curl -s wttr.in?format="%C+%t" 2>/dev/null || echo "Unknown")
 
 ### Today's Focus
-- 
+
+-
 
 ### Accomplished
-- 
+
+-
 
 ### Challenges
-- 
+
+-
 
 ### Notes
 
-
 ### Tomorrow's Plan
-- 
+
+-
 
 ### Mood/Energy
+
 **Start of day:** /10
 **End of day:** /10
 
@@ -57,6 +61,7 @@ jot capture daily --content "Completed API documentation review"
 ## Customization Options
 
 ### Simple Version
+
 ```markdown
 ---
 destination: lib/daily.md
@@ -66,15 +71,18 @@ tags: [daily]
 ## $(date '+%Y-%m-%d')
 
 ### Today
-- 
+
+-
 
 ### Notes
-- 
+
+-
 
 ---
 ```
 
 ### Developer-Focused Version
+
 ```markdown
 ---
 destination: lib/daily/$(date '+%Y-%m').md
@@ -88,24 +96,30 @@ tags: [daily, dev]
 **Commits Today:** $(git log --oneline --since="midnight" | wc -l)
 
 ### Code Progress
-- 
+
+-
 
 ### Bugs Fixed
-- 
+
+-
 
 ### Learning
-- 
+
+-
 
 ### Blockers
-- 
+
+-
 
 ### Tomorrow's Code Goals
-- 
+
+-
 
 ---
 ```
 
 ### Team-Focused Version
+
 ```markdown
 ---
 destination: lib/team-daily/$(date '+%Y-%m').md
@@ -115,25 +129,30 @@ tags: [daily, team]
 
 ## Team Daily - $(date '+%Y-%m-%d')
 
-**Attendees:** 
-**Duration:** $(date '+%H:%M') - 
+**Attendees:**
+**Duration:** $(date '+%H:%M') -
 
 ### Team Updates
+
 **John:**
-- Yesterday: 
-- Today: 
-- Blockers: 
+
+- Yesterday:
+- Today:
+- Blockers:
 
 **Sarah:**
-- Yesterday: 
-- Today: 
-- Blockers: 
+
+- Yesterday:
+- Today:
+- Blockers:
 
 ### Team Decisions
-- 
+
+-
 
 ### Action Items
-- [ ] 
+
+- [ ]
 
 ---
 ```

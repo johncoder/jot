@@ -5,6 +5,7 @@ This example shows how to set up and maintain a daily notes system with jot, per
 ## Overview
 
 This workflow creates:
+
 - **Daily capture** with timestamps and context
 - **Organized monthly files** for easy browsing
 - **Project tracking** across days
@@ -27,6 +28,7 @@ jot init
 Create these templates for different daily activities:
 
 **Daily Log Template** (`.jot/templates/daily.md`):
+
 ```markdown
 ---
 destination: lib/daily/$(date '+%Y-%m').md
@@ -41,24 +43,28 @@ tags: [daily, log]
 **Time Started:** $(date '+%H:%M')
 
 ### Today's Focus
-- 
+
+-
 
 ### Accomplished
-- 
+
+-
 
 ### Challenges
-- 
+
+-
 
 ### Notes
 
-
 ### Tomorrow's Plan
-- 
+
+-
 
 ---
 ```
 
 **Standup Template** (`.jot/templates/standup.md`):
+
 ```markdown
 ---
 destination: lib/standups/$(date '+%Y-%m').md
@@ -69,13 +75,16 @@ tags: [standup, daily]
 ### Standup - $(date '+%Y-%m-%d')
 
 **Yesterday:**
-- 
+
+-
 
 **Today:**
-- 
+
+-
 
 **Blockers:**
-- 
+
+-
 
 **Sprint:** $(git branch --show-current 2>/dev/null | sed 's/feature\///' | tr '-' ' ' || echo "N/A")
 
@@ -83,13 +92,14 @@ tags: [standup, daily]
 ```
 
 **Quick Note Template** (`.jot/templates/note.md`):
+
 ```markdown
 ---
 destination: inbox.md
 tags: [note, $(date '+%Y-%m-%d')]
 ---
 
-**$(date '+%H:%M')** - 
+**$(date '+%H:%M')** -
 ```
 
 ### 3. Approve Templates
@@ -143,7 +153,7 @@ Source: https://docs.docker.com/develop/dev-best-practices/"
 jot capture --content "## End of Day - $(date '+%H:%M')
 **Completed:**
 - Fixed authentication bug
-- Reviewed 3 PRs  
+- Reviewed 3 PRs
 - Updated documentation
 
 **Tomorrow:**
@@ -169,13 +179,13 @@ jot refile
 jot capture --content "## Week of $(date -d 'monday' '+%B %d') - $(date '+%B %d')
 
 **Major Accomplishments:**
-- 
+-
 
 **Challenges This Week:**
-- 
+-
 
 **Key Learnings:**
-- 
+-
 
 **Next Week Focus:**
 - "
@@ -191,13 +201,13 @@ jot archive
 jot capture --content "## $(date -d 'last month' '+%B %Y') Review
 
 **Projects Worked On:**
-- 
+-
 
 **Skills Developed:**
-- 
+-
 
 **Notable Achievements:**
-- 
+-
 
 **Areas for Improvement:**
 - "
@@ -229,16 +239,16 @@ jot capture --content "## Code Changes - $(date)
 $(git log --oneline --since='1 day ago')
 
 **Key Changes:**
-- 
+-
 
 **Testing Status:**
 - "
 
 # Document bug fixes
 jot capture --content "## Bug Fix: $(git log -1 --pretty=format:'%s')
-**Issue:** 
-**Root Cause:** 
-**Solution:** 
+**Issue:**
+**Root Cause:**
+**Solution:**
 **Commit:** $(git log -1 --pretty=format:'%h')"
 ```
 
@@ -253,7 +263,7 @@ jot capture --content "## Meeting Prep: Team Sync
 - Code review process
 
 **Questions to Ask:**
-- 
+-
 
 **Updates to Share:**
 - "
@@ -290,6 +300,7 @@ fi
 ```
 
 Make it executable:
+
 ```bash
 chmod +x .jot/hooks/post-capture.sh
 ```
@@ -313,13 +324,14 @@ jot capture --content "## Daily Summary - $(date)
 **Top Keyword:** $(jot find "$TODAY" | head -5 | grep -oE '\b[A-Za-z]{4,}\b' | sort | uniq -c | sort -nr | head -1 | awk '{print $2}' || echo "N/A")
 
 **Day Rating:** /10
-**Key Insight:** 
+**Key Insight:**
 "
 ```
 
 ## Tips for Success
 
 ### 1. Start Simple
+
 Begin with basic daily logs and add complexity over time:
 
 ```bash
@@ -334,12 +346,15 @@ jot capture standup
 ```
 
 ### 2. Consistent Timing
+
 Establish regular capture times:
+
 - **9:00 AM**: Daily log and standup
 - **Throughout day**: Quick notes as needed
 - **5:00 PM**: End-of-day summary
 
 ### 3. Use Context
+
 Always include context in your notes:
 
 ```bash
@@ -354,6 +369,7 @@ jot capture --content "Fixed bug"
 ```
 
 ### 4. Review and Refine
+
 Regular maintenance keeps the system useful:
 
 ```bash
@@ -365,6 +381,7 @@ jot refile                   # Organize notes
 ```
 
 ### 5. Cross-Reference
+
 Link related notes and projects:
 
 ```bash
@@ -377,6 +394,7 @@ Key insight: Users prefer social login over email"
 ## Troubleshooting Daily Workflow
 
 ### Template Issues
+
 ```bash
 # Template not rendering
 jot template list
@@ -387,6 +405,7 @@ date '+%Y-%m-%d'  # Test manually
 ```
 
 ### Organization Problems
+
 ```bash
 # Too many notes in inbox
 jot status
@@ -398,6 +417,7 @@ ls lib/daily/
 ```
 
 ### Automation Issues
+
 ```bash
 # Hooks not running
 chmod +x .jot/hooks/*.sh

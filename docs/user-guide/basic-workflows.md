@@ -53,6 +53,7 @@ jot status
 ```
 
 The refile interface lets you:
+
 - Move entire notes to different files
 - Split notes into multiple parts
 - Create new files for new topics
@@ -106,8 +107,11 @@ jot peek lib/work.md --section "Project Updates"
 ### Working with Code Blocks
 
 ```bash
-# Extract and run code from notes
+# List and execute code blocks (requires approval)
 jot eval lib/scripts.md
+
+# Execute specific approved blocks
+jot eval lib/scripts.md my_script
 
 # Extract code to files for reuse
 jot tangle lib/setup-notes.md
@@ -115,6 +119,8 @@ jot tangle lib/setup-notes.md
 # Append command output to notes
 git log --oneline -5 | jot capture --content "Recent commits:"
 ```
+
+**Note**: Code evaluation requires security approval. See the [Code Evaluation Guide](eval.md) for detailed documentation on the approval workflow and security model.
 
 ### Project Documentation
 
@@ -213,10 +219,13 @@ jot find "react memo"
 ## Tips for Effective Use
 
 ### 1. Capture First, Organize Later
+
 Don't worry about perfect organization during capture. Just get thoughts down quickly.
 
 ### 2. Use Descriptive Content
+
 Include context in your notes:
+
 ```bash
 jot capture --content "## API Rate Limiting Issue
 Context: User login endpoint
@@ -225,6 +234,7 @@ Solution: Implement exponential backoff"
 ```
 
 ### 3. Regular Maintenance
+
 ```bash
 # Weekly routine
 jot status        # Check inbox size
@@ -233,7 +243,9 @@ jot doctor        # Check for issues
 ```
 
 ### 4. Consistent File Structure
+
 Develop a consistent way to organize files:
+
 ```
 lib/
 ├── daily/          # Daily notes

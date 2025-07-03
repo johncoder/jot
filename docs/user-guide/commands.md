@@ -6,11 +6,13 @@ Complete reference for all jot commands and options.
 
 These options work with all commands:
 
-- `--config string` - Config file (default: `$HOME/.jotrc`)
-- `--json` - Output in JSON format
-- `--workspace string` - Use specific workspace (bypasses discovery)
-- `--help` - Show help for any command
-- `--version` - Show version information
+| Option        | Type   | Description                                 |
+| ------------- | ------ | ------------------------------------------- |
+| `--config`    | string | Config file (default: `$HOME/.jotrc`)       |
+| `--json`      | flag   | Output in JSON format                       |
+| `--workspace` | string | Use specific workspace (bypasses discovery) |
+| `--help`      | flag   | Show help for any command                   |
+| `--version`   | flag   | Show version information                    |
 
 ## Core Commands
 
@@ -23,12 +25,14 @@ jot init [flags]
 ```
 
 **What it creates:**
+
 - `inbox.md` - Capture file for new notes
-- `lib/` - Directory for organized notes  
+- `lib/` - Directory for organized notes
 - `.jot/` - Internal data directory
 - `.jot/config.json` - Workspace configuration
 
 **Examples:**
+
 ```bash
 jot init                    # Initialize in current directory
 jot init --workspace ~/work # Initialize specific location
@@ -43,18 +47,25 @@ jot capture [template] [flags]
 ```
 
 **Flags:**
-- `--content string` - Note content to append (skips editor)
-- `--template string` - Use a named template for structured capture
-- `--no-verify` - Skip hooks verification
-- `--note string` - Note content to append (legacy alias for --content)
+
+| Flag          | Type   | Description                                         |
+| ------------- | ------ | --------------------------------------------------- |
+| `--content`   | string | Note content to append (skips editor)               |
+| `--template`  | string | Use a named template for structured capture         |
+| `--no-verify` | flag   | Skip hooks verification                             |
+| `--note`      | string | Note content to append (legacy alias for --content) |
 
 **Input Methods:**
-1. **Interactive (default)** - Opens your editor
-2. **Direct content** - Use `--content` for quick notes
-3. **Piped input** - Pipe content from other commands
-4. **Template-based** - Use templates for structured notes
+
+| Method             | Usage                        | Description                        |
+| ------------------ | ---------------------------- | ---------------------------------- |
+| **Interactive**    | `jot capture`                | Opens your editor (default)        |
+| **Direct content** | `--content "text"`           | Quick notes without editor         |
+| **Piped input**    | `echo "text" \| jot capture` | Pipe content from other commands   |
+| **Template-based** | `jot capture template`       | Use templates for structured notes |
 
 **Examples:**
+
 ```bash
 jot capture                               # Open editor
 jot capture --content "Quick note"        # Direct append
@@ -73,13 +84,17 @@ jot refile [flags]
 ```
 
 **Features:**
-- Interactive menu for organizing notes
-- Move entire notes or sections
-- Create new destination files
-- Preview changes before applying
-- Supports file path targeting
+
+| Feature             | Description                                    |
+| ------------------- | ---------------------------------------------- |
+| Interactive menu    | Visual interface for organizing notes          |
+| Move entire notes   | Relocate complete note entries or sections     |
+| Create new files    | Generate new destination files during refiling |
+| Preview changes     | Review modifications before applying           |
+| File path targeting | Specify exact destination paths                |
 
 **Examples:**
+
 ```bash
 jot refile                             # Interactive refiling
 jot refile --json                      # JSON output for scripting
@@ -94,12 +109,16 @@ jot find <query> [files...] [flags]
 ```
 
 **Features:**
-- Full-text search across all files
-- Context lines around matches
-- Support for regular expressions
-- Search specific files or entire workspace
+
+| Feature             | Description                               |
+| ------------------- | ----------------------------------------- |
+| Full-text search    | Search across all files in workspace      |
+| Context lines       | Show lines around matches for context     |
+| Regular expressions | Support for regex patterns (if supported) |
+| File targeting      | Search specific files or entire workspace |
 
 **Examples:**
+
 ```bash
 jot find "authentication"              # Basic search
 jot find "API.*error" --regex          # Regex search (if supported)
@@ -116,13 +135,17 @@ jot status [flags]
 ```
 
 **Shows:**
-- Workspace location
-- Number of notes in inbox
-- File count in lib/
-- Recent activity
-- Health status
+
+| Information        | Description                            |
+| ------------------ | -------------------------------------- |
+| Workspace location | Current workspace directory path       |
+| Inbox note count   | Number of notes in inbox.md            |
+| Library file count | Number of files in lib/ directory      |
+| Recent activity    | Summary of recent captures and changes |
+| Health status      | Overall workspace health indicators    |
 
 **Examples:**
+
 ```bash
 jot status                            # Basic status
 jot status --json                     # JSON format
@@ -139,11 +162,15 @@ jot files [flags]
 ```
 
 **Features:**
-- List all markdown files in workspace
-- Show file sizes and modification times
-- Filter by patterns
+
+| Feature           | Description                            |
+| ----------------- | -------------------------------------- |
+| File listing      | List all markdown files in workspace   |
+| File metadata     | Show file sizes and modification times |
+| Pattern filtering | Filter by file name patterns           |
 
 **Examples:**
+
 ```bash
 jot files                            # List all files
 jot files --json                     # JSON output
@@ -158,11 +185,15 @@ jot peek <file> [flags]
 ```
 
 **Features:**
-- View entire files or specific sections
-- No editor required
-- Respects pager settings
+
+| Feature            | Description                            |
+| ------------------ | -------------------------------------- |
+| Content viewing    | View entire files or specific sections |
+| No editor required | Display content without opening editor |
+| Pager integration  | Respects `$PAGER` environment variable |
 
 **Examples:**
+
 ```bash
 jot peek lib/work.md                 # View entire file
 jot peek lib/work.md --section "API" # View specific section
@@ -177,11 +208,15 @@ jot archive [flags]
 ```
 
 **Features:**
-- Move old notes to archive
-- Configurable archive location
-- Maintains file structure
+
+| Feature                | Description                          |
+| ---------------------- | ------------------------------------ |
+| Archive old notes      | Move old notes to archive location   |
+| Configurable location  | Set custom archive directory         |
+| Structure preservation | Maintains original file organization |
 
 **Examples:**
+
 ```bash
 jot archive                          # Archive old notes
 jot archive --dry-run                # Preview what would be archived
@@ -198,14 +233,18 @@ jot template [command]
 ```
 
 **Subcommands:**
-- `list` - List available templates
-- `new <name>` - Create new template
-- `edit <name>` - Edit existing template
-- `view <name>` - View template content
-- `approve <name>` - Approve template for execution
-- `render <name>` - Render template with shell commands
+
+| Command          | Description                         |
+| ---------------- | ----------------------------------- |
+| `list`           | List available templates            |
+| `new <name>`     | Create new template                 |
+| `edit <name>`    | Edit existing template              |
+| `view <name>`    | View template content               |
+| `approve <name>` | Approve template for execution      |
+| `render <name>`  | Render template with shell commands |
 
 **Examples:**
+
 ```bash
 jot template list                    # List templates
 jot template new meeting             # Create meeting template
@@ -214,32 +253,44 @@ jot template approve meeting         # Approve for shell execution
 ```
 
 **Template Features:**
-- Support for shell command execution
-- Security approval system
-- Metadata and frontmatter
-- Dynamic content generation
+
+| Feature                    | Description                                 |
+| -------------------------- | ------------------------------------------- |
+| Shell command execution    | Dynamic content with `$(command)` syntax    |
+| Security approval system   | Explicit approval required before execution |
+| Metadata and frontmatter   | YAML frontmatter for template configuration |
+| Dynamic content generation | Date, git info, system data integration     |
 
 ## Code Integration
 
 ### `jot eval`
 
-Evaluate code blocks in markdown files.
+Evaluate code blocks in markdown files with approval-based security.
 
 ```bash
-jot eval <file> [flags]
+jot eval <file> [block_name] [flags]
 ```
 
 **Features:**
-- Execute code blocks from markdown
-- Support for multiple languages
-- Append results back to notes
-- Security controls
+
+| Feature                | Description                                |
+| ---------------------- | ------------------------------------------ |
+| Code block execution   | Execute code blocks from markdown files    |
+| Multi-language support | Support for multiple programming languages |
+| Result integration     | Append execution results back to notes     |
+| Security controls      | Safe execution with user approval          |
 
 **Examples:**
+
 ```bash
-jot eval lib/scripts.md              # Evaluate code blocks
-jot eval lib/scripts.md --lang bash  # Specific language only
+jot eval lib/scripts.md              # List blocks with approval status
+jot eval lib/scripts.md python_block # Execute specific approved block
+jot eval lib/scripts.md --all        # Execute all approved blocks
+jot eval lib/scripts.md block --approve --mode hash  # Approve block
+jot eval --list-approved             # Show all approved blocks
 ```
+
+**For detailed documentation on code evaluation, approval workflows, security model, and advanced features, see the [Code Evaluation Guide](eval.md).**
 
 ### `jot tangle`
 
@@ -250,11 +301,15 @@ jot tangle <file> [flags]
 ```
 
 **Features:**
-- Extract code to separate files
-- Maintain file organization
-- Support for multiple languages
+
+| Feature                | Description                                |
+| ---------------------- | ------------------------------------------ |
+| Code extraction        | Extract code blocks to separate files      |
+| File organization      | Maintain organized file structure          |
+| Multi-language support | Support for multiple programming languages |
 
 **Examples:**
+
 ```bash
 jot tangle lib/setup.md              # Extract all code blocks
 jot tangle lib/setup.md --output src/ # Extract to specific directory
@@ -271,12 +326,16 @@ jot workspace [command]
 ```
 
 **Subcommands:**
-- `list` - List configured workspaces
-- `add <name> <path>` - Add named workspace
-- `remove <name>` - Remove workspace
-- `switch <name>` - Switch to workspace
+
+| Command             | Description                |
+| ------------------- | -------------------------- |
+| `list`              | List configured workspaces |
+| `add <name> <path>` | Add named workspace        |
+| `remove <name>`     | Remove workspace           |
+| `switch <name>`     | Switch to workspace        |
 
 **Examples:**
+
 ```bash
 jot workspace list                   # List workspaces
 jot workspace add work ~/work-notes  # Add work workspace
@@ -294,12 +353,16 @@ jot doctor [flags]
 ```
 
 **Checks:**
-- Workspace integrity
-- File permissions
-- Configuration validity
-- Template security
+
+| Check                  | Description                           |
+| ---------------------- | ------------------------------------- |
+| Workspace integrity    | Verify workspace structure and files  |
+| File permissions       | Check file and directory permissions  |
+| Configuration validity | Validate configuration file syntax    |
+| Template security      | Review template approvals and content |
 
 **Examples:**
+
 ```bash
 jot doctor                          # Run all diagnostics
 jot doctor --fix                    # Auto-fix issues (if supported)
@@ -314,16 +377,23 @@ jot hooks [command]
 ```
 
 **Subcommands:**
-- `list` - List available hooks
-- `enable <hook>` - Enable hook
-- `disable <hook>` - Disable hook
+
+| Command          | Description          |
+| ---------------- | -------------------- |
+| `list`           | List available hooks |
+| `enable <hook>`  | Enable hook          |
+| `disable <hook>` | Disable hook         |
 
 **Hook Types:**
-- `post-capture` - Runs after note capture
-- `post-refile` - Runs after refiling
-- `pre-archive` - Runs before archiving
+
+| Hook           | Trigger                 |
+| -------------- | ----------------------- |
+| `post-capture` | Runs after note capture |
+| `post-refile`  | Runs after refiling     |
+| `pre-archive`  | Runs before archiving   |
 
 **Examples:**
+
 ```bash
 jot hooks list                      # List hooks
 jot hooks enable post-capture       # Enable post-capture hook
@@ -342,11 +412,15 @@ jot files --json                    # File list in JSON
 ```
 
 JSON output is useful for:
-- Scripting and automation
-- Integration with other tools
-- Processing with `jq`
+
+| Use Case                     | Description                                  |
+| ---------------------------- | -------------------------------------------- |
+| Scripting and automation     | Process command output programmatically      |
+| Integration with other tools | Export data to external systems              |
+| Processing with `jq`         | Use `jq` for JSON manipulation and filtering |
 
 **Example with jq:**
+
 ```bash
 jot find "TODO" --json | jq '.[] | .file' | sort | uniq
 ```
@@ -358,20 +432,20 @@ jot find "TODO" --json | jq '.[] | .file' | sort | uniq
 ```json5
 {
   // Named workspaces
-  "workspaces": {
-    "work": "/home/user/work-notes",
-    "personal": "/home/user/personal-notes"
+  workspaces: {
+    work: "/home/user/work-notes",
+    personal: "/home/user/personal-notes",
   },
-  
+
   // Default settings
-  "editor": "vim",
-  "pager": "less",
-  
+  editor: "vim",
+  pager: "less",
+
   // Archive settings
-  "archive": {
-    "location": "archive/",
-    "format": "YYYY/MM"
-  }
+  archive: {
+    location: "archive/",
+    format: "YYYY/MM",
+  },
 }
 ```
 
@@ -380,35 +454,39 @@ jot find "TODO" --json | jq '.[] | .file' | sort | uniq
 ```json5
 {
   // Workspace-specific settings
-  "templates": {
-    "default": "note",
-    "capture_template": "daily"
+  templates: {
+    default: "note",
+    capture_template: "daily",
   },
-  
+
   // Hook configuration
-  "hooks": {
-    "post_capture": true,
-    "post_refile": true
-  }
+  hooks: {
+    post_capture: true,
+    post_refile: true,
+  },
 }
 ```
 
 ## Environment Variables
 
-- `EDITOR` / `VISUAL` - Default editor for interactive editing
-- `PAGER` - Default pager for viewing content
-- `JOT_WORKSPACE` - Override default workspace discovery
-- `JOT_CONFIG` - Override config file location
+| Variable            | Description                            |
+| ------------------- | -------------------------------------- |
+| `EDITOR` / `VISUAL` | Default editor for interactive editing |
+| `PAGER`             | Default pager for viewing content      |
+| `JOT_WORKSPACE`     | Override default workspace discovery   |
+| `JOT_CONFIG`        | Override config file location          |
 
 ## Exit Codes
 
 jot follows standard CLI conventions:
 
-- `0` - Success
-- `1` - General error
-- `2` - Misuse of command (invalid arguments)
-- `126` - Command found but not executable
-- `127` - Command not found
+| Code  | Meaning                               |
+| ----- | ------------------------------------- |
+| `0`   | Success                               |
+| `1`   | General error                         |
+| `2`   | Misuse of command (invalid arguments) |
+| `126` | Command found but not executable      |
+| `127` | Command not found                     |
 
 ## See Also
 

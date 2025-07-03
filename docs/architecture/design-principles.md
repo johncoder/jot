@@ -99,7 +99,7 @@ Remove barriers to getting thoughts recorded:
 ```bash
 # These should all be fast and easy:
 jot capture                           # Opens editor immediately
-jot capture --content "quick thought" # No editor needed  
+jot capture --content "quick thought" # No editor needed
 echo "idea" | jot capture            # Works with pipes
 ```
 

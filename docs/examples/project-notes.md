@@ -5,6 +5,7 @@ This example demonstrates how to use jot for managing project-specific notes, do
 ## Overview
 
 This workflow enables:
+
 - **Project-specific note capture** and organization
 - **Technical documentation** as you build
 - **Decision tracking** and architecture notes
@@ -31,6 +32,7 @@ jot init
 ### 2. Create Project Templates
 
 **Project Update Template** (`.jot/templates/project-update.md`):
+
 ```markdown
 ---
 destination: lib/projects/$(basename $(pwd)).md
@@ -42,32 +44,39 @@ tags: [project, update, $(basename $(pwd))]
 
 **Project:** $(basename $(pwd))
 **Branch:** $(git branch --show-current 2>/dev/null || echo "main")
-**Sprint/Milestone:** 
+**Sprint/Milestone:**
 
 ### Completed This Week
-- 
+
+-
 
 ### In Progress
-- 
+
+-
 
 ### Planned Next Week
-- 
+
+-
 
 ### Blockers
-- 
+
+-
 
 ### Technical Decisions
-- 
+
+-
 
 ### Metrics
+
 - **Files Changed:** $(git diff --name-only HEAD~7 2>/dev/null | wc -l || echo "0")
 - **Commits:** $(git rev-list --count HEAD ^HEAD~7 2>/dev/null || echo "0")
-- **Tests:** $(find . -name "*test*" -type f 2>/dev/null | wc -l || echo "0")
+- **Tests:** $(find . -name "_test_" -type f 2>/dev/null | wc -l || echo "0")
 
 ---
 ```
 
 **Architecture Decision Template** (`.jot/templates/adr.md`):
+
 ```markdown
 ---
 destination: lib/architecture/decisions.md
@@ -82,21 +91,26 @@ tags: [architecture, decision, $(basename $(pwd))]
 **Context:** $(basename $(pwd))
 
 ### Context
+
 <!-- What is the issue that we're seeing that is motivating this decision or change? -->
 
 ### Decision
+
 <!-- What is the change that we're proposing and/or doing? -->
 
 ### Consequences
+
 <!-- What becomes easier or more difficult to do because of this change? -->
 
 ### Alternatives Considered
+
 <!-- What other options did we consider? -->
 
 ---
 ```
 
 **Bug Investigation Template** (`.jot/templates/bug.md`):
+
 ```markdown
 ---
 destination: lib/bugs/$(date '+%Y-%m').md
@@ -108,36 +122,33 @@ tags: [bug, investigation]
 
 **Project:** $(basename $(pwd))
 **Branch:** $(git branch --show-current 2>/dev/null || echo "main")
-**Environment:** 
+**Environment:**
 
 ### Issue Description
 
-
 ### Steps to Reproduce
-1. 
+
+1.
 
 ### Expected Behavior
 
-
 ### Actual Behavior
-
 
 ### Investigation Notes
 
-
 ### Root Cause
-
 
 ### Solution
 
-
 ### Prevention
+
 <!-- How can we prevent this in the future? -->
 
 ---
 ```
 
 **Learning Template** (`.jot/templates/til.md`):
+
 ```markdown
 ---
 destination: lib/learning/$(date '+%Y-%m').md
@@ -148,24 +159,25 @@ tags: [learning, til, $(basename $(pwd))]
 ## TIL: [Title] - $(date '+%Y-%m-%d')
 
 **Context:** $(basename $(pwd))
-**Source:** 
+**Source:**
 
 ### What I Learned
 
-
 ### Code Example
 ```
+
 <!-- Code snippet if applicable -->
+
 ```
 
 ### Why It Matters
 
 
 ### Related Concepts
-- 
+-
 
 ### Action Items
-- [ ] 
+- [ ]
 
 ---
 ```
@@ -193,10 +205,10 @@ mkdir -p lib/projects lib/architecture lib/bugs lib/learning lib/meetings
 # Document project start
 jot capture --content "## Project Kickoff: $(basename $(pwd))
 **Start Date:** $(date)
-**Team:** 
-**Goals:** 
-**Timeline:** 
-**Tech Stack:** 
+**Team:**
+**Goals:**
+**Timeline:**
+**Tech Stack:**
 
 ### Initial Setup
 $(ls -la | head -10)
@@ -229,7 +241,7 @@ jot capture bug
 # Start feature work
 jot capture --content "## Feature: User Authentication
 **Branch:** $(git branch --show-current)
-**Requirements:** 
+**Requirements:**
 - JWT token-based auth
 - Password reset flow
 - Social login integration
@@ -261,26 +273,26 @@ jot capture --content "## Auth Implementation Progress
 jot capture --content "## Pre-Review Checklist: $(git branch --show-current)
 **Files Changed:** $(git diff --name-only main | tr '\n' ', ')
 **Tests Added:** $(git diff --name-only main | grep test | wc -l)
-**Documentation Updated:** 
+**Documentation Updated:**
 
 **Key Changes:**
-- 
+-
 
 **Testing Strategy:**
-- 
+-
 
 **Questions for Reviewers:**
 - "
 
 # After code review
 jot capture --content "## Code Review Feedback: $(git branch --show-current)
-**Reviewer:** 
+**Reviewer:**
 **Overall:** Approved | Needs Changes
 **Action Items:**
-- [ ] 
+- [ ]
 
 **Key Learnings:**
-- 
+-
 
 **Follow-up Discussion:**
 - "
@@ -295,7 +307,7 @@ jot capture --content "## Code Review Feedback: $(git branch --show-current)
 echo '{
   "workspaces": {
     "project-a": "~/projects/project-a/docs/notes",
-    "project-b": "~/projects/project-b/docs/notes", 
+    "project-b": "~/projects/project-b/docs/notes",
     "shared": "~/project-notes"
   }
 }' > ~/.jotrc
@@ -361,14 +373,14 @@ exports.up = (knex) => {
 # Capture commit context
 alias git-commit-note='jot capture --content "## Commit: $(git log -1 --pretty=format:"%h - %s")
 **Files:** $(git show --name-only --pretty=format:"" | tr "\n" ", ")
-**Context:** 
-**Testing:** 
+**Context:**
+**Testing:**
 **Notes:** "'
 
 # Document git workflows
 jot capture --content "## Git Workflow Documentation
 **Branch Strategy:** $(git config --get gitflow.branch.master || echo "main-based")
-**Current Branches:** 
+**Current Branches:**
 $(git branch -a | head -10)
 
 **Release Process:**
@@ -389,11 +401,11 @@ jot capture --content "## Deployment Notes
 **Last Deployment:**
 - **Date:** $(git log --grep="deploy" -1 --pretty=format:"%ai" || echo "Unknown")
 - **Commit:** $(git log --grep="deploy" -1 --pretty=format:"%h" || echo "Unknown")
-- **Status:** 
+- **Status:**
 
 **Next Deployment:**
-- **Planned:** 
-- **Changes:** 
+- **Planned:**
+- **Changes:**
 - **Risk Level:** Low | Medium | High"
 ```
 
@@ -501,7 +513,7 @@ jot capture --content "## Architecture Evolution: Microservices Migration
 
 **Migration Strategy:**
 1. **Phase 1:** Extract user service
-2. **Phase 2:** Extract product service  
+2. **Phase 2:** Extract product service
 3. **Phase 3:** Extract order service
 
 **Current Progress:**
@@ -558,7 +570,7 @@ jot capture --content "## Team Onboarding: $(basename $(pwd))
 
 ### Contacts
 - **Tech Lead:** @alice
-- **DevOps:** @bob  
+- **DevOps:** @bob
 - **Product:** @charlie"
 ```
 
@@ -568,8 +580,8 @@ jot capture --content "## Team Onboarding: $(basename $(pwd))
 # Standardize code review process
 jot capture --content "## Code Review Checklist
 **PR:** #$(git branch --show-current | grep -o '[0-9]*' | head -1 || echo "XXX")
-**Reviewer:** 
-**Author:** 
+**Reviewer:**
+**Author:**
 
 ### Functional Review
 - [ ] Feature works as expected
@@ -603,10 +615,10 @@ jot capture --content "## Code Review Checklist
 
 ### Feedback
 **Strengths:**
-- 
+-
 
 **Improvements:**
-- 
+-
 
 **Questions:**
 - "
@@ -667,7 +679,7 @@ $(jot find "Bug Investigation" --since="1 week" | head -5)
 $(jot find "TIL:" --since="1 week" | head -5)
 
 ### Focus Next Week
-- 
+-
 "
 ```
 
@@ -681,17 +693,17 @@ jot capture --content "## Monthly Architecture Review - $(date '+%B %Y')
 $(jot find "ADR-" lib/architecture/ | head -10)
 
 ### Technical Debt Status
-- **High Priority:** 
-- **Medium Priority:** 
-- **Low Priority:** 
+- **High Priority:**
+- **Medium Priority:**
+- **Low Priority:**
 
 ### Performance Metrics
-- **Average Load Time:** 
-- **Error Rate:** 
-- **User Satisfaction:** 
+- **Average Load Time:**
+- **Error Rate:**
+- **User Satisfaction:**
 
 ### Next Month Focus
-- 
+-
 "
 ```
 

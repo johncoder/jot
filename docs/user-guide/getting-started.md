@@ -52,6 +52,7 @@ jot init
 ```
 
 This creates:
+
 - `inbox.md` - Where new notes are captured
 - `lib/` - Directory for organized notes
 - `.jot/` - Internal jot data (logs, config, templates)

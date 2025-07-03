@@ -5,6 +5,7 @@ Templates in jot allow you to create structured, reusable note formats with dyna
 ## Overview
 
 Templates help you:
+
 - Create consistent note structures
 - Generate dynamic content (dates, git info, system data)
 - Streamline common note-taking patterns
@@ -35,22 +36,19 @@ tags: [meeting, work]
 # Meeting: $(date '+%Y-%m-%d')
 
 **Date:** $(date)
-**Attendees:** 
+**Attendees:**
 
 ## Agenda
 
-1. 
+1.
 
 ## Notes
 
-
-
 ## Action Items
 
-- [ ] 
+- [ ]
 
 ## Next Steps
-
 ```
 
 ### Using Templates
@@ -79,13 +77,16 @@ Templates support shell commands using `$(command)` syntax:
 **Git Status:** $(git status --porcelain | wc -l) files changed
 
 ## Yesterday
-- 
 
-## Today  
-- 
+-
+
+## Today
+
+-
 
 ## Blockers
-- 
+
+-
 ```
 
 ### Metadata and Frontmatter
@@ -110,6 +111,7 @@ priority: "normal"
 ```
 
 **Frontmatter Options:**
+
 - `destination` - Target file for the note
 - `refile_mode` - How to insert content (`append`, `prepend`, `replace`)
 - `tags` - Array of tags for organization
@@ -131,11 +133,10 @@ tags: [daily, journal]
 
 ## Today's Focus
 
-
 ## Quick Notes
 
-
 ## System Info
+
 - **Disk Usage:** $(df -h ~ | tail -1 | awk '{print $5}')
 - **Load Average:** $(uptime | awk -F'load average:' '{print $2}')
 ```
@@ -187,7 +188,7 @@ jot template list
 # Output:
 # Available templates:
 #   meeting (✓ approved)
-#   standup (✓ approved)  
+#   standup (✓ approved)
 #   daily (✗ needs approval)
 #   project-update (✗ needs approval)
 ```
@@ -234,26 +235,30 @@ tags: [meeting]
 
 **Date:** $(date '+%A, %B %d, %Y')
 **Time:** $(date '+%H:%M')
-**Duration:** 
+**Duration:**
 
 ## Attendees
-- 
+
+-
 
 ## Agenda
-1. 
+
+1.
 
 ## Discussion
 
-
 ## Decisions Made
-- 
+
+-
 
 ## Action Items
-- [ ] 
+
+- [ ]
 
 ## Next Meeting
-- **Date:** 
-- **Topics:** 
+
+- **Date:**
+- **Topics:**
 ```
 
 ### Daily Standup Template
@@ -268,15 +273,19 @@ tags: [standup, daily]
 ## Standup - $(date '+%Y-%m-%d')
 
 ### Yesterday
-- 
+
+-
 
 ### Today
-- 
+
+-
 
 ### Blockers
-- 
+
+-
 
 ### Notes
+
 - **Sprint:** $(git branch --show-current | sed 's/feature\///' | sed 's/-/ /g')
 - **Commits:** $(git log --oneline --since="yesterday" | wc -l)
 
@@ -299,24 +308,30 @@ project: "$(basename $(pwd))"
 **Last Commit:** $(git log -1 --pretty=format:"%h - %s")
 
 ## Progress This Week
-- 
+
+-
 
 ## Completed
-- 
+
+-
 
 ## In Progress
-- 
+
+-
 
 ## Planned Next Week
-- 
+
+-
 
 ## Blockers
-- 
+
+-
 
 ## Metrics
+
 - **Files Changed:** $(git diff --name-only HEAD~7 | wc -l)
 - **Lines Added:** $(git diff --stat HEAD~7 | tail -1 | awk '{print $4}')
-- **Tests:** $(find . -name "*test*" | wc -l)
+- **Tests:** $(find . -name "_test_" | wc -l)
 ```
 
 ### Learning Notes Template
@@ -329,28 +344,29 @@ tags: [learning, notes]
 
 # Learning Notes - $(date '+%Y-%m-%d')
 
-**Topic:** 
-**Source:** 
-**Time Spent:** 
+**Topic:**
+**Source:**
+**Time Spent:**
 
 ## Key Concepts
-
 
 ## Code Examples
 
 \`\`\`
 
-
 \`\`\`
 
 ## Questions
-- 
+
+-
 
 ## Action Items
-- [ ] 
+
+- [ ]
 
 ## Related Resources
-- 
+
+-
 ```
 
 ## Advanced Template Patterns
@@ -376,7 +392,7 @@ $(if [ -f go.mod ]; then echo "**Go Project:** $(go version | awk '{print $3}')"
 **User:** $(whoami)
 **Host:** $(hostname)
 
-$(if [ "$NODE_ENV" = "production" ]; then echo "⚠️  **PRODUCTION ENVIRONMENT**"; fi)
+$(if [ "$NODE_ENV" = "production" ]; then echo "⚠️ **PRODUCTION ENVIRONMENT**"; fi)
 ```
 
 ### Integration with External Tools
@@ -385,18 +401,22 @@ $(if [ "$NODE_ENV" = "production" ]; then echo "⚠️  **PRODUCTION ENVIRONMENT
 # Weekly Review - $(date '+%Y-%m-%d')
 
 ## GitHub Activity
-$(gh pr list --author @me --state merged --limit 5 --json title,url | jq -r '.[] | "- [\(.title)](\(.url))"')
+
+$(gh pr list --author @me --state merged --limit 5 --json title,url | jq -r '.[] | "- [\(.title)]((.url))"')
 
 ## Jira Tickets
+
 $(if command -v jira >/dev/null; then jira list --assignee $(whoami); fi)
 
 ## Calendar
+
 $(if command -v calendar >/dev/null; then calendar -A 7; fi)
 ```
 
 ## Tips and Best Practices
 
 ### 1. Start Simple
+
 Begin with basic templates and add complexity gradually:
 
 ```markdown
@@ -404,19 +424,22 @@ Begin with basic templates and add complexity gradually:
 
 ## Notes
 
-
 ## Action Items
-- 
+
+-
 ```
 
 ### 2. Use Consistent Naming
+
 Develop a naming convention:
+
 - `meeting` - General meetings
-- `standup` - Daily standups  
+- `standup` - Daily standups
 - `weekly-review` - Weekly reviews
 - `project-update` - Project status
 
 ### 3. Test Before Approval
+
 Always test templates before approving:
 
 ```bash
@@ -428,6 +451,7 @@ jot template view meeting
 ```
 
 ### 4. Share Team Templates
+
 Keep templates in version control:
 
 ```bash
@@ -440,6 +464,7 @@ jot template approve meeting
 ```
 
 ### 5. Use Meaningful Metadata
+
 Include useful frontmatter:
 
 ```yaml
@@ -454,6 +479,7 @@ created: "$(date --iso-8601)"
 ## Troubleshooting Templates
 
 ### Permission Errors
+
 ```bash
 # Check permissions
 ls -la .jot/templates/
@@ -463,6 +489,7 @@ chmod 644 .jot/templates/*.md
 ```
 
 ### Command Failures
+
 ```bash
 # Test commands individually
 date '+%Y-%m-%d'
@@ -473,6 +500,7 @@ $(git branch --show-current 2>/dev/null || echo "no-branch")
 ```
 
 ### Approval Issues
+
 ```bash
 # Check approval status
 jot template list

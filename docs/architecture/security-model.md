@@ -29,6 +29,7 @@ Templates can execute shell commands for dynamic content generation, which requi
 ### Approval System
 
 **Initial Approval Required:**
+
 ```bash
 # Template requires approval before first use
 jot capture meeting
@@ -44,6 +45,7 @@ jot capture meeting
 ```
 
 **Content-Based Validation:**
+
 ```bash
 # Template content is hashed when approved
 jot template approve meeting
@@ -63,11 +65,13 @@ jot template approve meeting
 ### Security Implementation
 
 **Approval Storage:**
+
 ```
 .jot/template_permissions
 ```
 
 **Format:**
+
 ```
 template-name:sha256:hash-of-content
 meeting:sha256:a1b2c3d4e5f67890abcdef1234567890abcdef1234567890abcdef1234567890
@@ -75,6 +79,7 @@ daily:sha256:f6e5d4c3b2a1098765432109876543210987654321098765432109876543210
 ```
 
 **Hash Calculation:**
+
 - Content includes template file content and any shell commands
 - Uses SHA-256 for cryptographic integrity
 - Includes frontmatter and all executable commands
@@ -82,6 +87,7 @@ daily:sha256:f6e5d4c3b2a1098765432109876543210987654321098765432109876543210
 ### Template Command Restrictions
 
 **Allowed Command Patterns:**
+
 ```bash
 # Safe read-only commands
 $(date)                          # Current date/time
@@ -92,6 +98,7 @@ $(basename $(pwd))              # Directory name
 ```
 
 **Potentially Dangerous Commands:**
+
 ```bash
 # File system modifications
 $(rm -rf /)                     # Destructive operations
@@ -118,20 +125,25 @@ $(crontab -e)                  # Scheduled task modifications
 5. **Review periodically** - Re-examine approved templates occasionally
 
 **Safe Command Examples:**
+
 ```markdown
 # Good: Read-only system information
+
 $(date '+%Y-%m-%d')
 $(git log -1 --pretty=format:'%h')
 $(uname -s)
 
 # Good: Safe with fallbacks
+
 $(git branch --show-current 2>/dev/null || echo "no-branch")
 $(curl -s wttr.in?format=3 2>/dev/null || echo "Weather unavailable")
 
 # Risky: Network access (review carefully)
+
 $(curl -s api.example.com/data)
 
 # Dangerous: File system modification
+
 $(rm old-file.txt)
 $(mkdir -p /tmp/dangerous)
 ```
@@ -141,6 +153,7 @@ $(mkdir -p /tmp/dangerous)
 ### File Permissions
 
 **Recommended Permissions:**
+
 ```bash
 # Workspace readable by user and group
 chmod 755 workspace-directory/
@@ -163,6 +176,7 @@ chmod 755 .jot/hooks/*.sh
 ```
 
 **Permission Verification:**
+
 ```bash
 # Check workspace permissions
 jot doctor
@@ -177,11 +191,13 @@ ls -la lib/
 **Sensitive Information in Config:**
 
 Configuration files may contain:
+
 - Workspace paths that reveal directory structure
 - Editor preferences that could affect security
 - Hook configurations that enable automation
 
 **Best Practices:**
+
 ```bash
 # Protect global config
 chmod 600 ~/.jotrc
@@ -209,11 +225,13 @@ Hooks are shell scripts that run automatically after certain operations.
 ### Hook Execution Model
 
 **Hook Types:**
+
 - `post-capture.sh` - Runs after note capture
 - `post-refile.sh` - Runs after refiling operations
 - `pre-archive.sh` - Runs before archiving
 
 **Execution Context:**
+
 - Hooks run with user permissions
 - Working directory is workspace root
 - Environment variables are inherited
@@ -222,6 +240,7 @@ Hooks are shell scripts that run automatically after certain operations.
 ### Hook Security Guidelines
 
 **Safe Hook Examples:**
+
 ```bash
 #!/bin/bash
 # post-capture.sh - Log capture activity
@@ -235,6 +254,7 @@ fi
 ```
 
 **Dangerous Hook Examples:**
+
 ```bash
 #!/bin/bash
 # DON'T DO THESE:
@@ -251,6 +271,7 @@ ssh remote-server "dangerous-command"
 ```
 
 **Hook Review Checklist:**
+
 1. **Understand all commands** - Know what each line does
 2. **Check file operations** - Ensure operations stay within workspace
 3. **Verify network operations** - Review any external communication
@@ -260,6 +281,7 @@ ssh remote-server "dangerous-command"
 ### Hook Management
 
 **Enable/Disable Hooks:**
+
 ```bash
 # List available hooks
 jot hooks list
@@ -275,6 +297,7 @@ ls -la .jot/hooks/
 ```
 
 **Hook Permissions:**
+
 ```bash
 # Hooks must be executable
 chmod +x .jot/hooks/post-capture.sh
@@ -290,6 +313,7 @@ When multiple users share a workspace:
 ### Shared Workspace Setup
 
 **File Ownership:**
+
 ```bash
 # Create shared group
 sudo groupadd jot-users
@@ -317,12 +341,14 @@ bob: jot template approve meeting
 ### Access Control
 
 **File-Level Access:**
+
 - All users can read all notes
 - All users can capture new notes
 - Refiling operations require write access to target files
 - Templates require individual approval per user
 
 **Operation-Level Access:**
+
 - Captures: All users
 - Refiling: Users with write access
 - Template approval: Individual users only
@@ -333,17 +359,20 @@ bob: jot template approve meeting
 ### Security Logging
 
 **Operation Logs:**
+
 ```
 .jot/logs/security.log
 ```
 
 **Logged Events:**
+
 - Template approvals and revocations
 - Hook executions and failures
 - Configuration changes
 - Permission errors
 
 **Log Format:**
+
 ```
 2025-01-15T14:30:00Z [SECURITY] Template 'meeting' approved by user 'alice'
 2025-01-15T14:31:00Z [SECURITY] Hook 'post-capture' executed successfully
@@ -353,6 +382,7 @@ bob: jot template approve meeting
 ### Security Monitoring
 
 **Regular Security Checks:**
+
 ```bash
 # Run security diagnostics
 jot doctor --security
@@ -368,6 +398,7 @@ jot hooks list
 ```
 
 **Automated Monitoring:**
+
 ```bash
 #!/bin/bash
 # security-check.sh
@@ -392,25 +423,29 @@ fi
 If a template is suspected of being malicious:
 
 1. **Immediately revoke approval:**
+
    ```bash
    jot template revoke suspicious-template
    ```
 
 2. **Review template content:**
+
    ```bash
    jot template view suspicious-template
    ```
 
 3. **Check execution logs:**
+
    ```bash
    grep suspicious-template .jot/logs/*.log
    ```
 
 4. **Audit system for changes:**
+
    ```bash
    # Check for unexpected files
    find . -newer .jot/template_permissions
-   
+
    # Check for permission changes
    ls -la .jot/ lib/
    ```
@@ -420,17 +455,20 @@ If a template is suspected of being malicious:
 If workspace access is compromised:
 
 1. **Change file permissions:**
+
    ```bash
    chmod 700 .jot/
    chmod 600 .jot/config.json .jot/template_permissions
    ```
 
 2. **Review logs for suspicious activity:**
+
    ```bash
    tail -100 .jot/logs/*.log
    ```
 
 3. **Re-approve all templates:**
+
    ```bash
    rm .jot/template_permissions
    jot template list  # Shows all need approval

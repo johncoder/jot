@@ -548,16 +548,19 @@ Key areas for contribution:
 📚 **Complete documentation is available at [docs/README.md](docs/README.md)**
 
 ### Quick Start Guides
+
 - **[Getting Started](docs/user-guide/getting-started.md)** - Installation and first steps
 - **[Basic Workflows](docs/user-guide/basic-workflows.md)** - Common patterns and use cases
 - **[Command Reference](docs/user-guide/commands.md)** - Complete command documentation
 
 ### Real-World Examples
+
 - **[Daily Notes Workflow](docs/examples/daily-notes.md)** - Personal daily note system
 - **[Project Notes Workflow](docs/examples/project-notes.md)** - Managing project documentation
 - **[Template Examples](docs/examples/templates/)** - Ready-to-use templates
 
 ### Advanced Topics
+
 - **[Templates Guide](docs/user-guide/templates.md)** - Creating structured notes
 - **[Configuration](docs/user-guide/configuration.md)** - Customizing jot for your workflow
 - **[Architecture](docs/architecture/)** - Design principles and file structure

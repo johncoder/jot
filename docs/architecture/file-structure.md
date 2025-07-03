@@ -29,25 +29,31 @@ my-notes/                    # Workspace root
 The primary destination for new notes. All `jot capture` operations append to this file unless redirected by templates.
 
 **Characteristics:**
+
 - **Standard Markdown** - Compatible with any Markdown editor or viewer
 - **Timestamped entries** - Each capture includes timestamp
 - **Append-only** - New content is added to the end
 - **Temporary staging** - Content is eventually refiled to organized locations
 
 **Example content:**
+
 ```markdown
 # Inbox
 
 ## 2025-01-15 09:23
+
 Quick thought about improving the API rate limiting algorithm.
 
 ## 2025-01-15 14:45
+
 Meeting notes from architecture review:
+
 - Discussed microservices approach
 - Decided on API gateway pattern
 - Action: Draft service boundaries document
 
 ## 2025-01-15 16:30
+
 Learned about React.memo performance optimization.
 Source: https://react.dev/reference/react/memo
 ```
@@ -57,12 +63,14 @@ Source: https://react.dev/reference/react/memo
 The directory for organized, categorized notes. Files here are created during the refiling process.
 
 **Organization patterns:**
+
 - **Topic-based:** `work.md`, `personal.md`, `learning.md`
 - **Project-based:** `projects/project-alpha.md`, `projects/project-beta.md`
 - **Time-based:** `daily/2025-01.md`, `weekly/week-03.md`
 - **Type-based:** `meetings.md`, `ideas.md`, `references.md`
 
 **File naming conventions:**
+
 - Use kebab-case for multi-word files: `project-alpha.md`
 - Use clear, descriptive names: `meeting-notes.md` not `notes.md`
 - Group related files in subdirectories when helpful
@@ -70,6 +78,7 @@ The directory for organized, categorized notes. Files here are created during th
 ### Optional Organization Directories
 
 **`archive/`** - Long-term storage for old notes:
+
 ```
 archive/
 ├── 2024/
@@ -81,6 +90,7 @@ archive/
 ```
 
 **`templates/`** - User templates (alternative to `.jot/templates/`):
+
 ```
 templates/
 ├── meeting.md
@@ -93,6 +103,7 @@ templates/
 ### Configuration Files
 
 **`config.json`** - Workspace-specific configuration:
+
 ```json
 {
   "templates": {
@@ -113,6 +124,7 @@ templates/
 ```
 
 **`template_permissions`** - Template security approvals:
+
 ```
 meeting:sha256:a1b2c3d4e5f6...
 daily:sha256:f6e5d4c3b2a1...
@@ -122,6 +134,7 @@ standup:sha256:9876543210ab...
 ### Templates Directory
 
 **`.jot/templates/`** - Workspace-specific templates:
+
 ```
 templates/
 ├── meeting.md               # Meeting notes template
@@ -133,6 +146,7 @@ templates/
 ### Logs and History
 
 **`.jot/logs/`** - Operation history and debugging:
+
 ```
 logs/
 ├── captures.log             # Capture operations
@@ -144,6 +158,7 @@ logs/
 ### Automation Scripts
 
 **`.jot/hooks/`** - Automation and workflow scripts:
+
 ```
 hooks/
 ├── post-capture.sh         # Run after each capture
@@ -168,33 +183,37 @@ created: 2025-01-15T14:30:00Z
 # Meeting: API Architecture Review
 
 ## Attendees
+
 - John Doe (Tech Lead)
 - Jane Smith (Backend Dev)
 - Bob Johnson (Frontend Dev)
 
 ## Discussion
+
 ...
 ```
 
 ### Configuration Files
 
 **JSON5 format** for human readability:
+
 ```json5
 {
   // Comments are allowed
-  "workspaces": {
-    "work": "/home/user/work-notes",
-    "personal": "~/personal-notes"
+  workspaces: {
+    work: "/home/user/work-notes",
+    personal: "~/personal-notes",
   },
-  
+
   // Trailing commas are fine
-  "editor": "vim",
+  editor: "vim",
 }
 ```
 
 ### Template Files
 
 Templates are Markdown with shell command substitution:
+
 ```markdown
 ---
 destination: lib/daily/$(date '+%Y-%m').md
@@ -207,7 +226,6 @@ tags: [daily]
 **Time:** $(date '+%H:%M')
 
 ## Notes
-
 ```
 
 ## Directory Discovery
@@ -220,6 +238,7 @@ jot finds workspaces by searching for `.jot` directories:
 4. **Default workspace** - Fall back to configured default
 
 **Discovery examples:**
+
 ```bash
 # Working in a project subdirectory
 /home/user/notes/projects/alpha/src/
@@ -236,6 +255,7 @@ jot finds workspaces by searching for `.jot` directories:
 ### Single Workspace
 
 Simple setup for personal notes:
+
 ```
 ~/notes/
 ├── inbox.md
@@ -249,6 +269,7 @@ Simple setup for personal notes:
 ### Project-Specific Workspaces
 
 Separate workspace for each project:
+
 ```
 ~/projects/
 ├── project-alpha/
@@ -270,6 +291,7 @@ Separate workspace for each project:
 ### Hybrid Workspace
 
 Shared workspace with project-specific organization:
+
 ```
 ~/all-notes/
 ├── inbox.md
@@ -302,7 +324,7 @@ chmod 755 .jot/              # Internal directory
 chmod 644 inbox.md           # Capture file
 chmod 644 lib/*.md           # Note files
 
-# Configuration files  
+# Configuration files
 chmod 600 ~/.jotrc           # Global config (private)
 chmod 644 .jot/config.json   # Workspace config
 
@@ -324,16 +346,19 @@ chmod 644 .jot/template_permissions # Security data
 ### What to Backup
 
 **Essential files:**
+
 - `inbox.md` and all files in `lib/`
 - `.jot/config.json` (workspace configuration)
 - `.jot/templates/` (custom templates)
 - `.jot/template_permissions` (security approvals)
 
 **Optional files:**
+
 - `.jot/hooks/` (automation scripts)
 - `.jot/logs/` (operation history)
 
 **Example backup script:**
+
 ```bash
 #!/bin/bash
 BACKUP_DIR="backup-$(date +%Y%m%d)"

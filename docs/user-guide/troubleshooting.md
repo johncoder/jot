@@ -13,6 +13,7 @@ jot doctor
 ```
 
 This checks:
+
 - Workspace integrity
 - File permissions
 - Configuration validity
@@ -35,6 +36,7 @@ jot doctor --show-config
 **Cause:** jot is not in your PATH or not installed.
 
 **Solutions:**
+
 ```bash
 # Check if jot is installed
 which jot
@@ -54,6 +56,7 @@ go install github.com/johncoder/jot@latest
 **Cause:** Current directory doesn't contain a `.jot` directory.
 
 **Solutions:**
+
 ```bash
 # Initialize workspace in current directory
 jot init
@@ -70,6 +73,7 @@ echo '{"workspaces": {"default": "~/notes"}}' > ~/.jotrc
 **Cause:** Incorrect file permissions on workspace or config.
 
 **Solutions:**
+
 ```bash
 # Fix workspace permissions
 chmod 755 .jot/
@@ -90,6 +94,7 @@ chmod 644 .jot/templates/*.md
 **Symptoms:** Default behavior despite having config file.
 
 **Debug:**
+
 ```bash
 # Check config file exists
 ls -la ~/.jotrc
@@ -102,6 +107,7 @@ jot doctor --show-config
 ```
 
 **Solutions:**
+
 ```bash
 # Fix JSON5 syntax errors
 # Common issues: missing commas, unquoted keys, trailing commas
@@ -115,6 +121,7 @@ echo '{"workspaces": {"default": "~/notes"}}' > ~/.jotrc
 **Symptoms:** "No workspace found" despite having `.jot` directory.
 
 **Debug:**
+
 ```bash
 # Check current directory
 pwd
@@ -125,6 +132,7 @@ find . -name ".jot" -type d
 ```
 
 **Solutions:**
+
 ```bash
 # Ensure .jot is a directory, not a file
 file .jot
@@ -143,6 +151,7 @@ jot --workspace $(pwd) status
 **Symptoms:** Template requires approval before use.
 
 **Solutions:**
+
 ```bash
 # List template status
 jot template list
@@ -159,6 +168,7 @@ jot template view meeting
 **Symptoms:** Template renders but shell commands don't work.
 
 **Debug:**
+
 ```bash
 # Test commands manually
 date '+%Y-%m-%d'
@@ -169,6 +179,7 @@ jot template view problematic-template
 ```
 
 **Solutions:**
+
 ```bash
 # Use command fallbacks in templates
 $(git branch --show-current 2>/dev/null || echo "no-branch")
@@ -185,6 +196,7 @@ $(/usr/bin/date '+%Y-%m-%d')
 **Symptoms:** Cannot execute template commands.
 
 **Solutions:**
+
 ```bash
 # Check template file permissions
 ls -la .jot/templates/
@@ -203,6 +215,7 @@ jot template approve template-name
 **Symptoms:** `jot capture` doesn't open editor.
 
 **Debug:**
+
 ```bash
 # Check editor setting
 echo $EDITOR
@@ -213,6 +226,7 @@ $EDITOR test.md
 ```
 
 **Solutions:**
+
 ```bash
 # Set editor environment variable
 export EDITOR=vim
@@ -230,6 +244,7 @@ echo '{"editor": "code --wait"}' > ~/.jotrc
 **Symptoms:** Editor opens but note isn't captured.
 
 **Solutions:**
+
 ```bash
 # For VS Code, use --wait flag
 export EDITOR="code --wait"
@@ -249,6 +264,7 @@ jot capture
 **Symptoms:** Warning about too many notes in inbox.
 
 **Solutions:**
+
 ```bash
 # Check inbox size
 wc -l inbox.md
@@ -265,6 +281,7 @@ jot archive
 **Symptoms:** `jot find` doesn't return expected results.
 
 **Debug:**
+
 ```bash
 # Test with simple query
 jot find "test"
@@ -277,6 +294,7 @@ grep -r "search-term" lib/
 ```
 
 **Solutions:**
+
 ```bash
 # Rebuild search index (if supported)
 jot doctor --rebuild-index
@@ -293,6 +311,7 @@ jot find "term" $(pwd)/lib/work.md
 **Symptoms:** `jot refile` doesn't move content.
 
 **Debug:**
+
 ```bash
 # Check inbox content
 cat inbox.md
@@ -302,6 +321,7 @@ ls -la inbox.md lib/
 ```
 
 **Solutions:**
+
 ```bash
 # Ensure lib/ directory exists
 mkdir -p lib/
@@ -322,6 +342,7 @@ jot refile --verbose
 **Symptoms:** Changes not automatically committed.
 
 **Debug:**
+
 ```bash
 # Check git status
 git status
@@ -332,6 +353,7 @@ git config user.email
 ```
 
 **Solutions:**
+
 ```bash
 # Initialize git repository
 git init
@@ -352,6 +374,7 @@ echo '{"git": {"auto_commit": false}}' > .jot/config.json
 **Symptoms:** `jot find` takes too long.
 
 **Solutions:**
+
 ```bash
 # Check number of files
 find lib/ -name "*.md" | wc -l
@@ -368,6 +391,7 @@ jot archive
 **Symptoms:** All operations slow.
 
 **Solutions:**
+
 ```bash
 # Check workspace size
 du -sh .
@@ -386,6 +410,7 @@ jot workspace add project2 ~/project2-notes
 **Cause:** Corrupted or incomplete workspace structure.
 
 **Solution:**
+
 ```bash
 # Recreate workspace structure
 mkdir -p lib .jot/logs .jot/templates
@@ -403,6 +428,7 @@ jot doctor
 **Cause:** Template contains unapproved shell commands.
 
 **Solution:**
+
 ```bash
 # Approve template
 jot template approve template-name
@@ -416,13 +442,14 @@ jot template edit template-name
 **Cause:** Invalid JSON5 in configuration file.
 
 **Solution:**
+
 ```bash
 # Validate config syntax
 json5 validate ~/.jotrc
 
 # Common fixes:
 # - Add missing commas
-# - Remove trailing commas  
+# - Remove trailing commas
 # - Quote object keys properly
 # - Escape backslashes in paths
 ```
@@ -432,6 +459,7 @@ json5 validate ~/.jotrc
 **Cause:** Insufficient permissions on workspace files.
 
 **Solution:**
+
 ```bash
 # Fix common permission issues
 chmod 755 .jot/
