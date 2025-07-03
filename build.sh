@@ -4,6 +4,9 @@ set -e
 
 # Build configuration
 APP_NAME="jot"
+# VERSION: Uses git describe to get semver tags (e.g., v0.9.0) or commit hash
+# - For releases: Set VERSION=v0.9.0 manually or ensure a proper git tag exists
+# - For development: Automatically uses git describe --tags --always --dirty
 VERSION=${VERSION:-$(git describe --tags --always --dirty 2>/dev/null || echo "dev")}
 BUILD_TIME=$(date -u '+%Y-%m-%d_%H:%M:%S')
 GIT_COMMIT=${GIT_COMMIT:-$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")}
@@ -62,7 +65,28 @@ if [ "$1" = "--all" ]; then
     sha256sum * > checksums.txt
     cd ..
     
-    echo "Build complete! Binaries are in dist/"
+    # Create archives for release
+    echo "Creating release archives..."
+    cd dist
+    for platform in "${PLATFORMS[@]}"; do
+        os=$(echo $platform | cut -d'/' -f1)
+        arch=$(echo $platform | cut -d'/' -f2)
+        binary_name="${APP_NAME}_${os}_${arch}"
+        
+        if [ "$os" = "windows" ]; then
+            binary_name="${binary_name}.exe"
+            archive_name="${APP_NAME}_${VERSION}_${os}_${arch}.zip"
+            zip "$archive_name" "$binary_name" checksums.txt
+        else
+            archive_name="${APP_NAME}_${VERSION}_${os}_${arch}.tar.gz"
+            tar -czf "$archive_name" "$binary_name" checksums.txt
+        fi
+        
+        echo "Created $archive_name"
+    done
+    cd ..
+    
+    echo "Build complete! Binaries and archives are in dist/"
     ls -la dist/
 else
     echo "Build complete! Binary: dist/$APP_NAME"

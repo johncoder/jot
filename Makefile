@@ -1,4 +1,4 @@
-.PHONY: help setup build build-all clean test test-unit test-integration lint fmt vet staticcheck install deps release info
+.PHONY: help setup build build-all clean test test-unit test-integration lint fmt vet staticcheck install deps release release-build release-publish info
 
 # Build configuration
 APP_NAME := jot
@@ -27,7 +27,7 @@ help: ## Show this help message
 	@grep -E '^(build|build-all|install|clean):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-15s %s\n", $$1, $$2}'
 	@echo ""
 	@echo "Utilities:"
-	@grep -E '^(deps|release|info):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-15s %s\n", $$1, $$2}'
+	@grep -E '^(deps|release|release-build|release-publish|info):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-15s %s\n", $$1, $$2}'
 
 setup: ## Setup development environment (non-interactive)
 	@echo "Setting up development environment..."
@@ -90,10 +90,24 @@ deps: ## Download and tidy dependencies
 	@if ! go mod verify; then echo "Failed to verify modules"; exit 1; fi
 	@echo "Dependencies updated successfully"
 
-release: clean lint test build-all ## Prepare a release build
-	@echo "Release build complete!"
+release: ## DEPRECATED: Use release-build then release-publish
+	@echo "⚠️  DEPRECATED: Use 'make release-build' then 'make release-publish'"
+	@echo "This will be removed in a future version."
+	@echo ""
+	@$(MAKE) release-build
+
+release-build: clean lint test build-all ## Build release artifacts (step 1/2)
+	@echo "🚀 Release build complete!"
 	@echo "Version: $(VERSION)"
-	@ls -la dist/
+	@echo ""
+	@echo "📦 Created artifacts:"
+	@ls -la dist/ | grep -E '\.(tar\.gz|zip)$$'
+	@echo ""
+	@echo "Next: Run 'make release-publish' to upload to GitHub and update Homebrew"
+
+release-publish: ## Publish release to GitHub and Homebrew (step 2/2)
+	@echo "🚀 Publishing release $(VERSION)..."
+	@if ! ./scripts/release-publish.sh $(VERSION); then echo "Release publish failed"; exit 1; fi
 
 info: ## Show build information
 	@echo "Build Information:"

@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/johncoder/jot/internal/workspace"
 	"github.com/spf13/cobra"
@@ -71,8 +72,14 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&workspaceName, "workspace", "w", "", "use specific workspace (bypasses discovery)")
 	rootCmd.PersistentFlags().BoolVar(&jsonOutput, "json", false, "output in JSON format")
 
-	// Version handling
-	rootCmd.Version = fmt.Sprintf("%s\nBuild: %s\nCommit: %s", version, buildTime, gitCommit)
+	// Version handling - format output according to Linux CLI conventions
+	if version == "dev" || version == "" || !strings.HasPrefix(version, "v") {
+		// Development builds show more detail
+		rootCmd.Version = fmt.Sprintf("%s (build: %s, commit: %s)", version, buildTime, gitCommit)
+	} else {
+		// Release builds show clean version, with build info available via verbose flag
+		rootCmd.Version = version
+	}
 
 	// Add all commands
 	addCommands()

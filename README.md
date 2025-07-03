@@ -20,12 +20,40 @@ Think of it as your personal knowledge management system that lives where you wo
 
 ## Installation
 
+### Quick Install (Recommended)
+
+**Linux/macOS:**
+
+```bash
+curl -sSL https://raw.githubusercontent.com/johncoder/jot/main/install.sh | sh
+```
+
+This installs to `~/.local/bin/jot` and provides helpful PATH setup instructions.
+
+### Package Managers
+
+**Homebrew:**
+
+```bash
+brew install johncoder/tap/jot
+```
+
+**Go Install:**
+
+```bash
+go install github.com/johncoder/jot@latest
+```
+
+### Manual Download
+
+Download pre-built binaries from [GitHub Releases](https://github.com/johncoder/jot/releases).
+
 ### From Source
 
 ```bash
 git clone https://github.com/johncoder/jot.git
 cd jot
-make install  # Or: go install .
+make install
 ```
 
 ### Verify Installation
@@ -45,6 +73,7 @@ jot init
 ```
 
 This creates:
+
 - `inbox.md` - Where all new notes are captured
 - `lib/` - Directory for organized notes
 - `.jot/` - Internal data, templates, and configuration
@@ -97,13 +126,14 @@ jot refile --all --dest topics.md
 Initialize a new jot workspace with the proper directory structure.
 
 ```bash
-jot init                    # Initialize in current directory  
+jot init                    # Initialize in current directory
 jot init ~/my-notes         # Initialize in specific directory
 ```
 
 **What it creates:**
+
 - `inbox.md` - Default capture location
-- `lib/` - Directory for organized notes  
+- `lib/` - Directory for organized notes
 - `.jot/` - Internal data and configuration
 
 ### `jot capture [template]`
@@ -127,6 +157,7 @@ echo "Meeting notes" | jot capture meeting
 ```
 
 **Input Methods:**
+
 - **Editor**: Opens your `$EDITOR` for interactive note writing
 - **Direct**: Use `--content "text"` for quick notes
 - **Piped**: Pipe content from other commands
@@ -154,8 +185,9 @@ jot refile --offset 150 --dest current.md  # For editor integration
 ```
 
 **Targeting Options:**
+
 - **Index**: `1,3,5` or `1-3` for specific notes
-- **Exact Match**: `--exact "timestamp"` for precise targeting  
+- **Exact Match**: `--exact "timestamp"` for precise targeting
 - **Pattern**: `--pattern "regex"` for content-based selection
 - **All**: `--all` to process entire inbox
 - **Offset**: `--offset N` for editor cursor integration
@@ -166,11 +198,12 @@ Search through all notes with full-text search and context display.
 
 ```bash
 jot find "project meeting"       # Search for phrase
-jot find golang --limit 10       # Limit results  
+jot find golang --limit 10       # Limit results
 jot find todo --archive          # Include archived notes
 ```
 
 **Features:**
+
 - Full-text search across inbox, lib/, and optionally archive
 - Context display with match highlighting
 - Relevance-based result ranking
@@ -186,6 +219,7 @@ jot status --verbose           # Detailed information
 ```
 
 **Information Displayed:**
+
 - Workspace location and structure validation
 - Note counts by location (inbox, library, archive)
 - Recent activity summary
@@ -201,8 +235,9 @@ jot doctor --fix               # Automatically fix issues
 ```
 
 **Health Checks:**
+
 - Workspace structure integrity
-- File permissions and accessibility  
+- File permissions and accessibility
 - Configuration validation
 - External tool availability
 
@@ -213,12 +248,13 @@ Manage note templates for structured capture with shell command integration.
 ```bash
 jot template list                    # Show all templates
 jot template new meeting             # Create new template
-jot template edit meeting            # Edit existing template  
+jot template edit meeting            # Edit existing template
 jot template view meeting            # View template content
 jot template approve meeting         # Approve for shell execution
 ```
 
 **Template Features:**
+
 - Markdown format with embedded shell commands
 - Dynamic content using `$(command)` syntax
 - Security approval workflow for shell commands
@@ -233,11 +269,12 @@ jot archive                    # Create archive structure
 ```
 
 **Current Functionality:**
+
 - Creates `.jot/archive/` directory structure
 - Sets up monthly archive files
 - Foundation for future automated archiving
 
-*Note: Interactive archiving features are planned for future releases.*
+_Note: Interactive archiving features are planned for future releases._
 
 ### `jot eval`
 
@@ -252,6 +289,7 @@ jot eval --list-approved                    # Show all approved blocks
 ```
 
 **Features:**
+
 - Standards-compliant metadata parsing
 - Session-based execution for persistent interpreters
 - Security approval workflow
@@ -267,6 +305,7 @@ jot tangle docs/tutorial.md      # Process tutorial file
 ```
 
 **Features:**
+
 - Extracts blocks with `:tangle` or `:file` headers
 - Creates directories as needed
 - Supports multiple programming languages
@@ -284,6 +323,7 @@ jot template new meeting
 ```
 
 **Example Template** (`.jot/templates/meeting.md`):
+
 ```markdown
 # Meeting Notes - $(date '+%Y-%m-%d %H:%M')
 
@@ -291,16 +331,18 @@ jot template new meeting
 **Project:** $(git branch --show-current 2>/dev/null || echo "Unknown")
 
 ## Attendees
-- 
+
+-
 
 ## Agenda
-- 
+
+-
 
 ## Notes
 
-
 ## Action Items
-- [ ] 
+
+- [ ]
 ```
 
 **Using Templates:**
@@ -392,25 +434,26 @@ jot uses JSON5 configuration files for customization:
 ```json5
 {
   // Editor settings
-  "editor": {
-    "command": "code",  // Override $EDITOR
-    "args": ["--wait"]
+  editor: {
+    command: "code", // Override $EDITOR
+    args: ["--wait"],
   },
-  
+
   // Search settings
-  "search": {
-    "default_limit": 20,
-    "include_archive": false
+  search: {
+    default_limit: 20,
+    include_archive: false,
   },
-  
-  // Template settings  
-  "templates": {
-    "default_location": ".jot/templates"
-  }
+
+  // Template settings
+  templates: {
+    default_location: ".jot/templates",
+  },
 }
 ```
 
 **Environment Variables:**
+
 - `JOT_EDITOR` - Override editor
 - `JOT_CONFIG` - Custom config file location
 - Standard: `$EDITOR`, `$VISUAL`, `$PAGER`
@@ -446,14 +489,14 @@ Example daily workflow:
 # Morning capture
 echo "TODO: Review pull requests" | jot capture
 
-# During meetings  
+# During meetings
 jot capture meeting
 
 # End of day organization
 jot refile --all --dest today.md
 
 # Search when needed
-jot find "pull request" 
+jot find "pull request"
 
 # Check workspace health
 jot status
@@ -471,7 +514,7 @@ jot status
 jot follows these guiding principles:
 
 - **Pragmatism**: Focused on real-world workflows and daily use
-- **Speed**: Fast capture and retrieval with minimal friction  
+- **Speed**: Fast capture and retrieval with minimal friction
 - **Convenience**: Always accessible from your terminal
 - **Interoperability**: Works with existing tools (git, editors, shell)
 - **Simplicity**: Markdown files, simple structure, clear commands
@@ -492,8 +535,9 @@ Current functionality is stable and production-ready. Planned features include:
 Contributions are welcome! Please read the documentation in `docs/` for development guidelines and project structure.
 
 Key areas for contribution:
+
 - Additional template examples
-- External command integrations  
+- External command integrations
 - Documentation improvements
 - Bug reports and feature requests
 
@@ -502,7 +546,7 @@ Key areas for contribution:
 For detailed documentation, see the `docs/` directory:
 
 - [Product Requirements](docs/jot_prd.md)
-- [Implementation Summary](docs/IMPLEMENTATION_SUMMARY.md)  
+- [Implementation Summary](docs/IMPLEMENTATION_SUMMARY.md)
 - [Roadmap](docs/roadmap.md)
 - [Project Details](docs/projects/)
 
@@ -514,4 +558,4 @@ For detailed documentation, see the `docs/` directory:
 
 **jot** - Because your notes should be as close to your code as your terminal is to your workflow.
 
-*Fast • Simple • Extensible • Terminal-Native*
+_Fast • Simple • Extensible • Terminal-Native_

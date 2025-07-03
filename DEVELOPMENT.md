@@ -101,6 +101,33 @@ make build-all          # Build for all platforms (uses build.sh)
 make install            # Build and install to $GOPATH/bin
 ```
 
+### Version Information
+
+jot uses Git tags for version management:
+
+```bash
+# Check current version detection
+git describe --tags --always --dirty
+
+# Development builds show commit hash
+jot --version  # jot version <hash> (build: ..., commit: ...)
+
+# Tagged builds show clean semver
+git tag v0.9.0
+jot --version  # jot version v0.9.0
+
+# Manual version override
+VERSION=v1.0.0-beta make build
+```
+
+Version is injected at build time via LDFLAGS:
+
+- `version`: Git tag or commit hash
+- `buildTime`: UTC timestamp
+- `gitCommit`: Short commit hash
+
+See `RELEASE.md` for full versioning strategy.
+
 ### Cleanup
 
 ```bash
