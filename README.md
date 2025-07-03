@@ -119,6 +119,8 @@ jot refile 1,3,5 --dest work.md
 jot refile --all --dest topics.md
 ```
 
+**📚 For complete documentation, examples, and guides, see [docs/README.md](docs/README.md)**
+
 ## Core Commands
 
 ### `jot init [path]`
@@ -543,12 +545,22 @@ Key areas for contribution:
 
 ## Documentation
 
-For detailed documentation, see the `docs/` directory:
+📚 **Complete documentation is available at [docs/README.md](docs/README.md)**
 
-- [Product Requirements](docs/jot_prd.md)
-- [Implementation Summary](docs/IMPLEMENTATION_SUMMARY.md)
-- [Roadmap](docs/roadmap.md)
-- [Project Details](docs/projects/)
+### Quick Start Guides
+- **[Getting Started](docs/user-guide/getting-started.md)** - Installation and first steps
+- **[Basic Workflows](docs/user-guide/basic-workflows.md)** - Common patterns and use cases
+- **[Command Reference](docs/user-guide/commands.md)** - Complete command documentation
+
+### Real-World Examples
+- **[Daily Notes Workflow](docs/examples/daily-notes.md)** - Personal daily note system
+- **[Project Notes Workflow](docs/examples/project-notes.md)** - Managing project documentation
+- **[Template Examples](docs/examples/templates/)** - Ready-to-use templates
+
+### Advanced Topics
+- **[Templates Guide](docs/user-guide/templates.md)** - Creating structured notes
+- **[Configuration](docs/user-guide/configuration.md)** - Customizing jot for your workflow
+- **[Architecture](docs/architecture/)** - Design principles and file structure
 
 ## License
 
