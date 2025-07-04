@@ -124,12 +124,11 @@ Templates require approval before shell commands can execute.`,
 		defaultContent := fmt.Sprintf(`---
 destination: inbox.md
 refile_mode: append
-tags: [%s]
 ---
 ## %s - $(date '+%%Y-%%m-%%d %%H:%%M')
 
 
-`, strings.ToLower(name), strings.ToTitle(name))
+`, strings.ToTitle(name))
 
 		// Create template
 		pathUtil := cmdutil.NewPathUtil(ws)
