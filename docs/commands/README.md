@@ -27,17 +27,7 @@ These options are available for all jot commands:
 | [jot archive](jot-archive.md) | Archive old notes |
 | [jot status](jot-status.md) | Show workspace information |
 | [jot doctor](jot-doctor.md) | Diagnose workspace issues |
-
-## Template Commands
-
-| Command | Description |
-|---------|-------------|
 | [jot template](jot-template.md) | Manage note templates |
-
-## Workspace Commands
-
-| Command | Description |
-|---------|-------------|
 | [jot workspace](jot-workspace.md) | Manage workspace registry |
 
 ## Advanced Commands
