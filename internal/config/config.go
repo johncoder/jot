@@ -55,9 +55,6 @@ func Initialize(cfgFile string) error {
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	v.AutomaticEnv()
 
-	// Set defaults
-	setDefaults(v)
-
 	// Try to read config file with JSON5 support
 	var cfg Config
 	if configData, err := readConfigFile(v); err != nil {
@@ -84,9 +81,6 @@ func Initialize(cfgFile string) error {
 	if configFilePath == "" && v.ConfigFileUsed() != "" {
 		configFilePath = v.ConfigFileUsed()
 	}
-
-	// Migrate legacy configuration format
-	migrateLegacyConfig(&cfg)
 
 	globalConfig = &cfg
 	return nil
@@ -143,51 +137,12 @@ func expandEnvironmentVariables(data string) string {
 	})
 }
 
-// migrateLegacyConfig converts old configuration format to new format
-func migrateLegacyConfig(cfg *Config) {
-	// If new format is empty but legacy format exists, migrate
-	if len(cfg.Workspaces) == 0 && len(cfg.Locations) > 0 {
-		cfg.Workspaces = make(map[string]string)
-		for name, path := range cfg.Locations {
-			// Expand path for migration
-			if strings.HasPrefix(path, "~/") {
-				if home, err := os.UserHomeDir(); err == nil {
-					path = filepath.Join(home, path[2:])
-				}
-			}
-			cfg.Workspaces[name] = path
-		}
-
-		if cfg.Default == "" && cfg.DefaultLocation != "" {
-			cfg.Default = cfg.DefaultLocation
-		}
-	}
-}
-
-// setDefaults sets default configuration values
-func setDefaults(v *viper.Viper) {
-	// Legacy defaults (for backward compatibility)
-	v.SetDefault("defaultLocation", "default")
-	home, _ := os.UserHomeDir()
-	defaultPath := filepath.Join(home, "Documents", "notes")
-	v.SetDefault("locations.default", defaultPath)
-}
-
 // Get returns the global configuration
 func Get() *Config {
 	if globalConfig == nil {
-		// Return default config if not initialized
-		home, _ := os.UserHomeDir()
+		// Return empty config if not initialized - no default workspace
 		return &Config{
-			Default: "notes",
-			Workspaces: map[string]string{
-				"notes": filepath.Join(home, "Documents", "notes"),
-			},
-			// Legacy support
-			DefaultLocation: "default",
-			Locations: map[string]string{
-				"default": filepath.Join(home, "Documents", "notes"),
-			},
+			Workspaces: make(map[string]string),
 		}
 	}
 	return globalConfig

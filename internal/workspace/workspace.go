@@ -139,6 +139,11 @@ func findWorkspaceFromConfig(configPath string) (*Workspace, error) {
 
 // findWorkspaceFromGlobalConfig finds the default workspace from global config
 func findWorkspaceFromGlobalConfig() (*Workspace, error) {
+	// Initialize config if not already initialized
+	if err := config.Initialize(""); err != nil {
+		return nil, fmt.Errorf("failed to initialize config: %w", err)
+	}
+
 	defaultName, defaultPath, err := config.GetDefaultWorkspace()
 	if err != nil {
 		return nil, fmt.Errorf("no workspace found. Run 'jot init' from the directory you wish to store your notes")
@@ -187,6 +192,11 @@ func RequireWorkspaceWithOverride(workspaceName string) (*Workspace, error) {
 
 // RequireSpecificWorkspace finds a workspace by name from the config registry
 func RequireSpecificWorkspace(name string) (*Workspace, error) {
+	// Initialize config if not already initialized
+	if err := config.Initialize(""); err != nil {
+		return nil, fmt.Errorf("failed to initialize config: %w", err)
+	}
+
 	path, err := config.GetWorkspace(name)
 	if err != nil {
 		return nil, fmt.Errorf("workspace '%s' not found in registry: %w\nUse 'jot workspace list' to see available workspaces", name, err)
