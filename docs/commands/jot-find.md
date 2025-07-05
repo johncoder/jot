@@ -189,6 +189,4 @@ In interactive mode, results are enhanced with:
 ## See Also
 
 - [Global Options](README.md#global-options)
-- [Interactive Workflows](../topics/interactive.md)
-- [Search Strategies](../topics/search.md)
-- [Workspace Structure](../topics/workspace.md)
+- [Configuration Guide](../user-guide/configuration.md) - Pager configuration for search results

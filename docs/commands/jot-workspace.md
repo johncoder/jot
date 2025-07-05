@@ -250,6 +250,4 @@ jot uses the following priority order to find workspaces:
 ## See Also
 
 - [Global Options](README.md#global-options)
-- [Workspace Structure](../topics/workspace.md)
-- [Configuration](../topics/configuration.md)
-- [Multiple Workspaces](../topics/multiple-workspaces.md)
+- [Configuration Guide](../user-guide/configuration.md) - Workspace configuration and named workspaces

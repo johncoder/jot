@@ -346,3 +346,4 @@ Templates consist of:
 
 - [jot capture](jot-capture.md) - Use templates for note capture
 - [jot status](jot-status.md) - Check template counts and status
+- [Configuration Guide](../user-guide/configuration.md) - Template directory configuration and editor integration

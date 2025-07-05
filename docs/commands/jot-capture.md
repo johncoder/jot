@@ -187,3 +187,4 @@ Capture integrates with the hooks system:
 - [jot template](jot-template.md) - Manage templates for structured capture
 - [jot refile](jot-refile.md) - Organize captured notes
 - [jot status](jot-status.md) - Check workspace and recent activity
+- [Configuration Guide](../user-guide/configuration.md) - Editor integration and workspace defaults

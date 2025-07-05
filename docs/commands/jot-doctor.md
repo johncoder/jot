@@ -318,6 +318,4 @@ jot doctor --json | jq '.checks[] | select(.name == "inbox_exists")'
 ## See Also
 
 - [Global Options](README.md#global-options)
-- [Workspace Structure](../topics/workspace.md)
-- [Troubleshooting](../user-guide/troubleshooting.md)
-- [Configuration](../topics/configuration.md)
+- [Configuration Guide](../user-guide/configuration.md) - Configuration validation and troubleshooting

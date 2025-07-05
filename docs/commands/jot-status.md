@@ -138,3 +138,4 @@ The status output includes:
 - [jot doctor](jot-doctor.md) - Diagnose and repair workspace issues
 - [jot workspace](jot-workspace.md) - Manage workspace registry
 - [jot find](jot-find.md) - Search workspace content
+- [Configuration Guide](../user-guide/configuration.md) - Workspace configuration and defaults

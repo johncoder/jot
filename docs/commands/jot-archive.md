@@ -301,6 +301,4 @@ jot find "archived" --archive
 ## See Also
 
 - [Global Options](README.md#global-options)
-- [Workspace Configuration](../topics/configuration.md)
-- [Archive Strategies](../topics/archiving.md)
-- [Hook System](../topics/hooks.md)
+- [Configuration Guide](../user-guide/configuration.md) - Archive directory defaults and hook configuration

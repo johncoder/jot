@@ -172,6 +172,4 @@ When moving subtrees between different heading levels, content is automatically 
 ## See Also
 
 - [Global Options](README.md#global-options)
-- [Path-based Selectors](../topics/selectors.md)
-- [Interactive Workflows](../topics/interactive.md)
-- [Hook System](../topics/hooks.md)
+- [Configuration Guide](../user-guide/configuration.md) - Hook configuration for refile operations

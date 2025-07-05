@@ -4,6 +4,8 @@
 
 Complete reference documentation for all jot commands and their options.
 
+For configuration options including workspace defaults, hook settings, editor integration, and environment variables, see the [Configuration Guide](../user-guide/configuration.md).
+
 ## Global Options
 
 These options are available for all jot commands:

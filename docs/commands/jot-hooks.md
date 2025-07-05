@@ -318,10 +318,10 @@ jot refile "inbox.md#notes" --to "work.md#tasks" --no-verify
 - [jot archive](jot-archive.md) - Content archive with hooks
 - [jot workspace](jot-workspace.md) - Workspace switching with hooks
 - [jot init](jot-init.md) - Workspace initialization
+- [jot external](jot-external.md) - External command integration with hooks
 
 ## See Also
 
 - [Global Options](README.md#global-options)
-- [Hook System](../topics/hooks.md)
-- [Automation Workflows](../topics/automation.md)
-- [External Tools Integration](../topics/integration.md)
+- [Configuration Guide](../user-guide/configuration.md) - Hook configuration and environment variables
+- [JSON Output Reference](../reference/json-output.md) - JSON output formats

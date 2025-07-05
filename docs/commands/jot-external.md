@@ -449,12 +449,11 @@ jot export --config /custom/config.json --format pdf
 
 - [jot init](jot-init.md) - Creating workspaces for external commands
 - [jot workspace](jot-workspace.md) - Managing workspace context
-- [jot json](jot-json.md) - JSON output format reference
+- [JSON Output Reference](../reference/json-output.md) - JSON output format reference
 - [Global Options](README.md#global-options) - Global flags passed to external commands
 
 ## See Also
 
 - [Global Options](README.md#global-options)
-- [External Tools Integration](../topics/integration.md)
-- [Extending jot](../topics/extending.md)
-- [Automation Workflows](../topics/automation.md)
+- [Configuration Guide](../user-guide/configuration.md) - External command configuration and environment variables
+- [Hook System](jot-hooks.md) - Hook integration with external commands

@@ -4,7 +4,7 @@
 
 ## Description
 
-The `jot eval` command evaluates code blocks in markdown files using standards-compliant metadata. It provides a secure way to execute code directly from your notes with configurable parameters and approval workflows.
+The `jot eval` command evaluates code blocks in markdown files with a basic security model.
 
 This command is useful for:
 - Creating executable documentation and tutorials
@@ -372,6 +372,3 @@ The eval command integrates with the hook system:
 ## See Also
 
 - [Global Options](README.md#global-options)
-- [Security Model](../topics/security.md)
-- [Code Integration](../topics/code-integration.md)
-- [Hook System](../topics/hooks.md)

@@ -345,6 +345,4 @@ jot peek "work.md" --toc --short
 ## See Also
 
 - [Global Options](README.md#global-options)
-- [Path-based Selectors](../topics/selectors.md)
-- [Workspace Structure](../topics/workspace.md)
-- [Content Navigation](../topics/navigation.md)
+- [Configuration Guide](../user-guide/configuration.md) - Pager configuration for content viewing

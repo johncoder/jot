@@ -317,6 +317,4 @@ jot files -i -s | xargs typora  # Open in Typora editor
 ## See Also
 
 - [Global Options](README.md#global-options)
-- [Interactive Workflows](../topics/interactive.md)
-- [Editor Integration](../topics/editor-integration.md)
-- [Workspace Structure](../topics/workspace.md)
+- [Configuration Guide](../user-guide/configuration.md) - Editor integration and pager configuration

@@ -144,3 +144,4 @@ After initialization, you typically want to:
 - [jot workspace add](jot-workspace.md#add) - Register workspace in global registry
 - [jot status](jot-status.md) - Check workspace information
 - [jot capture](jot-capture.md) - Start capturing notes
+- [Configuration Guide](../user-guide/configuration.md) - Workspace defaults and directory structure
