@@ -1,24 +1,30 @@
+[Documentation](../README.md) > [Commands](README.md) > evaluator
+
 # jot evaluator
-
-> [Documentation](../README.md) > [Commands](README.md) > jot evaluator
-
-Manage and run code evaluators for the jot eval system.
-
-## Synopsis
-
-```bash
-jot evaluator [language]              # Run evaluator for specific language
-jot evaluator                         # List available evaluators
-```
 
 ## Description
 
-The `jot evaluator` command serves two main purposes:
+The `jot evaluator` command manages and runs code evaluators for the jot eval system.
 
-1. **Run built-in evaluators**: Execute code using jot's built-in language support
-2. **List available evaluators**: Show which evaluators are available in the system
+This command serves two main purposes:
+- **Run built-in evaluators**: Execute code using jot's built-in language support
+- **List available evaluators**: Show which evaluators are available in the system
 
-This command is part of jot's extensible evaluator system, which allows code execution in markdown files through a convention-based approach.
+The evaluator system is the foundation of jot's code execution capabilities, providing an extensible and convention-based approach to running code in different languages.
+
+## Usage
+
+```bash
+jot evaluator [language]
+```
+
+## Arguments
+
+| Argument | Description |
+|----------|-------------|
+| `[language]` | Language to run built-in evaluator for (optional) |
+
+If no language is specified, lists all available evaluators.
 
 ## Evaluator Discovery System
 
@@ -34,26 +40,20 @@ jot provides built-in evaluators for these languages:
 
 | Language | Command | Interpreter Used |
 |----------|---------|------------------|
-| `python` | `jot evaluator python` | `python3` |
 | `python3` | `jot evaluator python3` | `python3` |
 | `javascript` | `jot evaluator javascript` | `node` |
 | `bash` | `jot evaluator bash` | `bash` |
-| `sh` | `jot evaluator sh` | `bash` |
 | `go` | `jot evaluator go` | `go run` |
+
+Note: `python` (without version) maps to `python3`, and `sh` maps to `bash`.
 
 ## Environment Variables
 
 When running evaluators, jot sets these environment variables:
 
-### Standard Context (same as external commands)
-- `JOT_WORKSPACE_PATH` - Path to current workspace
-- `JOT_WORKSPACE_NAME` - Name of current workspace  
-- `JOT_CONFIG_FILE` - Path to configuration file
-
 ### Eval-Specific Context
-- `JOT_EVAL_CODE` - The actual code to execute
+- `JOT_EVAL_CODE` - The actual code to execute (required)
 - `JOT_EVAL_LANG` - Language from code fence or shell parameter
-- `JOT_EVAL_FILE` - Source markdown file path
 - `JOT_EVAL_BLOCK_NAME` - Block name from eval element
 - `JOT_EVAL_CWD` - Working directory for execution
 - `JOT_EVAL_TIMEOUT` - Timeout duration (e.g., "30s")
@@ -62,7 +62,7 @@ When running evaluators, jot sets these environment variables:
 ### Custom Environment Variables
 - `JOT_EVAL_ENV_*` - Any custom env vars from eval element's `env` parameter
 
-## Usage Examples
+## Examples
 
 ### List Available Evaluators
 
@@ -73,14 +73,14 @@ jot evaluator
 Output:
 ```
 Built-in evaluators:
-  python3     (python3)
-  javascript  (node)
-  bash        (bash) 
-  go          (go run)
+  python3      (python3)
+  javascript   (node)
+  bash         (bash)
+  go           (go run)
 
 PATH evaluators:
-  haskell     (jot-eval-haskell)
-  r           (jot-eval-r)
+  haskell      (jot-eval-haskell)
+  r            (jot-eval-r)
 ```
 
 ### Run Built-in Evaluator
@@ -99,11 +99,75 @@ jot evaluator python3
 echo 'console.log("Hello World")' | JOT_EVAL_CODE='console.log("Hello World")' jot evaluator javascript
 ```
 
+## JSON Output
+
+### List Evaluators JSON
+
+```bash
+jot evaluator --json
+```
+
+```json
+{
+  "operation": "list_evaluators",
+  "evaluators": {
+    "built_in": [
+      {
+        "language": "python3",
+        "command": "jot evaluator python3",
+        "interpreter": "python3"
+      },
+      {
+        "language": "javascript", 
+        "command": "jot evaluator javascript",
+        "interpreter": "node"
+      }
+    ],
+    "path": [
+      {
+        "language": "haskell",
+        "command": "jot-eval-haskell",
+        "path": "/usr/local/bin/jot-eval-haskell"
+      }
+    ]
+  },
+  "metadata": {
+    "success": true,
+    "command": "jot evaluator",
+    "execution_time_ms": 15,
+    "timestamp": "2025-07-06T12:30:00Z"
+  }
+}
+```
+
+### Evaluator Execution JSON
+
+```bash
+JOT_EVAL_CODE="print('Hello')" jot evaluator python3 --json
+```
+
+```json
+{
+  "operation": "run_evaluator",
+  "language": "python3",
+  "success": true,
+  "output": "Hello\n",
+  "metadata": {
+    "success": true,
+    "command": "jot evaluator python3",
+    "execution_time_ms": 120,
+    "timestamp": "2025-07-06T12:30:00Z"
+  }
+}
+```
+
 ## Creating Custom Evaluators
 
 ### PATH Evaluators
 
 Create executable scripts named `jot-eval-<language>` and place them in your PATH:
+
+#### Basic Haskell Evaluator
 
 ```bash
 #!/bin/bash
@@ -119,7 +183,7 @@ else
 fi
 ```
 
-### Advanced R Evaluator Example
+#### Advanced R Evaluator
 
 ```bash
 #!/bin/bash
@@ -140,7 +204,7 @@ fi
 rm -f "$TEMP_FILE"
 ```
 
-### Windows Compatibility
+#### Windows Compatibility
 
 ```batch
 @echo off
@@ -166,17 +230,26 @@ print("Hello from Python!")
 ```
 
 When you run `jot eval file.md`, it will:
-1. Look for `jot-eval-python` in PATH
-2. Fall back to `jot evaluator python`
+1. Look for `jot-eval-python3` in PATH
+2. Fall back to `jot evaluator python3`
 3. Set all environment variables
 4. Execute the code and capture output
 
-## Error Handling
+## Error Conditions
+
+| Error | Cause | Solution |
+|-------|-------|----------|
+| `no code provided` | `JOT_EVAL_CODE` environment variable not set | Set the required environment variable |
+| `not a built-in evaluator` | Language not supported by built-in evaluators | Create PATH evaluator or use supported language |
+| `evaluator failed` | Code execution failed | Check code syntax and interpreter availability |
+| `command timed out` | Execution exceeded timeout | Increase timeout or optimize code |
+
+## Error Messages
 
 When no evaluator is found:
 
 ```
-Error: No evaluator found for 'haskell'
+no evaluator found for 'haskell'
 
 Tried:
   1. PATH evaluator: jot-eval-haskell (not found)
@@ -187,27 +260,11 @@ To add Haskell support:
   - Check available evaluators: jot evaluator
 ```
 
-## Exit Codes
-
-- **0**: Success
-- **1**: General error (evaluator failed, code execution error)
-- **2**: Usage error (invalid arguments)
-- **3**: Language not supported
-- **4**: Evaluator not found in PATH
-- **124**: Timeout (when using timeout command)
-
 ## See Also
 
 - [`jot eval`](jot-eval.md) - Execute code blocks in markdown files
-- [Configuration Guide](../user-guide/configuration.md#code-execution-environment) - Code execution environment setup
-- [External Commands](jot-external.md) - External command system (similar pattern)
 
 ## Cross-References
 
-### Related Commands
-- [`jot eval`](jot-eval.md) - Main eval command that uses evaluators
-- [`jot external`](jot-external.md) - External command system
-
-### Configuration Topics
 - [Code Execution Environment](../user-guide/configuration.md#code-execution-environment)
 - [Environment Variables](../user-guide/configuration.md#environment-variable-overrides)
