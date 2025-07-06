@@ -148,6 +148,83 @@ Override configuration at runtime:
 |----------|-------------|---------|
 | `JOT_CONFIG` | Custom config file path | `/path/to/config.json` |
 | `JOT_WORKSPACE` | Override workspace discovery | `/path/to/workspace` |
+
+### Code Execution Environment
+
+The evaluator system allows code execution within jot documents using external evaluators. jot discovers evaluators through a convention-based approach.
+
+#### Evaluator Discovery
+
+When `jot eval` encounters a code block, it uses this discovery order:
+
+1. **PATH evaluator**: Look for `jot-eval-<lang>` in PATH (e.g., `jot-eval-haskell`)
+2. **Built-in evaluator**: Use `jot evaluator <lang>` for supported languages
+3. **Error**: No evaluator found
+
+#### Environment Variables
+
+Evaluators receive standardized environment variables:
+
+**Standard Context:**
+- `JOT_WORKSPACE_PATH` - Path to current workspace
+- `JOT_WORKSPACE_NAME` - Name of current workspace  
+- `JOT_CONFIG_FILE` - Path to configuration file
+
+**Eval-Specific Context:**
+- `JOT_EVAL_CODE` - The actual code to execute
+- `JOT_EVAL_LANG` - Language from code fence or shell parameter
+- `JOT_EVAL_FILE` - Source markdown file path
+- `JOT_EVAL_BLOCK_NAME` - Block name from eval element
+- `JOT_EVAL_CWD` - Working directory for execution
+- `JOT_EVAL_TIMEOUT` - Timeout duration (e.g., "30s")
+- `JOT_EVAL_ARGS` - Additional arguments from eval element
+
+**Custom Environment Variables:**
+- `JOT_EVAL_ENV_*` - Any custom env vars from eval element's `env` parameter
+
+#### Built-in Evaluators
+
+jot provides built-in evaluators for core languages:
+
+- **python3**: Python code execution
+- **javascript**: Node.js JavaScript execution  
+- **bash**: Bash shell command execution
+- **sh**: POSIX shell command execution
+- **go**: Go code execution
+
+**Example:**
+```bash
+# List available evaluators
+jot evaluator
+
+# Use built-in Python evaluator
+jot evaluator python3
+
+# Create custom evaluator
+#!/usr/bin/env bash
+# File: /usr/local/bin/jot-eval-ruby
+ruby -e "$JOT_EVAL_CODE"
+```
+
+#### Custom Evaluators
+
+Create custom evaluators by placing executables named `jot-eval-<lang>` in your `$PATH`:
+
+```bash
+#!/usr/bin/env bash
+# File: ~/.local/bin/jot-eval-ruby
+# Custom Ruby evaluator
+
+# Use environment variables provided by jot
+cd "$JOT_EVAL_CWD" || exit 1
+echo "Executing Ruby code in $JOT_WORKSPACE_PATH"
+ruby -e "$JOT_EVAL_CODE"
+```
+
+Make the evaluator executable:
+```bash
+chmod +x ~/.local/bin/jot-eval-ruby
+```
 | `JOT_HOOKS_ENABLED` | Enable/disable hooks | `true` or `false` |
 | `JOT_DEBUG` | Enable debug output | `true` or `false` |
 
@@ -218,6 +295,8 @@ Configuration supports environment variable expansion with these patterns:
 ## See Also
 
 - [Commands Reference](../commands/README.md) - All jot commands
+- [Evaluator System](../commands/jot-evaluator.md) - Evaluator configuration and usage
+- [Code Evaluation](../commands/jot-eval.md) - Code execution commands
 - [Hook System](../commands/jot-hooks.md) - Hook configuration and usage
 - [External Commands](../commands/jot-external.md) - External command integration
 - [Workspace Management](../commands/jot-workspace.md) - Workspace configuration

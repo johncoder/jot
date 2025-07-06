@@ -242,7 +242,6 @@ Examples:
 }
 
 func listBlocks(filename string) error {
-	fmt.Printf("Blocks in %s:\n", filename)
 	return eval.ListEvalBlocks(filename)
 }
 

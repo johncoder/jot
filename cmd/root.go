@@ -137,6 +137,7 @@ func addCommands() {
 	rootCmd.AddCommand(doctorCmd)
 	rootCmd.AddCommand(templateCmd)
 	rootCmd.AddCommand(evalCmd)
+	rootCmd.AddCommand(evaluatorCmd)
 	rootCmd.AddCommand(tangleCmd)
 	rootCmd.AddCommand(workspaceCmd)
 	rootCmd.AddCommand(hooksCmd)

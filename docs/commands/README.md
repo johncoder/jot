@@ -37,6 +37,7 @@ These options are available for all jot commands:
 | Command | Description |
 |---------|-------------|
 | [jot eval](jot-eval.md) | Execute code blocks in notes |
+| [jot evaluator](jot-evaluator.md) | Manage and run code evaluators |
 | [jot tangle](jot-tangle.md) | Extract code from markdown |
 | [jot peek](jot-peek.md) | Preview content and navigation |
 | [jot files](jot-files.md) | Browse workspace files |
@@ -49,3 +50,7 @@ All commands support JSON output with the `--json` flag. See the [JSON Output Re
 ## External Commands
 
 jot supports external commands that can be added to your PATH with the `jot-` prefix. See [External Commands](jot-external.md) for details on creating and using external commands, including environment variables and integration patterns.
+
+### Code Evaluators
+
+The evaluator system extends jot's code execution capabilities through external evaluators. Create custom evaluators by placing executables named `jot-eval-<language>` in your PATH. See [`jot evaluator`](jot-evaluator.md) for details on the evaluator system and creating custom evaluators.

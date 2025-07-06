@@ -1,13 +1,11 @@
 package eval
 
 import (
-	"context"
 	"fmt"
-	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
-	"time"
+
+	"github.com/johncoder/jot/internal/workspace"
 )
 
 // ExecuteEvaluableBlocks executes all evaluable code blocks in a file and returns a slice of results
@@ -131,134 +129,49 @@ func ExecuteEvaluableBlockByName(filename, name string) ([]*EvalResult, error) {
 	return results, nil
 }
 
-// executeBlock runs the code block using the shell/interpreter specified in EvalMetadata or inferred from language
+// executeBlock runs the code block using the new evaluator system
 func executeBlock(b *CodeBlock, filename string) (string, error) {
 	lang := b.Lang
 	if shell, ok := b.Eval.Params["shell"]; ok && shell != "" {
 		lang = shell
 	}
 
-	cmd, args := getInterpreter(lang)
-	if cmd == "" {
-		return "", fmt.Errorf("unsupported language/shell: %s", lang)
+	// Try to get workspace context for enhanced features
+	var manager *EvaluatorManager
+	if ws, err := workspace.GetWorkspaceContext(false); err == nil && ws != nil {
+		manager = NewEvaluatorManagerWithWorkspace(ws)
+	} else {
+		manager = NewEvaluatorManager()
 	}
-
-	// Add additional args if specified
-	if extraArgs, ok := b.Eval.Params["args"]; ok && extraArgs != "" {
-		// Parse quoted arguments
-		args = append(args, parseArgs(extraArgs)...)
-	}
-
-	// Create command with context for timeout support
-	ctx := context.Background()
-	var cancel context.CancelFunc
-
-	// Set timeout if specified
-	if timeoutStr, ok := b.Eval.Params["timeout"]; ok && timeoutStr != "" {
-		timeout, err := time.ParseDuration(timeoutStr)
-		if err != nil {
-			return "", fmt.Errorf("invalid timeout format: %s", timeoutStr)
-		}
-		ctx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
-	}
-
-	c := exec.CommandContext(ctx, cmd, args...)
-	c.Stdin = strings.NewReader(strings.Join(b.Code, "\n"))
 
 	// Set working directory - default to file's directory (org-mode behavior)
+	workingDir := filepath.Dir(filename)
 	if cwd, ok := b.Eval.Params["cwd"]; ok && cwd != "" {
-		c.Dir = cwd
-	} else {
-		// Default to directory containing the markdown file for org-mode compatibility
-		c.Dir = filepath.Dir(filename)
+		workingDir = cwd
 	}
 
-	// Set environment variables if specified
-	if envStr, ok := b.Eval.Params["env"]; ok && envStr != "" {
-		c.Env = os.Environ() // Start with current environment
-		envVars := parseEnvVars(envStr)
-		for key, value := range envVars {
-			c.Env = append(c.Env, fmt.Sprintf("%s=%s", key, value))
+	// Build code string
+	code := strings.Join(b.Code, "\n")
+
+	// Execute using the evaluator system
+	output, err := manager.ExecuteWithEvaluator(lang, code, b.Eval.Params, workingDir)
+	if err != nil {
+		// If no evaluator found, return the helpful error message
+		if evalErr, ok := err.(*EvaluatorError); ok {
+			return "", evalErr
 		}
+		return output, err
 	}
 
-	out, err := c.CombinedOutput()
-
-	// Handle timeout errors more gracefully
-	if ctx.Err() == context.DeadlineExceeded {
-		return string(out), fmt.Errorf("command timed out")
-	}
-
-	return string(out), err
+	return output, nil
 }
 
-// getInterpreter returns the command and args for a given language/shell
-func getInterpreter(lang string) (string, []string) {
-	switch lang {
-	case "python", "python3":
-		return "python3", nil
-	case "bash", "sh":
-		return "bash", nil
-	case "node", "javascript":
-		return "node", nil
-	case "go":
-		return "go", []string{"run", "-"}
-	default:
-		return "", nil
-	}
+// EvaluatorError represents an error from the evaluator system
+type EvaluatorError struct {
+	Language string
+	Message  string
 }
 
-// parseArgs parses a space-separated argument string, handling quoted arguments
-func parseArgs(argsStr string) []string {
-	var args []string
-	var current strings.Builder
-	inQuote := false
-	var quote rune
-
-	for _, r := range argsStr {
-		switch {
-		case !inQuote && (r == '"' || r == '\''):
-			inQuote = true
-			quote = r
-		case inQuote && r == quote:
-			inQuote = false
-			quote = 0
-		case !inQuote && r == ' ':
-			if current.Len() > 0 {
-				args = append(args, current.String())
-				current.Reset()
-			}
-		default:
-			current.WriteRune(r)
-		}
-	}
-
-	if current.Len() > 0 {
-		args = append(args, current.String())
-	}
-
-	return args
-}
-
-// parseEnvVars parses comma-separated environment variables of the form KEY=VALUE
-func parseEnvVars(envStr string) map[string]string {
-	envVars := make(map[string]string)
-	pairs := strings.Split(envStr, ",")
-
-	for _, pair := range pairs {
-		pair = strings.TrimSpace(pair)
-		if pair == "" {
-			continue
-		}
-
-		parts := strings.SplitN(pair, "=", 2)
-		if len(parts) == 2 {
-			key := strings.TrimSpace(parts[0])
-			value := strings.TrimSpace(parts[1])
-			envVars[key] = value
-		}
-	}
-
-	return envVars
+func (e *EvaluatorError) Error() string {
+	return e.Message
 }

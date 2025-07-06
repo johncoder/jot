@@ -4,13 +4,15 @@
 
 ## Description
 
-The `jot eval` command evaluates code blocks in markdown files with a basic security model.
+The `jot eval` command evaluates code blocks in markdown files with a robust security model and extensible evaluator system.
 
 This command is useful for:
 - Creating executable documentation and tutorials
 - Running code examples in notes for validation
 - Building interactive notebooks within markdown
 - Automating tasks documented in your notes
+
+Code execution is handled through an extensible evaluator system that supports both built-in and custom evaluators. See [`jot evaluator`](jot-evaluator.md) for details on the evaluator system.
 
 ## Usage
 
@@ -365,10 +367,12 @@ The eval command integrates with the hook system:
 
 ## Cross-references
 
+- [jot evaluator](jot-evaluator.md) - Evaluator system for code execution
 - [jot tangle](jot-tangle.md) - Extracting code from markdown
 - [jot peek](jot-peek.md) - Previewing code blocks
 - [jot capture](jot-capture.md) - Adding eval blocks to notes
 
 ## See Also
 
+- [Configuration Guide](../user-guide/configuration.md#code-execution-environment) - Code execution environment setup
 - [Global Options](README.md#global-options)
