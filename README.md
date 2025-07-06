@@ -2,6 +2,14 @@
 
 A terminal-first note management tool that captures, organizes, and retrieves your thoughts with ease. Inspired by org-mode, it brings its structured power to markdown right where you work.
 
+## Special Note
+
+For a long time, I've wanted a tool that does what org-mode does, but increasingly the industry pulls me away from its natural habitat. The jot CLI is my attempt to bring the best of org-mode to markdown, in a way that fits naturally into my terminal-based workflow, along with abundant opportunities to leverage these features in editors, tools, and scripts.
+
+Vast majorities of this code base were generated with the help of Copilot. Keep this in mind as you read the code and documentation, as there maybe inaccuracies or inconsistencies. Features and functionality of jot were well planned out ahead of unleashing any coding agents, and tested throughout the development process.
+
+The use of AI tools in the development of this project does not imply any special endorsement or affiliation with them, nor does it necessitate continued use of such tools in future development. Simply put, these tools helped make this possible sooner than I could have done it in my spare time.
+
 ## Installation
 
 ### Quick Install
@@ -119,4 +127,4 @@ make install  # Build and install locally
 
 ## License
 
-[License information]
+MIT License - see [LICENSE](LICENSE) file for details.
