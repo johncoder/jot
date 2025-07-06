@@ -126,30 +126,15 @@ After release, users can install jot using:
 curl -sSL https://raw.githubusercontent.com/johncoder/jot/main/install.sh | sh
 ```
 
-### 2. Homebrew (after setting up tap)
-
-```bash
-brew install johncoder/tap/jot
-```
-
-### 3. Go Install
+### 2. Go Install
 
 ```bash
 go install github.com/johncoder/jot@v0.9.0
 ```
 
-### 4. Manual Download
+### 3. Manual Download
 
 Download binaries directly from [GitHub Releases](https://github.com/johncoder/jot/releases).
-
-## Setting Up Homebrew Tap (Optional)
-
-To enable `brew install johncoder/tap/jot`:
-
-1. Create repository: `johncoder/homebrew-tap`
-2. Copy `homebrew/jot.rb` to `Formula/jot.rb` in that repo
-3. Update SHA256 checksums for each release
-4. Users can then: `brew install johncoder/tap/jot`
 
 ## Versioning
 

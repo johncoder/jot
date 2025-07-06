@@ -79,11 +79,6 @@ RELEASE_NOTES="Release $VERSION
 curl -sSL https://raw.githubusercontent.com/johncoder/jot/main/install.sh | sh
 \`\`\`
 
-### Homebrew
-\`\`\`bash
-brew install johncoder/tap/jot
-\`\`\`
-
 ### Go Install
 \`\`\`bash
 go install github.com/johncoder/jot@$VERSION
@@ -103,18 +98,6 @@ gh release create "$VERSION" \
     dist/*.tar.gz dist/*.zip dist/checksums.txt
 
 success "GitHub release created: $VERSION"
-
-# Update Homebrew formula (if tap exists)
-info "Checking for Homebrew tap..."
-if gh repo view johncoder/homebrew-tap >/dev/null 2>&1; then
-    info "Updating Homebrew formula..."
-    # This would need the actual tap repository and formula
-    warn "Homebrew formula update not implemented yet"
-    echo "Manual step: Update formula in johncoder/homebrew-tap repository"
-else
-    warn "Homebrew tap not found (johncoder/homebrew-tap)"
-    echo "Consider creating a tap repository for easier installation"
-fi
 
 echo ""
 success "🎉 Release $VERSION published successfully!"

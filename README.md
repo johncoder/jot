@@ -22,15 +22,7 @@ curl -sSL https://raw.githubusercontent.com/johncoder/jot/main/install.sh | sh
 
 This installs to `~/.local/bin/jot` and provides helpful PATH setup instructions.
 
-### Package Managers
-
-**Homebrew:** (Coming Soon)
-
-```bash
-brew install johncoder/tap/jot
-```
-
-**Go Install:**
+### Go Install
 
 ```bash
 go install github.com/johncoder/jot@latest
