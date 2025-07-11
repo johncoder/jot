@@ -32,6 +32,23 @@ This command is useful for:
 - **Exact matching**: Must match exactly one subtree
 - **Leading slashes**: Handle unusual document structures (`#/foo/bar` skips level 1)
 
+#### Line Number Selectors
+
+- You can specify a line number to select the subtree containing that line:
+  - `filename.md:42` — selects the subtree at or above line 42
+  - `filename.md:42#heading` — combines line number and heading for precise selection
+- This is especially useful for editor integrations, where the cursor position can be mapped to a selector.
+
+### Line Number Selector Examples
+
+```bash
+# Move the subtree at line 42 in inbox.md to the work projects section
+jot refile "inbox.md:42" --to "work.md#projects"
+
+# Move the subtree at line 15 under the 'meeting' heading
+jot refile "notes.md:15#meeting" --to "archive.md#meetings"
+```
+
 ## Operation Modes
 
 ### 1. Standard Refile
@@ -142,7 +159,7 @@ The refile command integrates with the hook system for automation:
 | `source file not found` | Source file doesn't exist | Check file path and spelling |
 | `destination file not found` | Destination file doesn't exist | Create destination file first |
 | `subtree not found` | Selector doesn't match any heading | Check selector syntax and case |
-| `multiple subtrees match` | Selector matches multiple headings | Use more specific selector |
+| `multiple subtrees match` | Selector matches multiple headings | Use a more specific selector or include additional path segments or line number |
 | `pre-refile hook aborted` | Hook script prevented operation | Check hook output, fix issues |
 | `permission denied` | File access restrictions | Check file permissions |
 
