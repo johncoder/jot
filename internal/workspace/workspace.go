@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/johncoder/jot/internal/config"
 )
@@ -240,16 +239,13 @@ func (w *Workspace) RelativePath(absolutePath string) string {
 
 // AppendToInbox adds content to the inbox with a timestamp
 func (w *Workspace) AppendToInbox(content string) error {
-	timestamp := time.Now().Format("2006-01-02 15:04:05")
-	entry := fmt.Sprintf("\n## %s\n\n%s\n\n", timestamp, content)
-
 	file, err := os.OpenFile(w.InboxPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return fmt.Errorf("failed to open inbox: %w", err)
 	}
 	defer file.Close()
 
-	_, err = file.WriteString(entry)
+	_, err = file.WriteString(content)
 	if err != nil {
 		return fmt.Errorf("failed to write to inbox: %w", err)
 	}
