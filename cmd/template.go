@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"fmt"
+	"io"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -209,7 +211,7 @@ refile_mode: append
 var templateEditCmd = &cobra.Command{
 	Use:   "edit <n>",
 	Short: "Edit an existing template",
-	Long:  `Edit an existing template in your editor. Changes will require re-approval.`,
+	Long:  `Edit an existing template in your editor. Changes will require re-approval. If stdin is a pipe, the template will be overwritten with the piped content and the editor will not be launched.`,
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmdutil.StartCommand(cmd)
@@ -236,6 +238,23 @@ var templateEditCmd = &cobra.Command{
 		}
 
 		templatePath := pathUtil.JotDirJoin(filepath.Join("templates", name+".md"))
+
+		// Check for piped stdin (not a terminal)
+		stat, _ := os.Stdin.Stat()
+		hasPipedInput := (stat.Mode() & os.ModeCharDevice) == 0
+		if hasPipedInput {
+			stdinContent, err := io.ReadAll(os.Stdin)
+			if err != nil {
+				return fmt.Errorf("failed to read stdin: %w", err)
+			}
+			err = cmdutil.WriteFileContent(templatePath, stdinContent)
+			if err != nil {
+				return fmt.Errorf("failed to save template: %w", err)
+			}
+			fmt.Printf("Template '%s' overwritten from stdin. Re-approve if needed:\n", name)
+			fmt.Printf("  jot template approve %s\n", name)
+			return nil
+		}
 
 		if ctx.IsJSONOutput() {
 			// For JSON output, skip interactive editor and return success
@@ -462,6 +481,62 @@ Examples:
 	},
 }
 
+var templateRemoveCmd = &cobra.Command{
+	Use:   "remove <n>",
+	Short: "Remove a template",
+	Long:  `Remove (delete) a template file from the templates directory.`,
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := cmdutil.StartCommand(cmd)
+
+		ws, err := workspace.RequireWorkspace()
+		if err != nil {
+			if ctx.IsJSONOutput() {
+				return ctx.HandleError(err)
+			}
+			return err
+		}
+
+		name := args[0]
+		pathUtil := cmdutil.NewPathUtil(ws)
+		templatePath := pathUtil.JotDirJoin(filepath.Join("templates", name+".md"))
+
+		// Check if file exists
+		if _, err := cmdutil.ReadFileContent(templatePath); err != nil {
+			if ctx.IsJSONOutput() {
+				return ctx.HandleError(fmt.Errorf("template '%s' not found", name))
+			}
+			return fmt.Errorf("template '%s' not found", name)
+		}
+
+		err = os.Remove(templatePath)
+		if err != nil {
+			if ctx.IsJSONOutput() {
+				return ctx.HandleError(fmt.Errorf("failed to remove template: %w", err))
+			}
+			return fmt.Errorf("failed to remove template: %w", err)
+		}
+
+		if ctx.IsJSONOutput() {
+			response := struct {
+				Operation    string               `json:"operation"`
+				TemplateName string               `json:"template_name"`
+				Removed      bool                 `json:"removed"`
+				Metadata     cmdutil.JSONMetadata `json:"metadata"`
+			}{
+				Operation:    "template_remove",
+				TemplateName: name,
+				Removed:      true,
+				Metadata:     cmdutil.CreateJSONMetadata(cmd, true, ctx.StartTime),
+			}
+			return cmdutil.OutputJSON(response)
+		}
+
+		fmt.Printf("Template '%s' removed.\n", name)
+		return nil
+	},
+}
+
 // Helper function to count approved templates
 func countApproved(templates []template.Template) int {
 	count := 0
@@ -547,4 +622,5 @@ func init() {
 	templateCmd.AddCommand(templateApproveCmd)
 	templateCmd.AddCommand(templateViewCmd)
 	templateCmd.AddCommand(templateRenderCmd)
+	templateCmd.AddCommand(templateRemoveCmd)
 }
