@@ -142,12 +142,17 @@ The `new` subcommand:
 
 ## edit
 
-Modify an existing template in your editor.
+Modify an existing template in your editor, or overwrite it with content from stdin.
 
 ### Usage
 
 ```bash
-jot template edit <name> [options]
+# Edit in your editor
+jot template edit <name>
+
+# Overwrite with piped content (no editor)
+echo "new template content" | jot template edit <name>
+cat template.md | jot template edit <name>
 ```
 
 ### Arguments
@@ -158,21 +163,29 @@ jot template edit <name> [options]
 
 ### Examples
 
-#### Edit existing template
+#### Edit existing template in your editor
 
 ```bash
 jot template edit meeting
 ```
 
-Opens the meeting template in your editor. If the template contains shell commands and you modify them, the template will need re-approval.
+#### Overwrite a template with piped content
+
+```bash
+echo "---\ndestination: inbox.md\n---\n# New Template" | jot template edit meeting
+cat my-template.md | jot template edit meeting
+```
+
+If you pipe content to `jot template edit`, the template will be overwritten with the piped content and the editor will not be launched.
 
 ### What Happens
 
 The `edit` subcommand:
-1. **Opens template file** in your editor
-2. **Checks for modifications** after editing
-3. **Invalidates approval** if shell commands changed
-4. **Prompts for re-approval** if needed
+1. **If stdin is a pipe**, reads content from stdin and overwrites the template file (no editor is launched)
+2. **Otherwise**, opens the template file in your editor
+3. **Checks for modifications** after editing
+4. **Invalidates approval** if shell commands changed
+5. **Prompts for re-approval** if needed
 
 ## approve
 

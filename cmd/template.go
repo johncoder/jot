@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"fmt"
+	"io"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -209,7 +211,7 @@ refile_mode: append
 var templateEditCmd = &cobra.Command{
 	Use:   "edit <n>",
 	Short: "Edit an existing template",
-	Long:  `Edit an existing template in your editor. Changes will require re-approval.`,
+	Long:  `Edit an existing template in your editor. Changes will require re-approval. If stdin is a pipe, the template will be overwritten with the piped content and the editor will not be launched.`,
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmdutil.StartCommand(cmd)
@@ -236,6 +238,23 @@ var templateEditCmd = &cobra.Command{
 		}
 
 		templatePath := pathUtil.JotDirJoin(filepath.Join("templates", name+".md"))
+
+		// Check for piped stdin (not a terminal)
+		stat, _ := os.Stdin.Stat()
+		hasPipedInput := (stat.Mode() & os.ModeCharDevice) == 0
+		if hasPipedInput {
+			stdinContent, err := io.ReadAll(os.Stdin)
+			if err != nil {
+				return fmt.Errorf("failed to read stdin: %w", err)
+			}
+			err = cmdutil.WriteFileContent(templatePath, stdinContent)
+			if err != nil {
+				return fmt.Errorf("failed to save template: %w", err)
+			}
+			fmt.Printf("Template '%s' overwritten from stdin. Re-approve if needed:\n", name)
+			fmt.Printf("  jot template approve %s\n", name)
+			return nil
+		}
 
 		if ctx.IsJSONOutput() {
 			// For JSON output, skip interactive editor and return success
