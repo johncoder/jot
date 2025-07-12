@@ -333,6 +333,44 @@ The `render` subcommand:
 3. **Displays rendered output** with dynamic content
 4. **Respects security settings** and approval requirements
 
+## remove
+
+Remove (delete) a template file from the templates directory.
+
+### Usage
+
+```bash
+jot template remove <name> [options]
+```
+
+### Arguments
+
+| Argument | Description |
+|----------|-------------|
+| `name`   | Name of the template to remove |
+
+### Examples
+
+#### Remove a template
+
+```bash
+jot template remove meeting
+```
+
+#### Remove a template with JSON output
+
+```bash
+jot template remove meeting --json
+```
+
+### What Happens
+
+The `remove` subcommand:
+1. **Checks if the template file exists** in `.jot/templates/`
+2. **Deletes the template file** if found
+3. **Prints a confirmation message** (or outputs JSON if `--json` is used)
+4. **Returns an error** if the template does not exist or cannot be deleted
+
 ## Template Structure
 
 Templates consist of:
