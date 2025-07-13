@@ -245,6 +245,12 @@ func (w *Workspace) AppendToInbox(content string) error {
 	}
 	defer file.Close()
 
+	// Write a separator to ensure new content appears on a new line
+	_, err = file.WriteString("\n\n")
+	if err != nil {
+		return fmt.Errorf("failed to write separator to inbox: %w", err)
+	}
+
 	_, err = file.WriteString(content)
 	if err != nil {
 		return fmt.Errorf("failed to write to inbox: %w", err)
