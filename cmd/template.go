@@ -476,7 +476,13 @@ Examples:
 			return cmdutil.OutputJSON(response)
 		}
 
-		fmt.Print(renderedContent)
+		renderedFrontmatter := template.GetRenderedTemplateFrontmatter(t.Content)
+
+		if withFrontmatter {
+			fmt.Print(renderedFrontmatter + "\n" + renderedContent)
+		} else {
+			fmt.Print(renderedContent)
+		}
 		return nil
 	},
 }
@@ -615,6 +621,8 @@ type TemplateRenderResponse struct {
 	Metadata         cmdutil.JSONMetadata `json:"metadata"`
 }
 
+var withFrontmatter bool
+
 func init() {
 	templateCmd.AddCommand(templateListCmd)
 	templateCmd.AddCommand(templateNewCmd)
@@ -623,4 +631,6 @@ func init() {
 	templateCmd.AddCommand(templateViewCmd)
 	templateCmd.AddCommand(templateRenderCmd)
 	templateCmd.AddCommand(templateRemoveCmd)
+
+	templateRenderCmd.Flags().BoolVar(&withFrontmatter, "with-frontmatter", false, "Include rendered frontmatter in output")
 }

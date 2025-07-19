@@ -4,13 +4,14 @@
 
 ## Description
 
-Templates are stored in `.jot/templates/` and require explicit approval before they can execute shell commands for security. Templates contain frontmatter for configuration and can generate dynamic content using shell commands.
+Templates are stored in `.jot/templates/` and require explicit approval before they can execute shell commands for security. Templates contain frontmatter for configuration and can generate dynamic content using shell commands. **Frontmatter is rendered (shell commands executed) and honored in both `jot template render` and `jot capture`.**
 
 This command group is useful for:
 - Creating structured, consistent note formats
 - Building templates with dynamic content (dates, git info, etc.)
 - Managing template approval for security
 - Previewing template output before use
+- Automating destination and refile mode via rendered frontmatter
 
 ## list
 
@@ -281,7 +282,7 @@ The `view` subcommand:
 
 ## render
 
-Preview template output with shell command execution.
+Preview template output with shell command execution. **Frontmatter is rendered and included in output.**
 
 ### Usage
 
@@ -294,6 +295,12 @@ jot template render <name> [options]
 | Argument | Description |
 |----------|-------------|
 | `name` | Name of the template to render |
+
+### Options
+
+| Flag | Short | Description | Default |
+|------|-------|-------------|---------|
+| `--with-frontmatter` | | Include rendered frontmatter in output | false |
 
 ### Examples
 
@@ -325,13 +332,42 @@ refile_mode: append
 - 
 ```
 
+#### Render template with dynamic content and rendered frontmatter
+
+```bash
+jot template render meeting --with-frontmatter
+```
+
+Output:
+
+```
+---
+destination: inbox.md
+refile_mode: append
+---
+## Meeting - 2025-07-04 16:30
+
+**Date:** July 04, 2025
+**Attendees:** 
+
+**Agenda:**
+- 
+
+**Notes:**
+
+
+**Action Items:**
+- 
+```
+
 ### What Happens
 
 The `render` subcommand:
 1. **Checks template approval** status
-2. **Executes shell commands** in template content
+2. **Executes shell commands** in both frontmatter and template content
 3. **Displays rendered output** with dynamic content
 4. **Respects security settings** and approval requirements
+5. **Outputs rendered frontmatter if `--with-frontmatter` is used**
 
 ## remove
 
@@ -375,14 +411,38 @@ The `remove` subcommand:
 
 Templates consist of:
 
-**Frontmatter**
+**Frontmatter (rendered before use)**
 - `destination`: Target file (default: `inbox.md`)
 - `refile_mode`: How to add content (`append`, `prepend`)
+- **Shell commands in frontmatter are executed and honored by both `jot template render` and `jot capture`**
 
 **Content**
 - Markdown content with optional shell commands
 - Shell commands use `$(command)` syntax
 - Dynamic content is executed during rendering
+
+## jot capture integration
+
+When you use `jot capture <template>`, the rendered frontmatter is parsed and honored. This means:
+- Shell commands in frontmatter (e.g., `destination: $(date '+%Y-%m-%d').md`) are executed before capture
+- The resulting values control where and how your note is filed
+- This enables dynamic destinations and refile modes based on context
+
+### Example: Dynamic destination
+
+Template frontmatter:
+```
+---
+destination: notes-$(date '+%Y-%m-%d').md
+refile_mode: prepend
+---
+```
+
+When you run:
+```bash
+jot capture meeting
+```
+The note will be filed to `notes-2025-07-13.md` (or current date) and prepended to the file.
 
 ## Error Conditions
 

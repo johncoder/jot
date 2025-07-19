@@ -206,7 +206,7 @@ func (m *Manager) RenderWithOptions(template *Template, appendContent string, in
 
 	// Strip frontmatter if not requested (for capture use cases)
 	if !includeFrontmatter {
-		content = stripFrontmatter(content)
+		content = StripFrontmatter(content)
 	}
 
 	// Execute shell commands
@@ -274,30 +274,66 @@ func calculateHash(content string) string {
 	return fmt.Sprintf("%x", hash)
 }
 
-// parseMetadata extracts metadata from template content
+// GetRenderedTemplateFrontmatter extracts and renders the YAML frontmatter block (executes shell commands)
+func GetRenderedTemplateFrontmatter(content string) string {
+	lines := strings.Split(content, "\n")
+	if len(lines) == 0 || strings.TrimSpace(lines[0]) != "---" {
+		return "" // No frontmatter
+	}
+
+	// Find the closing delimiter
+	endIdx := -1
+	for i := 1; i < len(lines); i++ {
+		if strings.TrimSpace(lines[i]) == "---" {
+			endIdx = i
+			break
+		}
+	}
+	if endIdx == -1 {
+		return "" // No closing delimiter
+	}
+
+	frontmatterLines := lines[:endIdx+1] // include closing ---
+	frontmatter := strings.Join(frontmatterLines, "\n")
+
+	// Render shell commands in frontmatter
+	re := regexp.MustCompile(`\$\(([^)]+)\)`)
+	result := re.ReplaceAllStringFunc(frontmatter, func(match string) string {
+		command := match[2 : len(match)-1]
+		cmd := exec.Command("sh", "-c", command)
+		output, err := cmd.Output()
+		if err != nil {
+			return match // If command fails, leave as-is
+		}
+		return strings.TrimSpace(string(output))
+	})
+
+	return result
+}
+
+// parseMetadata extracts metadata from rendered frontmatter
 // Enhanced to support YAML frontmatter for destination selectors and refile modes
 func parseMetadata(content string) map[string]string {
 	metadata := make(map[string]string)
 
-	// Check if content has YAML frontmatter
-	if strings.HasPrefix(content, "---\n") {
-		parts := strings.SplitN(content, "\n---\n", 2)
-		if len(parts) >= 2 {
-			yamlContent := parts[0][4:] // Remove the initial "---\n"
+	// Use rendered frontmatter for metadata extraction
+	renderedFrontmatter := GetRenderedTemplateFrontmatter(content)
+	if renderedFrontmatter != "" {
+		// Remove --- delimiters for YAML parsing
+		yamlContent := strings.ReplaceAll(renderedFrontmatter, "---", "")
+		yamlContent = strings.TrimSpace(yamlContent)
 
-			var yamlData map[string]interface{}
-			if err := yaml.Unmarshal([]byte(yamlContent), &yamlData); err == nil {
-				// Convert YAML data to string map
-				for key, value := range yamlData {
-					if strValue, ok := value.(string); ok {
-						metadata[key] = strValue
-					} else {
-						// Convert non-string values to string representation
-						metadata[key] = fmt.Sprintf("%v", value)
-					}
+		var yamlData map[string]interface{}
+		if err := yaml.Unmarshal([]byte(yamlContent), &yamlData); err == nil {
+			// Convert YAML data to string map
+			for key, value := range yamlData {
+				if strValue, ok := value.(string); ok {
+					metadata[key] = strValue
+				} else {
+					metadata[key] = fmt.Sprintf("%v", value)
 				}
-				return metadata
 			}
+			return metadata
 		}
 	}
 
@@ -389,24 +425,51 @@ func (m *Manager) ValidateDestination(destination string) error {
 	return nil
 }
 
-// stripFrontmatter removes YAML frontmatter from content
-func stripFrontmatter(content string) string {
-	lines := strings.Split(content, "\n")
+// StripFrontmatter removes YAML frontmatter from content (exported)
+func StripFrontmatter(content string) string {
+	// Trim leading whitespace and newlines for robust frontmatter detection
+	trimmed := strings.TrimLeft(content, "\r\n \t")
+	n := len(trimmed)
+	i := 0
 
-	// Check if content starts with frontmatter delimiter
-	if len(lines) > 0 && strings.TrimSpace(lines[0]) == "---" {
-		// Find the closing delimiter
-		for i := 1; i < len(lines); i++ {
-			if strings.TrimSpace(lines[i]) == "---" {
-				// Return content after the closing delimiter
-				if i+1 < len(lines) {
-					return strings.Join(lines[i+1:], "\n")
-				}
-				return ""
+	// Check for starting delimiter "---" at the very start
+	if n < 3 || trimmed[:3] != "---" {
+		return content
+	}
+	i = 3
+
+	// Move to end of line after starting delimiter
+	for i < n && trimmed[i] != '\n' {
+		i++
+	}
+	if i < n {
+		i++
+	}
+
+	// Search for closing delimiter "---" at start of line
+	for i < n {
+		// Check for "---" at start of line
+		if i+3 <= n && trimmed[i:i+3] == "---" {
+			i += 3
+			// Move to end of line after closing delimiter
+			for i < n && trimmed[i] != '\n' {
+				i++
 			}
+			if i < n {
+				i++
+			}
+			// Return content after closing delimiter, but preserve original leading whitespace
+			return content[len(content)-len(trimmed)+i:]
+		}
+		// Move to next line
+		for i < n && trimmed[i] != '\n' {
+			i++
+		}
+		if i < n {
+			i++
 		}
 	}
 
-	// No frontmatter found, return original content
+	// No closing delimiter found, return original content
 	return content
 }

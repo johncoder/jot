@@ -11,8 +11,10 @@ import (
 )
 
 // WorkspaceConfig represents workspace-specific configuration
+// Added AllowCreateMissingFiles to support creation of missing files
 type WorkspaceConfig struct {
-	ArchiveLocation string `json:"archive_location,omitempty"`
+	ArchiveLocation         string `json:"archive_location,omitempty"`
+	AllowCreateMissingFiles bool   `json:"allow_create_missing_files,omitempty"`
 }
 
 // Workspace represents a jot workspace
@@ -31,7 +33,8 @@ func LoadWorkspaceConfig(jotDir string) (*WorkspaceConfig, error) {
 	// Return default config if file doesn't exist
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		return &WorkspaceConfig{
-			ArchiveLocation: "archive/archive.md#Archive", // Default simple path
+			ArchiveLocation:         "archive/archive.md#Archive", // Default simple path
+			AllowCreateMissingFiles: false, // Default: do not allow creating missing files
 		}, nil
 	}
 
@@ -45,10 +48,11 @@ func LoadWorkspaceConfig(jotDir string) (*WorkspaceConfig, error) {
 		return nil, fmt.Errorf("failed to parse workspace config: %w", err)
 	}
 
-	// Set default if not specified
+	// Set defaults if not specified
 	if cfg.ArchiveLocation == "" {
 		cfg.ArchiveLocation = "archive/archive.md#Archive"
 	}
+	// Default for AllowCreateMissingFiles is false
 
 	return &cfg, nil
 }
@@ -259,10 +263,51 @@ func (w *Workspace) AppendToInbox(content string) error {
 	return nil
 }
 
-// InboxExists checks if the inbox file exists
-func (w *Workspace) InboxExists() bool {
-	_, err := os.Stat(w.InboxPath)
-	return err == nil
+// PrependToInbox inserts content at the top of the inbox, after the main heading if present
+func (w *Workspace) PrependToInbox(content string) error {
+	inboxBytes, err := os.ReadFile(w.InboxPath)
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to read inbox: %w", err)
+	}
+	inbox := string(inboxBytes)
+
+	lines := strings.Split(inbox, "\n")
+	// Skip leading blank lines
+	firstNonBlank := 0
+	for ; firstNonBlank < len(lines); firstNonBlank++ {
+		if strings.TrimSpace(lines[firstNonBlank]) != "" {
+			break
+		}
+	}
+	// Find first top-level heading
+	headingIdx := -1
+	for i := firstNonBlank; i < len(lines); i++ {
+		if strings.HasPrefix(strings.TrimSpace(lines[i]), "# ") {
+			headingIdx = i
+			break
+		}
+	}
+	insertIdx := 0
+	if headingIdx != -1 {
+		// Find first blank line after heading
+		for i := headingIdx + 1; i < len(lines); i++ {
+			if strings.TrimSpace(lines[i]) == "" {
+				insertIdx = i + 1
+				break
+			}
+		}
+		if insertIdx == 0 {
+			insertIdx = headingIdx + 1
+		}
+	} else {
+		insertIdx = firstNonBlank
+	}
+	// Insert content
+	newLines := append([]string{}, lines[:insertIdx]...)
+	newLines = append(newLines, content, "")
+	newLines = append(newLines, lines[insertIdx:]...)
+	newContent := strings.Join(newLines, "\n")
+	return os.WriteFile(w.InboxPath, []byte(newContent), 0644)
 }
 
 // LibExists checks if the lib directory exists
@@ -271,8 +316,39 @@ func (w *Workspace) LibExists() bool {
 	return err == nil && info.IsDir()
 }
 
+// EnsureFileExists checks if a file exists, and creates it if allowed by config
+func (w *Workspace) EnsureFileExists(filePath string) error {
+	absPath := filePath
+	if !filepath.IsAbs(filePath) {
+		absPath = filepath.Join(w.Root, filePath)
+	}
+	rel, err := filepath.Rel(w.Root, absPath)
+	if err != nil || strings.HasPrefix(rel, "..") || filepath.IsAbs(rel) {
+		return fmt.Errorf("refusing to create file outside workspace: %s", absPath)
+	}
+	if _, err := os.Stat(absPath); err != nil {
+		if os.IsNotExist(err) {
+			if w.Config != nil && w.Config.AllowCreateMissingFiles {
+				f, err := os.Create(absPath)
+				if err != nil {
+					return fmt.Errorf("failed to create file: %w", err)
+				}
+				f.Close()
+			} else {
+				return fmt.Errorf("file does not exist and creation is not allowed by config: %s", absPath)
+			}
+		} else {
+			return fmt.Errorf("failed to stat file: %w", err)
+		}
+	}
+	return nil
+}
+
 // AppendToFile appends content to a specified file
 func (w *Workspace) AppendToFile(filePath, content string) error {
+	if err := w.EnsureFileExists(filePath); err != nil {
+		return err
+	}
 	file, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return fmt.Errorf("failed to open file: %w", err)
@@ -287,6 +363,52 @@ func (w *Workspace) AppendToFile(filePath, content string) error {
 	return nil
 }
 
+// PrependToFile inserts content at the top of the specified file, after the main heading if present
+func (w *Workspace) PrependToFile(filePath, content string) error {
+	if err := w.EnsureFileExists(filePath); err != nil {
+		return err
+	}
+	fileBytes, err := os.ReadFile(filePath)
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to read file: %w", err)
+	}
+	fileStr := string(fileBytes)
+
+	lines := strings.Split(fileStr, "\n")
+	firstNonBlank := 0
+	for ; firstNonBlank < len(lines); firstNonBlank++ {
+		if strings.TrimSpace(lines[firstNonBlank]) != "" {
+			break
+		}
+	}
+	headingIdx := -1
+	for i := firstNonBlank; i < len(lines); i++ {
+		if strings.HasPrefix(strings.TrimSpace(lines[i]), "# ") {
+			headingIdx = i
+			break
+		}
+	}
+	insertIdx := 0
+	if headingIdx != -1 {
+		for i := headingIdx + 1; i < len(lines); i++ {
+			if strings.TrimSpace(lines[i]) == "" {
+				insertIdx = i + 1
+				break
+			}
+		}
+		if insertIdx == 0 {
+			insertIdx = headingIdx + 1
+		}
+	} else {
+		insertIdx = firstNonBlank
+	}
+	newLines := append([]string{}, lines[:insertIdx]...)
+	newLines = append(newLines, content, "")
+	newLines = append(newLines, lines[insertIdx:]...)
+	newContent := strings.Join(newLines, "\n")
+	return os.WriteFile(filePath, []byte(newContent), 0644)
+}
+
 // GetWorkspaceContext attempts to find workspace for configuration but allows operation without it
 // When noWorkspace is true, workspace detection failures are ignored and nil workspace is returned
 func GetWorkspaceContext(noWorkspace bool) (*Workspace, error) {
@@ -296,4 +418,10 @@ func GetWorkspaceContext(noWorkspace bool) (*Workspace, error) {
 		return ws, nil // Return nil workspace without error if not found
 	}
 	return RequireWorkspace() // Existing behavior
+}
+
+// InboxExists checks if the inbox file exists
+func (w *Workspace) InboxExists() bool {
+	_, err := os.Stat(w.InboxPath)
+	return err == nil
 }
