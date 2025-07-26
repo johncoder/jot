@@ -3,10 +3,10 @@ module github.com/johncoder/jot
 go 1.24
 
 require (
+	github.com/gomarkdown/markdown v0.0.0-20250311123330-531bef5e742b
 	github.com/spf13/cobra v1.8.0
 	github.com/spf13/viper v1.18.2
 	github.com/titanous/json5 v1.0.0
-	github.com/yuin/goldmark v1.7.12
 	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.1
 	honnef.co/go/tools v0.6.1
@@ -15,7 +15,6 @@ require (
 require (
 	github.com/BurntSushi/toml v1.4.1-0.20240526193622-a339e1f7089c // indirect
 	github.com/fsnotify/fsnotify v1.8.0 // indirect
-	github.com/gomarkdown/markdown v0.0.0-20250311123330-531bef5e742b // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/magiconair/properties v1.8.7 // indirect

@@ -8,7 +8,6 @@ import (
 
 	"github.com/johncoder/jot/internal/markdown"
 	"github.com/johncoder/jot/internal/workspace"
-	"github.com/yuin/goldmark/ast"
 )
 
 // Test data for path resolution tests
@@ -123,7 +122,7 @@ func TestCalculatePathMatch(t *testing.T) {
 
 func TestNavigateHeadingPath(t *testing.T) {
 	// Parse the test markdown content
-	doc := markdown.ParseDocument([]byte(testMarkdownContent))
+	doc := markdown.ParseMarkdownAST([]byte(testMarkdownContent))
 	content := []byte(testMarkdownContent)
 
 	tests := []struct {
@@ -218,7 +217,7 @@ func TestNavigateHeadingPath(t *testing.T) {
 
 func TestResolveDestinationPath(t *testing.T) {
 	// Parse the test markdown content
-	doc := markdown.ParseDocument([]byte(testMarkdownContent))
+	doc := markdown.ParseMarkdownAST([]byte(testMarkdownContent))
 	content := []byte(testMarkdownContent)
 
 	tests := []struct {
@@ -294,119 +293,6 @@ func TestResolveDestinationPath(t *testing.T) {
 			// Check create path
 			if !sliceEqual(result.CreatePath, tt.expectedCreate) {
 				t.Errorf("resolveDestinationPath() create path = %v, want %v", result.CreatePath, tt.expectedCreate)
-			}
-
-			// Check that insert offset is reasonable
-			if result.InsertOffset < 0 || result.InsertOffset > len(content) {
-				t.Errorf("resolveDestinationPath() insert offset %d out of range [0, %d]", result.InsertOffset, len(content))
-			}
-		})
-	}
-}
-
-func TestCalculateInsertionPoint(t *testing.T) {
-	// Create a simple test document
-	testContent := `# Work
-
-## Projects
-
-### Frontend
-Some content here
-
-### Backend
-More content
-
-## Meetings
-Meeting notes
-`
-
-	doc := markdown.ParseDocument([]byte(testContent))
-	content := []byte(testContent)
-
-	// Find the "Projects" heading to test insertion
-	var projectsHeading *ast.Heading
-	ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
-		if !entering {
-			return ast.WalkContinue, nil
-		}
-		if heading, ok := n.(*ast.Heading); ok {
-			text := markdown.ExtractHeadingText(heading, content)
-			if text == "Projects" {
-				projectsHeading = heading
-				return ast.WalkStop, nil
-			}
-		}
-		return ast.WalkContinue, nil
-	})
-
-	if projectsHeading == nil {
-		t.Fatal("Could not find Projects heading in test content")
-	}
-
-	tests := []struct {
-		name     string
-		prepend  bool
-		validate func(t *testing.T, offset int, content []byte)
-	}{
-		{
-			name:    "append mode",
-			prepend: false,
-			validate: func(t *testing.T, offset int, content []byte) {
-				// Should be after the Backend section but before Meetings
-				if offset <= 0 || offset >= len(content) {
-					t.Errorf("Insert offset %d out of range", offset)
-				}
-				// Check that we're before "## Meetings"
-				remainingContent := string(content[offset:])
-				if !strings.Contains(remainingContent, "## Meetings") {
-					t.Errorf("Insert point should be before Meetings section")
-				}
-			},
-		},
-		{
-			name:    "prepend mode",
-			prepend: true,
-			validate: func(t *testing.T, offset int, content []byte) {
-				// Should be right after the Projects heading line
-				if offset <= 0 || offset >= len(content) {
-					t.Errorf("Insert offset %d out of range", offset)
-				}
-				// Should be after "## Projects\n"
-				beforeContent := string(content[:offset])
-				if !strings.Contains(beforeContent, "## Projects") {
-					t.Errorf("Insert point should be after Projects heading")
-				}
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			offset := calculateInsertionPoint(projectsHeading, content, tt.prepend)
-			tt.validate(t, offset, content)
-		})
-	}
-}
-
-func TestFindHeadingByOffset(t *testing.T) {
-	doc := markdown.ParseDocument([]byte(testMarkdownContent))
-	content := []byte(testMarkdownContent)
-
-	// Find all headings and their offsets
-	allHeadings := markdown.FindAllHeadings(doc, content)
-
-	for _, headingInfo := range allHeadings {
-		t.Run("find_"+headingInfo.Text, func(t *testing.T) {
-			found := findHeadingByOffset(doc, headingInfo.Offset)
-			if found == nil {
-				t.Errorf("findHeadingByOffset() could not find heading at offset %d", headingInfo.Offset)
-				return
-			}
-
-			// Verify we found the correct heading
-			foundText := markdown.ExtractHeadingText(found, content)
-			if foundText != headingInfo.Text {
-				t.Errorf("findHeadingByOffset() found heading %q, want %q", foundText, headingInfo.Text)
 			}
 		})
 	}

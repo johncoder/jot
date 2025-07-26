@@ -265,3 +265,62 @@ func editFile(result *SearchResult) error {
 	// Execute editor
 	return cmd.Run()
 }
+
+// SelectFile presents a list of files to the user via FZF and returns the selected file.
+func SelectFile(prompt string, files []string) (string, error) {
+	if len(files) == 0 {
+		return "", fmt.Errorf("no files to select from")
+	}
+	tempFile, err := os.CreateTemp("", "jot-files-*.txt")
+	if err != nil {
+		return "", err
+	}
+	defer os.Remove(tempFile.Name())
+	for _, f := range files {
+		tempFile.WriteString(f + "\n")
+	}
+	tempFile.Close()
+	cmd := exec.Command("fzf", "--prompt="+prompt+" ")
+	cmd.Stdin, _ = os.Open(tempFile.Name())
+	out, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	selected := strings.TrimSpace(string(out))
+	if selected == "" {
+		return "", fmt.Errorf("no file selected")
+	}
+	return selected, nil
+}
+
+// SelectIndex presents a list of options to the user via FZF and returns the selected index.
+func SelectIndex(prompt string, options []string) (int, error) {
+	if len(options) == 0 {
+		return -1, fmt.Errorf("no options to select from")
+	}
+	tempFile, err := os.CreateTemp("", "jot-options-*.txt")
+	if err != nil {
+		return -1, err
+	}
+	defer os.Remove(tempFile.Name())
+	for _, opt := range options {
+		tempFile.WriteString(opt + "\n")
+	}
+	tempFile.Close()
+	cmd := exec.Command("fzf", "--prompt="+prompt+" ")
+	cmd.Stdin, _ = os.Open(tempFile.Name())
+	out, err := cmd.Output()
+	if err != nil {
+		return -1, err
+	}
+	selected := strings.TrimSpace(string(out))
+	if selected == "" {
+		return -1, fmt.Errorf("no option selected")
+	}
+	for i, opt := range options {
+		if opt == selected {
+			return i, nil
+		}
+	}
+	return -1, fmt.Errorf("selected option not found")
+}

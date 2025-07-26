@@ -425,3 +425,26 @@ func (w *Workspace) InboxExists() bool {
 	_, err := os.Stat(w.InboxPath)
 	return err == nil
 }
+
+// ResolveFilePath resolves a user-supplied file path to an absolute path within the workspace.
+// If ensureExists is true, it will create the file if it does not exist.
+func (ws *Workspace) ResolveFilePath(path string, ensureExists bool) (string, error) {
+	if path == "" || path == "inbox.md" {
+		if ensureExists {
+			if err := ws.EnsureFileExists(ws.InboxPath); err != nil {
+				return "", err
+			}
+		}
+		return ws.InboxPath, nil
+	}
+	absPath := path
+	if !filepath.IsAbs(path) {
+		absPath = filepath.Join(ws.Root, path)
+	}
+	if ensureExists {
+		if err := ws.EnsureFileExists(absPath); err != nil {
+			return "", err
+		}
+	}
+	return absPath, nil
+}

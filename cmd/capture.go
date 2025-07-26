@@ -2,13 +2,10 @@ package cmd
 
 import (
 	"fmt"
-	"io"
 	"os"
-	"path/filepath"
 	"strings"
-	"time"
 
-	"github.com/johncoder/jot/internal/cmdutil"
+	"github.com/gomarkdown/markdown/ast"
 	"github.com/johncoder/jot/internal/editor"
 	"github.com/johncoder/jot/internal/hooks"
 	"github.com/johncoder/jot/internal/markdown"
@@ -18,17 +15,11 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-var (
-	captureNote     string
-	captureTemplate string
-	captureContent  string
-	captureNoVerify bool
-)
-
+// captureCmd is the primary capture command, using robust Markdown AST operations.
 var captureCmd = &cobra.Command{
 	Use:   "capture [template]",
-	Short: "Capture a new note",
-	Long: `Capture a new note and add it to inbox.md.
+	Short: "Capture a note to inbox or a specific destination (AST-based)",
+	Long: `Capture a new note and add it to inbox.md or a specific destination.
 
 Supports templates for structured note capture:
 - Templates open in editor by default for interactive editing
@@ -37,7 +28,7 @@ Supports templates for structured note capture:
 
 Input methods:
 - Template-based (default): Opens template in editor
-- Direct content: Use --content "your note text"  
+- Direct content: Use --content "your note text"
 - Stdin input: Pipe content or use explicit flags
 
 Examples:
@@ -46,180 +37,323 @@ Examples:
   jot capture --template meeting           # Use meeting template in editor (same as above)
   jot capture standup --content "Completed API design"
   echo "Notes here" | jot capture meeting
-  jot capture --content "Quick note"       # Direct append to inbox`,
-	Args: cobra.MaximumNArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		ctx := cmdutil.StartCommand(cmd)
+  jot capture --content "Quick note"       # Direct append to inbox
 
-		ws, err := getWorkspace(cmd)
-		if err != nil {
-			return ctx.HandleError(err)
-		}
-
-		// Initialize hook manager
-		hookManager := hooks.NewManager(ws)
-
-		// Run pre-capture hook unless --no-verify is set
-		if !captureNoVerify {
-			hookCtx := &hooks.HookContext{
-				Type:         hooks.PreCapture,
-				Workspace:    ws,
-				Content:      captureContent,
-				TemplateName: captureTemplate,
-				Timeout:      30 * time.Second,
-				AllowBypass:  captureNoVerify,
-			}
-
-			result, err := hookManager.Execute(hookCtx)
-			if err != nil {
-				return ctx.HandleExternalCommand("pre-capture hook", nil, err)
-			}
-
-			if result.Aborted {
-				return ctx.HandleOperationError("pre-capture hook", fmt.Errorf("pre-capture hook aborted operation"))
-			}
-
-			// Update content if hook modified it
-			if result.Content != captureContent {
-				captureContent = result.Content
-			}
-		}
-
-		// Use positional argument as template name if provided
-		if len(args) > 0 {
-			captureTemplate = args[0]
-		}
-
-		// Consolidated content source handling
-		appendContent, useEditor, err := getCaptureContent(captureContent, captureNote, captureTemplate, true)
-		if err != nil {
-			return ctx.HandleOperationError("content", err)
-		}
-		var finalContent string
-		isTemplate := captureTemplate != ""
-		if isTemplate {
-			tm := template.NewManager(ws)
-			t, err := tm.Get(captureTemplate)
-			if err != nil {
-				return ctx.HandleOperationError("template", fmt.Errorf("template error: %w", err))
-			}
-			renderedTemplate, err := tm.Render(t, appendContent)
-			if err != nil {
-				return ctx.HandleOperationError("template", err)
-			}
-			if useEditor {
-				if !ctx.IsJSONOutput() {
-					fmt.Printf("Opening template '%s' in editor...\n", captureTemplate)
-				}
-				editedContent, err := editor.OpenEditor(renderedTemplate)
-				if err != nil {
-					return ctx.HandleOperationError("editor", fmt.Errorf("failed to open editor: %w", err))
-				}
-				finalContent = strings.TrimSpace(editedContent)
-			} else {
-				finalContent = renderedTemplate
-			}
-			// Remove frontmatter
-			finalContent = template.StripFrontmatter(finalContent)
-			// Unified frontmatter parsing
-			fm := parseFrontmatter(t.Content, t.DestinationFile, t.RefileMode)
-			if finalContent == "" {
-				return handleCaptureOutput(ctx, ws, hookManager, "", appendContent, captureTemplate, fm, true, "capture_empty")
-			}
-			if err := saveCapturedContent(ws, fm, finalContent); err != nil {
-				return ctx.HandleOperationError("save", fmt.Errorf("failed to save note: %w", err))
-			}
-			if !captureNoVerify {
-				hookCtx := &hooks.HookContext{
-					Type:         hooks.PostCapture,
-					Workspace:    ws,
-					Content:      finalContent,
-					TemplateName: captureTemplate,
-					SourceFile:   fm.Destination,
-					Timeout:      30 * time.Second,
-					AllowBypass:  captureNoVerify,
-				}
-				_, err := hookManager.Execute(hookCtx)
-				if err != nil && !ctx.IsJSONOutput() {
-					cmdutil.ShowWarning("Warning: post-capture hook failed: %s", err.Error())
-				}
-			}
-			return handleCaptureOutput(ctx, ws, hookManager, finalContent, appendContent, captureTemplate, fm, true, func() string {
-				if strings.Contains(fm.Destination, "#") {
-					return "capture_and_refile"
-				}
-				return "capture_to_file"
-			}())
-		} else {
-			if appendContent == "" && useEditor {
-				if !ctx.IsJSONOutput() {
-					fmt.Println("Opening editor for note capture...")
-				}
-				editedContent, err := editor.OpenEditor("")
-				if err != nil {
-					return ctx.HandleOperationError("editor", fmt.Errorf("failed to open editor: %w", err))
-				}
-				finalContent = strings.TrimSpace(editedContent)
-			} else {
-				finalContent = appendContent
-			}
-			if finalContent == "" {
-				fm := parseFrontmatter("", "inbox.md", "append")
-				return handleCaptureOutput(ctx, ws, hookManager, "", appendContent, captureTemplate, fm, false, "capture_empty")
-			}
-			// Unified frontmatter parsing
-			fm := parseFrontmatter(finalContent, "inbox.md", "append")
-			finalContent = template.StripFrontmatter(finalContent)
-			if err := saveCapturedContent(ws, fm, finalContent); err != nil {
-				return ctx.HandleOperationError("save", fmt.Errorf("failed to save note: %w", err))
-			}
-			if !captureNoVerify {
-				hookCtx := &hooks.HookContext{
-					Type:         hooks.PostCapture,
-					Workspace:    ws,
-					Content:      finalContent,
-					TemplateName: captureTemplate,
-					SourceFile:   fm.Destination,
-					Timeout:      30 * time.Second,
-					AllowBypass:  captureNoVerify,
-				}
-				_, err := hookManager.Execute(hookCtx)
-				if err != nil && !ctx.IsJSONOutput() {
-					cmdutil.ShowWarning("Warning: post-capture hook failed: %s", err.Error())
-				}
-			}
-			return handleCaptureOutput(ctx, ws, hookManager, finalContent, appendContent, captureTemplate, fm, false, "capture")
-		}
-	},
+Flags:
+  --template, -t     Use a named template for structured capture
+  --content          Note content to append (skips editor)
+  --editor           Edit the note in $EDITOR before saving
+  --prepend          Prepend the note instead of appending
+  --destination, -d  Destination file[#selector] for the note
+  --json             Output result as JSON
+  --no-verify        Skip hooks verification
+`,
+	Args:  cobra.MaximumNArgs(1),
+	RunE:  runCapture,
 }
 
 func init() {
-	captureCmd.Flags().StringVar(&captureTemplate, "template", "", "Use a named template for structured capture")
-	captureCmd.Flags().StringVar(&captureContent, "content", "", "Note content to append (skips editor)")
-	captureCmd.Flags().StringVar(&captureNote, "note", "", "Note content to append (legacy alias for --content)")
-	captureCmd.Flags().BoolVar(&captureNoVerify, "no-verify", false, "Skip hooks verification")
+	captureCmd.Flags().StringP("destination", "d", "inbox.md", "Destination file[#selector] for the note")
+	captureCmd.Flags().Bool("editor", false, "Edit the note in $EDITOR before saving")
+	captureCmd.Flags().Bool("prepend", false, "Prepend the note instead of appending")
+	captureCmd.Flags().Bool("json", false, "Output result as JSON")
+	captureCmd.Flags().String("template", "", "Template to use for new notes (file path or template name)")
+	captureCmd.Flags().String("content", "", "Note content (overrides stdin/template)")
+	captureCmd.Flags().Bool("no-verify", false, "Skip hooks verification")
 }
 
-// Helper: get content from all sources (flag, piped, note, editor)
-func getCaptureContent(captureContent, captureNote, captureTemplate string, useEditorDefault bool) (string, bool, error) {
-	stat, _ := os.Stdin.Stat()
-	hasPipedInput := (stat.Mode() & os.ModeCharDevice) == 0
-	if captureContent != "" {
-		return strings.TrimSpace(captureContent), false, nil
-	} else if hasPipedInput {
-		stdin, err := io.ReadAll(os.Stdin)
-		if err != nil {
-			return "", false, fmt.Errorf("failed to read from stdin: %w", err)
-		}
-		return strings.TrimSpace(string(stdin)), captureTemplate == "", nil
-	} else if captureNote != "" {
-		return strings.TrimSpace(captureNote), false, nil
+// CaptureContext holds all state for the capture pipeline.
+type CaptureContext struct {
+	WS         *workspace.Workspace
+	Content    string
+	File       string
+	Selector   string
+	Doc        *ast.Document
+	Heading    *ast.Heading
+	Subtree    []ast.Node
+	Prepend    bool
+	Editor     bool
+	JSONOut    bool
+	Template   string
+	ResultPath string
+	Err        error
+	NoVerify   bool // skip hooks if true
+}
+
+func runCapture(cmd *cobra.Command, args []string) error {
+	ctx := &CaptureContext{}
+
+	// Parse flags and positional template
+	ctx.Editor, _ = cmd.Flags().GetBool("editor")
+	ctx.Prepend, _ = cmd.Flags().GetBool("prepend")
+	ctx.JSONOut, _ = cmd.Flags().GetBool("json")
+	ctx.NoVerify, _ = cmd.Flags().GetBool("no-verify")
+	flagTemplate, _ := cmd.Flags().GetString("template")
+	if len(args) > 0 && args[0] != "" {
+		ctx.Template = args[0]
+	} else {
+		ctx.Template = flagTemplate
 	}
-	return "", useEditorDefault, nil
+	dest, _ := cmd.Flags().GetString("destination")
+	if dest == "" {
+		dest = "inbox.md"
+	}
+	ctx.File, ctx.Selector = parseDestination(dest)
+
+	// --- Default to editor if template is used and --editor is not set ---
+	if ctx.Template != "" && !ctx.Editor {
+		ctx.Editor = true
+	}
+
+	// Pipeline steps
+	if err := captureStepFindWorkspace(ctx); err != nil {
+		return err
+	}
+
+	// --- Pre-capture hook ---
+	if !ctx.NoVerify {
+		preHook := hooks.NewPreCaptureHook(ctx.WS)
+		newContent, err := preHook.Execute(ctx.Content, ctx.Template, false)
+		if err != nil {
+			return fmt.Errorf("pre-capture hook failed: %w", err)
+		}
+		ctx.Content = newContent
+	}
+
+	if err := captureStepGetContent(cmd, ctx); err != nil {
+		return err
+	}
+
+	if err := captureStepApplyFrontmatter(ctx); err != nil {
+		return err
+	}
+	if err := captureStepResolveFile(ctx); err != nil {
+		return err
+	}
+	if err := captureStepReadOrInitDoc(ctx); err != nil {
+		return err
+	}
+	if err := captureStepPrepareSubtree(ctx); err != nil {
+		return err
+	}
+	if err := captureStepInsertSubtree(ctx); err != nil {
+		return err
+	}
+	if err := captureStepWriteDoc(ctx); err != nil {
+		return err
+	}
+
+	// --- Post-capture hook ---
+	if !ctx.NoVerify {
+		postHook := hooks.NewPostCaptureHook(ctx.WS)
+		err := postHook.Execute(ctx.Content, ctx.Template, ctx.File, false)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: post-capture hook failed: %v\n", err)
+		}
+	}
+
+	if ctx.JSONOut {
+		captureStepOutputJSON(ctx)
+	}
+	return ctx.Err
 }
 
-// Helper: parse frontmatter from content or template
-func parseFrontmatter(content string, fallbackDest, fallbackMode string) CaptureFrontmatter {
+// Apply frontmatter: override destination and prepend mode if present
+func captureStepApplyFrontmatter(ctx *CaptureContext) error {
+	fm := parseFrontmatter(ctx.Content, ctx.File, func() string {
+		if ctx.Prepend {
+			return "prepend"
+		}
+		return "append"
+	}())
+	if fm.Destination != "" && fm.Destination != ctx.File {
+		ctx.File, ctx.Selector = parseDestination(fm.Destination)
+	}
+	if fm.RefileMode == "prepend" {
+		ctx.Prepend = true
+	} else if fm.RefileMode == "append" {
+		ctx.Prepend = false
+	}
+	return nil
+}
+
+// --- Pipeline step functions (to be implemented/filled in) ---
+func captureStepFindWorkspace(ctx *CaptureContext) error {
+	ws, err := workspace.FindWorkspace()
+	if err != nil {
+		return err
+	}
+	ctx.WS = ws
+	return nil
+}
+
+func captureStepGetContent(cmd *cobra.Command, ctx *CaptureContext) error {
+	// 1. --content flag takes highest precedence
+	contentFlag, _ := cmd.Flags().GetString("content")
+	if contentFlag != "" {
+		ctx.Content = contentFlag
+		return nil
+	}
+
+	// 2. If a template is specified, load and render it
+	if ctx.Template != "" {
+		tm := template.NewManager(ctx.WS)
+		t, err := tm.Get(ctx.Template)
+		if err != nil {
+			return fmt.Errorf("template error: %w", err)
+		}
+		rendered, err := tm.Render(t, "")
+		if err != nil {
+			return fmt.Errorf("template render error: %w", err)
+		}
+		// Strip frontmatter before editor
+		ctx.Content = template.StripFrontmatter(rendered)
+	} else {
+		// 3. Otherwise, use stdin (piped input or prompt)
+		stat, _ := os.Stdin.Stat()
+		hasPipedInput := (stat.Mode() & os.ModeCharDevice) == 0
+		if hasPipedInput {
+			b, err := os.ReadFile("/dev/stdin")
+			if err != nil {
+				return err
+			}
+			ctx.Content = string(b)
+			return nil // skip editor if piped input
+		}
+		content, err := getCaptureContent()
+		if err != nil {
+			return err
+		}
+		ctx.Content = content
+	}
+
+	// 4. Open editor if requested (after content is loaded)
+	if ctx.Editor {
+		edited, err := editor.OpenEditor(ctx.Content)
+		if err != nil {
+			return fmt.Errorf("failed to open editor: %w", err)
+		}
+		ctx.Content = edited
+	}
+
+	return nil
+}
+
+func captureStepResolveFile(ctx *CaptureContext) error {
+	file, err := ctx.WS.ResolveFilePath(ctx.File, true)
+	if err != nil {
+		return err
+	}
+	ctx.File = file
+	if err := ctx.WS.EnsureFileExists(file); err != nil {
+		return err
+	}
+	return nil
+}
+
+func captureStepReadOrInitDoc(ctx *CaptureContext) error {
+	destContent, err := os.ReadFile(ctx.File)
+	if err != nil {
+		return err
+	}
+	ctx.Doc = markdown.ParseMarkdownAST(destContent)
+	return nil
+}
+
+func captureStepPrepareSubtree(ctx *CaptureContext) error {
+	ctx.Subtree = markdown.ParseContentAsSubtree(ctx.Content)
+	return nil
+}
+
+func captureStepInsertSubtree(ctx *CaptureContext) error {
+	if ctx.Selector == "" {
+		if ctx.Prepend {
+			markdown.InsertSubtree(ctx.Doc, 0, ctx.Subtree)
+		} else {
+			markdown.InsertSubtree(ctx.Doc, len(ctx.Doc.GetChildren()), ctx.Subtree)
+		}
+	} else {
+		sp := markdown.ParseSelector(ctx.Selector, false)
+		h, _ := sp.FindOrCreateHeadingNode(ctx.Doc, 1)
+		ctx.Heading = h
+		// Determine parent heading level
+		headingLevel := 1
+		if h != nil {
+			headingLevel = h.Level
+		}
+		if len(ctx.Subtree) > 0 {
+			// Find minimum heading level in subtree
+			minLevel := 7
+			for _, n := range ctx.Subtree {
+				if hd, ok := n.(*ast.Heading); ok {
+					if hd.Level < minLevel {
+						minLevel = hd.Level
+					}
+				}
+			}
+			if minLevel <= 6 {
+				// Calculate level shift so top-level heading is one deeper than parent
+				shift := headingLevel + 1 - minLevel
+				if shift != 0 {
+					markdown.RelevelSubtree(ctx.Subtree, shift)
+				}
+				// Clamp all heading levels to max 6
+				for _, n := range ctx.Subtree {
+					if hd, ok := n.(*ast.Heading); ok {
+						if hd.Level > 6 {
+							hd.Level = 6
+						}
+					}
+				}
+			}
+		}
+		if ctx.Prepend {
+			markdown.InsertSubtree(h, 0, ctx.Subtree)
+		} else {
+			markdown.InsertSubtree(h, len(h.GetChildren()), ctx.Subtree)
+		}
+	}
+	return nil
+}
+
+func captureStepWriteDoc(ctx *CaptureContext) error {
+	newContent := markdown.RenderMarkdownAST(ctx.Doc)
+	ctx.ResultPath = ctx.File
+	return os.WriteFile(ctx.File, []byte(newContent), 0644)
+}
+
+func captureStepOutputJSON(ctx *CaptureContext) {
+	fmt.Printf("{\"file\":%q,\"ok\":%v}\n", ctx.ResultPath, ctx.Err == nil)
+}
+
+func getCaptureContent() (string, error) {
+	fmt.Print("Enter note content (end with Ctrl+D):\n")
+	b, err := os.ReadFile("/dev/stdin")
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
+}
+
+func parseDestination(dest string) (file, selector string) {
+	parts := strings.SplitN(dest, "#", 2)
+	file = parts[0]
+	if len(parts) > 1 {
+		selector = parts[1]
+	}
+	return
+}
+
+// --- Frontmatter utilities ---
+
+// CaptureFrontmatter holds supported frontmatter fields for capture
+type CaptureFrontmatter struct {
+	Destination string `yaml:"destination"`
+	RefileMode  string `yaml:"refile_mode"`
+}
+
+// parseFrontmatter extracts supported fields from YAML frontmatter in content
+func parseFrontmatter(content, fallbackDest, fallbackMode string) CaptureFrontmatter {
 	var fm CaptureFrontmatter
 	renderedFrontmatter := template.GetRenderedTemplateFrontmatter(content)
 	if renderedFrontmatter != "" {
@@ -232,205 +366,4 @@ func parseFrontmatter(content string, fallbackDest, fallbackMode string) Capture
 		fm.RefileMode = fallbackMode
 	}
 	return fm
-}
-
-// Helper: unified save logic for all destinations/modes
-func saveCapturedContent(ws *workspace.Workspace, fm CaptureFrontmatter, content string) error {
-	pathUtil := cmdutil.NewPathUtil(ws)
-	if fm.Destination == "inbox.md" {
-		if fm.RefileMode == "prepend" {
-			return ws.PrependToInbox(content)
-		}
-		return ws.AppendToInbox(content)
-	} else if strings.Contains(fm.Destination, "#") {
-		return refileContentToDestination(ws, content, fm.Destination, fm.RefileMode)
-	} else {
-		destPath := fm.Destination
-		if !filepath.IsAbs(destPath) {
-			destPath = pathUtil.WorkspaceJoin(destPath)
-		}
-		if err := ws.EnsureFileExists(destPath); err != nil {
-			return err
-		}
-		if fm.RefileMode == "prepend" {
-			return ws.PrependToFile(destPath, content)
-		}
-		return ws.AppendToFile(destPath, content)
-	}
-}
-
-// Helper: output and hook handling
-func handleCaptureOutput(ctx *cmdutil.CommandContext, ws *workspace.Workspace, hookManager *hooks.Manager, finalContent, appendContent, captureTemplate string, fm CaptureFrontmatter, isTemplate bool, jsonOp string) error {
-	if ctx.IsJSONOutput() {
-		lineCount := strings.Count(finalContent, "\n") + 1
-		if len(finalContent) == 0 {
-			lineCount = 0
-		}
-		response := CaptureResponse{
-			Operation: jsonOp,
-			ContentInfo: CaptureContent{
-				Content:        finalContent,
-				CharacterCount: len(finalContent),
-				LineCount:      lineCount,
-				Source:         getContentSource(appendContent, !isTemplate),
-			},
-			FileInfo: CaptureFile{
-				FilePath:    fm.Destination,
-				IsInbox:     fm.Destination == "inbox.md",
-				IsSelector:  strings.Contains(fm.Destination, "#"),
-				Destination: fm.Destination,
-			},
-			Template: func() *CaptureTemplate {
-				if isTemplate {
-					return &CaptureTemplate{
-						Name:            captureTemplate,
-						RenderedContent: finalContent,
-						DestinationFile: fm.Destination,
-						RefileMode:      fm.RefileMode,
-					}
-				}
-				return nil
-			}(),
-			Metadata: cmdutil.CreateJSONMetadata(ctx.Cmd, true, ctx.StartTime),
-		}
-		return cmdutil.OutputJSON(response)
-	}
-	// Human output
-	if isTemplate {
-		cmdutil.ShowSuccess("✓ Captured '%s' to '%s'", captureTemplate, fm.Destination)
-	} else {
-		cmdutil.ShowSuccess("✓ Note captured (%d characters)", len(finalContent))
-		cmdutil.ShowSuccess("✓ Added to %s", fm.Destination)
-	}
-	return nil
-}
-
-// refileContentToDestination performs refile operation for captured content
-func refileContentToDestination(ws *workspace.Workspace, content, destination, mode string) error {
-	// Parse the destination
-	destPath, err := markdown.ParsePath(destination)
-	if err != nil {
-		return cmdutil.NewValidationError("destination", destination, err)
-	}
-
-	// Do not wrap content in any heading or subtree
-	capturedContent := []byte(content)
-
-	// Use the existing refile functionality to resolve the destination
-	pathUtil := cmdutil.NewPathUtil(ws)
-	var absDestFile string
-	if filepath.IsAbs(destPath.File) {
-		absDestFile = destPath.File
-	} else {
-		absDestFile = pathUtil.WorkspaceJoin(destPath.File)
-	}
-	if err := ws.EnsureFileExists(absDestFile); err != nil {
-		return err
-	}
-	dest, err := ResolveDestination(ws, destPath, mode == "prepend")
-	if err != nil {
-		return fmt.Errorf("failed to resolve destination: %w", err)
-	}
-
-	// Insert content directly, no subtree transformation
-	return performDirectInsertion(ws, dest, capturedContent)
-}
-
-// performDirectInsertion inserts content directly into the destination file
-func performDirectInsertion(ws *workspace.Workspace, dest *DestinationTarget, transformedContent []byte) error {
-	// Construct destination file path
-	pathUtil := cmdutil.NewPathUtil(ws)
-	var destFilePath string
-	if dest.File == "inbox.md" {
-		destFilePath = ws.InboxPath
-	} else if filepath.IsAbs(dest.File) {
-		destFilePath = dest.File
-	} else {
-		// Use workspace root for relative paths, not lib/ directory
-		destFilePath = pathUtil.WorkspaceJoin(dest.File)
-	}
-
-	if err := ws.EnsureFileExists(destFilePath); err != nil {
-		return err
-	}
-
-	// Read destination file using unified content utilities
-	destContent, err := cmdutil.ReadFileContent(destFilePath)
-	if err != nil {
-		return err
-	}
-
-	// Prepare content to insert
-	var insertContent []byte = transformedContent
-
-	// Add missing headings if needed
-	if len(dest.CreatePath) > 0 {
-		// Calculate the base level for missing headings
-		baseLevel := dest.TargetLevel - len(dest.CreatePath)
-		var headingLines []string
-		for i, heading := range dest.CreatePath {
-			level := baseLevel + i + 1
-			headingLines = append(headingLines, strings.Repeat("#", level)+" "+heading)
-		}
-		insertContent = append([]byte(strings.Join(headingLines, "\n\n")+"\n\n"), insertContent...)
-	}
-
-	// Insert at the specified offset
-	newDestContent := append(destContent[:dest.InsertOffset], insertContent...)
-	newDestContent = append(newDestContent, destContent[dest.InsertOffset:]...)
-
-	// Write back to destination file
-	if err := pathUtil.SafeWriteFile(destFilePath, newDestContent); err != nil {
-		return fmt.Errorf("failed to write destination file: %w", err)
-	}
-
-	return nil
-}
-
-// JSON response structures for capture command
-type CaptureResponse struct {
-	Operation   string               `json:"operation"`
-	ContentInfo CaptureContent       `json:"content_info"`
-	FileInfo    CaptureFile          `json:"file_info"`
-	Template    *CaptureTemplate     `json:"template,omitempty"`
-	Metadata    cmdutil.JSONMetadata `json:"metadata"`
-}
-
-type CaptureContent struct {
-	Content        string `json:"content"`
-	CharacterCount int    `json:"character_count"`
-	LineCount      int    `json:"line_count"`
-	Source         string `json:"source"` // "editor", "stdin", "content_flag", "template"
-}
-
-type CaptureFile struct {
-	FilePath    string `json:"file_path"`
-	IsInbox     bool   `json:"is_inbox"`
-	IsSelector  bool   `json:"is_selector"`
-	Destination string `json:"destination"`
-}
-
-type CaptureTemplate struct {
-	Name            string `json:"name"`
-	RenderedContent string `json:"rendered_content,omitempty"`
-	DestinationFile string `json:"destination_file,omitempty"`
-	RefileMode      string `json:"refile_mode,omitempty"`
-}
-
-// getContentSource determines the source of content for JSON output
-func getContentSource(appendContent string, useEditor bool) string {
-	if appendContent != "" && !useEditor {
-		return "content_flag"
-	} else if appendContent != "" && useEditor {
-		return "template" // Template with piped/flag content
-	} else if useEditor {
-		return "editor"
-	}
-	return "stdin"
-}
-
-// Helper struct for frontmatter
-type CaptureFrontmatter struct {
-	Destination string `yaml:"destination"`
-	RefileMode  string `yaml:"refile_mode"`
 }

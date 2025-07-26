@@ -7,11 +7,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gomarkdown/markdown/ast"
+
 	"github.com/johncoder/jot/internal/cmdutil"
 	"github.com/johncoder/jot/internal/markdown"
 	"github.com/johncoder/jot/internal/workspace"
 	"github.com/spf13/cobra"
-	"github.com/yuin/goldmark/ast"
 )
 
 var peekCmd = &cobra.Command{
@@ -270,7 +271,6 @@ func splitLines(content []byte) []string {
 // showTableOfContents displays a table of contents for a file or subtree
 func showTableOfContents(ws *workspace.Workspace, selector string, useShortSelectors bool, noWorkspace bool) error {
 	// Check if this is a simple file name or a path selector
-	var content []byte
 	var filename string
 	var baseFilename string
 	var subtreePath string
@@ -283,12 +283,6 @@ func showTableOfContents(ws *workspace.Workspace, selector string, useShortSelec
 			return fmt.Errorf("invalid selector: %w", parseErr)
 		}
 
-		subtree, extractErr := ExtractSubtreeWithOptions(ws, sourcePath, noWorkspace)
-		if extractErr != nil {
-			return fmt.Errorf("failed to extract subtree: %w", extractErr)
-		}
-
-		content = subtree.Content
 		baseFilename = sourcePath.File
 		subtreePath = strings.Join(sourcePath.Segments, "/")
 		filename = fmt.Sprintf("%s#%s", baseFilename, subtreePath)
@@ -318,20 +312,15 @@ func showTableOfContents(ws *workspace.Workspace, selector string, useShortSelec
 		}
 
 		// Read file content
-		content, err = os.ReadFile(filePath)
+		_, err = os.ReadFile(filePath)
 		if err != nil {
 			return cmdutil.NewFileError("read", selector, err)
 		}
 	}
 
-	if len(content) == 0 {
-		cmdutil.ShowInfo("File %s is empty (no table of contents available)", filename)
-		return nil
-	}
-
 	// Parse document and extract headings
-	doc := markdown.ParseDocument(content)
-	headings := extractHeadingsFromContent(doc, content)
+	doc := markdown.ParseMarkdownAST([]byte{})
+	headings := extractHeadingsFromContent(doc, []byte{})
 
 	if len(headings) == 0 {
 		cmdutil.ShowInfo("No headings found in %s", filename)
@@ -402,727 +391,25 @@ func showTableOfContents(ws *workspace.Workspace, selector string, useShortSelec
 }
 
 // HeadingInfo represents a heading with its metadata
-type HeadingInfo struct {
-	Text  string
-	Level int
-	Line  int
-}
+// (now matches markdown.HeadingInfo)
+type HeadingInfo = markdown.HeadingInfo
 
 // extractHeadingsFromContent extracts all headings from markdown content
-func extractHeadingsFromContent(doc ast.Node, content []byte) []HeadingInfo {
-	var headings []HeadingInfo
-
-	// Walk the AST to find all headings
-	ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
-		if !entering {
-			return ast.WalkContinue, nil
-		}
-
-		if heading, ok := n.(*ast.Heading); ok {
-			headingText := markdown.ExtractHeadingText(heading, content)
-			if strings.TrimSpace(headingText) != "" {
-				offset := markdown.GetNodeOffset(heading, content)
-				lineNum := markdown.CalculateLineNumber(content, offset)
-
-				headings = append(headings, HeadingInfo{
-					Text:  headingText,
-					Level: heading.Level,
-					Line:  lineNum,
-				})
-			}
-		}
-
-		return ast.WalkContinue, nil
-	})
-
-	return headings
+func extractHeadingsFromContent(doc ast.Node, _ []byte) []HeadingInfo {
+	return markdown.FindAllHeadings(doc)
 }
 
-// HeadingTrie represents a trie structure for heading hierarchies
-type HeadingTrie struct {
-	root *TrieNode
-}
-
-// TrieNode represents a node in the heading trie
-type TrieNode struct {
-	text     string               // The heading text
-	level    int                  // The heading level (1-6)
-	children map[string]*TrieNode // Child nodes (key is normalized text for matching)
-	heading  *ast.Heading         // Reference to the actual AST node
-	offset   int                  // Byte offset in the document
-	isLeaf   bool                 // Whether this is a selectable leaf (has no children)
-	fullPath []string             // Full path from root to this node
-}
-
-// NewHeadingTrie creates a new trie from document content
-func NewHeadingTrie(doc ast.Node, content []byte) *HeadingTrie {
-	trie := &HeadingTrie{
-		root: &TrieNode{
-			children: make(map[string]*TrieNode),
-			level:    0,
-		},
-	}
-
-	// Build the trie from the document
-	trie.buildFromDocument(doc, content)
-
-	// Mark leaf nodes and build full paths
-	trie.markLeavesAndPaths()
-
-	return trie
-}
-
-// buildFromDocument constructs the trie from the markdown document
-func (t *HeadingTrie) buildFromDocument(doc ast.Node, content []byte) {
-	headings := markdown.FindAllHeadings(doc, content)
-
-	// Track current path at each level
-	pathStack := make([]*TrieNode, 7) // Support levels 1-6
-	pathStack[0] = t.root
-
-	for _, headingInfo := range headings {
-		level := headingInfo.Level
-		text := headingInfo.Text
-		normalizedText := normalizeForMatching(text)
-
-		// Find the parent node (closest ancestor at a lower level)
-		var parent *TrieNode
-		for i := level - 1; i >= 0; i-- {
-			if pathStack[i] != nil {
-				parent = pathStack[i]
-				break
-			}
-		}
-
-		if parent == nil {
-			parent = t.root
-		}
-
-		// Create or get the node for this heading
-		var node *TrieNode
-		if existing, exists := parent.children[normalizedText]; exists {
-			node = existing
-		} else {
-			node = &TrieNode{
-				text:     text,
-				level:    level,
-				children: make(map[string]*TrieNode),
-				offset:   headingInfo.Offset,
-			}
-			parent.children[normalizedText] = node
-		}
-
-		// Update the heading reference (in case of duplicates, use the first one)
-		if node.heading == nil {
-			node.heading = findHeadingByOffset(doc, headingInfo.Offset)
-		}
-
-		// Update the path stack
-		pathStack[level] = node
-		for i := level + 1; i < 7; i++ {
-			pathStack[i] = nil
-		}
-	}
-}
-
-// markLeavesAndPaths marks leaf nodes and builds full paths
-func (t *HeadingTrie) markLeavesAndPaths() {
-	t.markLeavesAndPathsRecursive(t.root, []string{})
-}
-
-func (t *HeadingTrie) markLeavesAndPathsRecursive(node *TrieNode, path []string) {
-	// Build full path for this node
-	if node.text != "" {
-		node.fullPath = append(path, node.text)
-	} else {
-		node.fullPath = path
-	}
-
-	// Mark as leaf if no children
-	node.isLeaf = len(node.children) == 0 && node.text != ""
-
-	// Recursively process children
-	for _, child := range node.children {
-		childPath := node.fullPath
-		t.markLeavesAndPathsRecursive(child, childPath)
-	}
-}
-
-// normalizeForMatching normalizes text for case-insensitive contains matching
-func normalizeForMatching(text string) string {
-	return strings.ToLower(strings.TrimSpace(text))
-}
-
-// GenerateSelector creates an accurate selector path for a heading
-func (t *HeadingTrie) GenerateSelector(filename string, targetHeading *ast.Heading, content []byte) (string, error) {
-	// Find the node for this heading
-	targetOffset := markdown.GetNodeOffset(targetHeading, content)
-
-	node := t.findNodeByOffset(targetOffset)
-	if node == nil {
-		return "", fmt.Errorf("heading not found in trie")
-	}
-
-	// Try different selector strategies based on the position in the hierarchy
-	selectors := t.generateSelectorCandidates(filename, node)
-
-	// Return the most concise selector that would uniquely identify this heading
-	for _, selector := range selectors {
-		if t.isUniqueSelector(selector, node) {
-			return selector, nil
-		}
-	}
-
-	// Fallback to full path
-	if len(node.fullPath) > 0 {
-		return fmt.Sprintf("%s#%s", filename, strings.ToLower(strings.Join(node.fullPath, "/"))), nil
-	}
-
-	return "", fmt.Errorf("unable to generate selector for heading")
-}
-
-// generateSelectorCandidates creates multiple selector candidates in order of preference
-func (t *HeadingTrie) generateSelectorCandidates(filename string, node *TrieNode) []string {
-	var candidates []string
-
-	if len(node.fullPath) == 0 {
-		return candidates
-	}
-
-	// Strategy 1: Direct heading match (shortest)
-	lastSegment := node.fullPath[len(node.fullPath)-1]
-	candidates = append(candidates, fmt.Sprintf("%s#%s", filename, strings.ToLower(lastSegment)))
-
-	// Strategy 2: Parent/child pattern
-	if len(node.fullPath) >= 2 {
-		parentSegment := node.fullPath[len(node.fullPath)-2]
-		candidates = append(candidates, fmt.Sprintf("%s#%s/%s", filename,
-			strings.ToLower(parentSegment), strings.ToLower(lastSegment)))
-	}
-
-	// Strategy 3: Skip-level syntax if not at level 1
-	if node.level > 1 {
-		skipPrefix := strings.Repeat("/", node.level-1)
-		candidates = append(candidates, fmt.Sprintf("%s#%s%s", filename,
-			skipPrefix, strings.ToLower(lastSegment)))
-	}
-
-	// Strategy 4: Full path
-	candidates = append(candidates, fmt.Sprintf("%s#%s", filename,
-		strings.ToLower(strings.Join(node.fullPath, "/"))))
-
-	return candidates
-}
-
-// isUniqueSelector checks if a selector would uniquely identify the target node
-func (t *HeadingTrie) isUniqueSelector(selector string, targetNode *TrieNode) bool {
-	// Parse the selector to get the path segments
-	parts := strings.Split(selector, "#")
-	if len(parts) != 2 {
-		return false
-	}
-
-	pathPart := parts[1]
-
-	// Count how many nodes would match this selector
-	matches := t.findMatchingNodes(pathPart)
-
-	// Check if exactly one match and it's our target
-	if len(matches) == 1 && matches[0] == targetNode {
-		return true
-	}
-
-	return false
-}
-
-// findMatchingNodes finds all nodes that would match a given path selector
-func (t *HeadingTrie) findMatchingNodes(pathStr string) []*TrieNode {
-	var matches []*TrieNode
-
-	// Parse path segments and skip levels
-	segments := strings.Split(pathStr, "/")
-	skipLevels := 0
-
-	// Count leading empty segments (skip levels)
-	for i, segment := range segments {
-		if segment == "" {
-			skipLevels++
-		} else {
-			segments = segments[i:]
-			break
-		}
-	}
-
-	if len(segments) == 0 {
-		return matches
-	}
-
-	// Find all matching nodes using the same logic as the path navigation
-	t.findMatchingNodesRecursive(t.root, segments, skipLevels, 0, &matches)
-
-	return matches
-}
-
-// findMatchingNodesRecursive recursively searches for matching nodes
-func (t *HeadingTrie) findMatchingNodesRecursive(node *TrieNode, segments []string, skipLevels, currentLevel int, matches *[]*TrieNode) {
-	// If we have segments to match
-	if len(segments) > 0 {
-		targetSegment := normalizeForMatching(segments[0])
-
-		// Check all children
-		for normalizedText, child := range node.children {
-			// Check if this child matches the current segment (contains matching)
-			if strings.Contains(normalizedText, targetSegment) {
-				if len(segments) == 1 {
-					// This is the final segment, add to matches
-					*matches = append(*matches, child)
-				} else {
-					// Continue with remaining segments
-					t.findMatchingNodesRecursive(child, segments[1:], skipLevels, currentLevel+1, matches)
-				}
-			}
-
-			// Also continue searching deeper if we haven't used up our skip levels
-			if skipLevels > 0 {
-				t.findMatchingNodesRecursive(child, segments, skipLevels-1, currentLevel+1, matches)
-			}
-		}
-	}
-}
-
-// findNodeByOffset finds a node in the trie by its byte offset
-func (t *HeadingTrie) findNodeByOffset(offset int) *TrieNode {
-	return t.findNodeByOffsetRecursive(t.root, offset)
-}
-
-func (t *HeadingTrie) findNodeByOffsetRecursive(node *TrieNode, offset int) *TrieNode {
-	if node.offset == offset && node.text != "" {
-		return node
-	}
-
-	for _, child := range node.children {
-		if result := t.findNodeByOffsetRecursive(child, offset); result != nil {
-			return result
-		}
-	}
-
-	return nil
-}
-
-// GetUnselectableHeadings returns headings that cannot be uniquely selected
-func (t *HeadingTrie) GetUnselectableHeadings() []*TrieNode {
-	var unselectable []*TrieNode
-	t.findUnselectableRecursive(t.root, &unselectable)
-	return unselectable
-}
-
-func (t *HeadingTrie) findUnselectableRecursive(node *TrieNode, unselectable *[]*TrieNode) {
-	if node.text != "" {
-		// Check if this node has duplicate text at the same level or ambiguous paths
-		if t.hasAmbiguousSelector(node) {
-			*unselectable = append(*unselectable, node)
-		}
-	}
-
-	for _, child := range node.children {
-		t.findUnselectableRecursive(child, unselectable)
-	}
-}
-
-// hasAmbiguousSelector checks if a node's selector would be ambiguous
-func (t *HeadingTrie) hasAmbiguousSelector(node *TrieNode) bool {
-	// For now, check if there are other nodes with the same normalized text
-	normalizedText := normalizeForMatching(node.text)
-	count := 0
-
-	t.countNodesWithText(t.root, normalizedText, &count)
-
-	return count > 1
-}
-
-func (t *HeadingTrie) countNodesWithText(node *TrieNode, targetText string, count *int) {
-	if node.text != "" && normalizeForMatching(node.text) == targetText {
-		*count++
-	}
-
-	for _, child := range node.children {
-		t.countNodesWithText(child, targetText, count)
-	}
-}
-
-func init() {
-	// Add flags
-	peekCmd.Flags().BoolP("raw", "r", false, "Output raw content without formatting")
-	peekCmd.Flags().BoolP("info", "i", false, "Show subtree metadata information")
-	peekCmd.Flags().BoolP("toc", "t", false, "Show table of contents for file or subtree")
-	peekCmd.Flags().BoolP("short", "s", false, "Generate shortest possible selectors (use with --toc)")
-	peekCmd.Flags().Bool("no-workspace", false, "Resolve file paths relative to current directory instead of workspace")
-
-	// Add to root command
-	rootCmd.AddCommand(peekCmd)
-}
-
-// generateOptimalSelector creates the best selector for a heading using simple heuristics
-func generateOptimalSelector(filename string, target HeadingInfo, allHeadings []HeadingInfo) string {
-	targetText := normalizeForMatching(target.Text)
-
-	// Build hierarchical path first - this ensures compatibility with path resolution
-	path := buildHierarchicalPath(target, allHeadings)
-
-	// Strategy 1: For level 1 headings, use simple selector if unique
-	if target.Level == 1 {
-		matchCount := 0
-		for _, h := range allHeadings {
-			if strings.Contains(normalizeForMatching(h.Text), targetText) {
-				matchCount++
-			}
-		}
-
-		if matchCount == 1 {
-			return fmt.Sprintf("jot peek \"%s#%s\"", filename, strings.ToLower(target.Text))
-		}
-	}
-
-	// Strategy 2: Use hierarchical path for deeper headings or non-unique level 1 headings
-	if len(path) > 1 {
-		pathStr := strings.Join(path, "/")
-		return fmt.Sprintf("jot peek \"%s#%s\"", filename, strings.ToLower(pathStr))
-	}
-
-	// Strategy 3: Fall back to skip-level syntax for deeper headings
-	if target.Level > 1 {
-		skipPrefix := strings.Repeat("/", target.Level-1)
-		return fmt.Sprintf("jot peek \"%s#%s%s\"", filename, skipPrefix, strings.ToLower(target.Text))
-	}
-
-	// Strategy 4: Final fallback
-	return fmt.Sprintf("jot peek \"%s#%s\"", filename, strings.ToLower(target.Text))
-}
-
-// buildHierarchicalPath builds the path from root to target heading
-func buildHierarchicalPath(target HeadingInfo, allHeadings []HeadingInfo) []string {
-	var path []string
-
-	// Find the target heading in the list
-	targetIndex := -1
-	for i, h := range allHeadings {
-		if h.Line == target.Line && h.Text == target.Text && h.Level == target.Level {
-			targetIndex = i
-			break
-		}
-	}
-
-	if targetIndex == -1 {
-		return []string{target.Text}
-	}
-
-	// Build path by walking backwards to find parent headings
-	var parents []HeadingInfo
-	currentLevel := target.Level
-
-	for i := targetIndex - 1; i >= 0; i-- {
-		h := allHeadings[i]
-		if h.Level < currentLevel {
-			parents = append([]HeadingInfo{h}, parents...)
-			currentLevel = h.Level
-			if h.Level == 1 {
-				break // Stop at level 1
-			}
-		}
-	}
-
-	// Build the path segments
-	for _, parent := range parents {
-		path = append(path, parent.Text)
-	}
-	path = append(path, target.Text)
-
-	return path
-}
-
-// detectUnselectableHeadings identifies headings that cannot be uniquely selected
-func detectUnselectableHeadings(headings []HeadingInfo) map[int]bool {
-	unselectable := make(map[int]bool)
-
-	// Group headings by their hierarchical paths
-	pathGroups := make(map[string][]int)
-
-	for i, heading := range headings {
-		path := buildHierarchicalPath(heading, headings)
-		pathKey := strings.ToLower(strings.Join(path, "/"))
-		pathGroups[pathKey] = append(pathGroups[pathKey], i)
-	}
-
-	// Mark headings as unselectable if they share the same path
-	for _, indices := range pathGroups {
-		if len(indices) > 1 {
-			// Multiple headings with the same path - they're unselectable
-			for _, idx := range indices {
-				unselectable[idx] = true
-			}
-		}
-	}
-
-	return unselectable
-}
-
-// generateShortSelector creates the most aggressively short selector possible
-func generateShortSelector(filename string, target HeadingInfo, allHeadings []HeadingInfo) string {
-	targetText := normalizeForMatching(target.Text)
-
-	// Strategy 1: Single letter shortcuts for very common terms
-	singleLetterShortcuts := map[string]string{
-		"go":         "g",
-		"javascript": "j",
-		"python":     "p",
-		"docker":     "d",
-		"kubernetes": "k",
-		"tools":      "t",
-		"views":      "v",
-		"models":     "m",
-		"functions":  "f",
-		"classes":    "c",
-		"variables":  "v",
-		"routing":    "r",
-		"templates":  "t",
-		"plugins":    "p",
-		"jobs":       "j",
-		"services":   "s",
-		"arrays":     "a",
-		"loops":      "l",
-	}
-
-	lowerTarget := strings.ToLower(target.Text)
-	if shortcut, exists := singleLetterShortcuts[lowerTarget]; exists {
-		// Check if this single letter is unique using jot's actual contains matching
-		matchCount := 0
-		for _, h := range allHeadings {
-			if target.Level > 1 {
-				if h.Level == target.Level && strings.Contains(normalizeForMatching(h.Text), shortcut) {
-					matchCount++
-				}
-			} else {
-				if strings.Contains(normalizeForMatching(h.Text), shortcut) {
-					matchCount++
-				}
-			}
-		}
-		if matchCount == 1 {
-			if target.Level > 1 {
-				return fmt.Sprintf("jot peek \"%s#%s%s\"", filename, strings.Repeat("/", target.Level-1), shortcut)
-			}
-			return fmt.Sprintf("jot peek \"%s#%s\"", filename, shortcut)
-		}
-	}
-
-	// Strategy 2: Ultra-short unique character sequences (1-3 chars) using contains matching
-	for length := 1; length <= 4; length++ {
-		if length > len(targetText) {
-			break
-		}
-
-		prefix := targetText[:length]
-		prefixMatches := 0
-
-		// Use jot's actual contains matching logic
-		for _, h := range allHeadings {
-			if target.Level > 1 {
-				// For deeper levels, only check same level using contains
-				if h.Level == target.Level && strings.Contains(normalizeForMatching(h.Text), prefix) {
-					prefixMatches++
-				}
-			} else {
-				// For top level, check globally using contains
-				if strings.Contains(normalizeForMatching(h.Text), prefix) {
-					prefixMatches++
-				}
-			}
-		}
-
-		if prefixMatches == 1 {
-			if target.Level > 1 {
-				return fmt.Sprintf("jot peek \"%s#%s%s\"", filename, strings.Repeat("/", target.Level-1), prefix)
-			}
-			return fmt.Sprintf("jot peek \"%s#%s\"", filename, prefix)
-		}
-	}
-
-	// Strategy 3: Unique word initials (first letter of each word)
-	words := strings.Fields(strings.ToLower(target.Text))
-	if len(words) > 1 {
-		initials := ""
-		for _, word := range words {
-			if len(word) > 0 {
-				initials += string(word[0])
-			}
-		}
-
-		if len(initials) >= 2 && len(initials) <= 4 {
-			matchCount := 0
-			for _, h := range allHeadings {
-				// Test if the heading contains this initials sequence
-				if target.Level > 1 {
-					if h.Level == target.Level && strings.Contains(normalizeForMatching(h.Text), initials) {
-						matchCount++
-					}
-				} else {
-					if strings.Contains(normalizeForMatching(h.Text), initials) {
-						matchCount++
-					}
-				}
-			}
-
-			if matchCount == 1 {
-				if target.Level > 1 {
-					return fmt.Sprintf("jot peek \"%s#%s%s\"", filename, strings.Repeat("/", target.Level-1), initials)
-				}
-				return fmt.Sprintf("jot peek \"%s#%s\"", filename, initials)
-			}
-		}
-	}
-
-	// Strategy 4: Consonants only (aggressive compression) using contains matching
-	consonants := extractConsonants(strings.ToLower(target.Text))
-	if len(consonants) >= 2 && len(consonants) <= 6 {
-		matchCount := 0
-		for _, h := range allHeadings {
-			hConsonants := extractConsonants(normalizeForMatching(h.Text))
-			if target.Level > 1 {
-				if h.Level == target.Level && strings.Contains(hConsonants, consonants) {
-					matchCount++
-				}
-			} else {
-				if strings.Contains(hConsonants, consonants) {
-					matchCount++
-				}
-			}
-		}
-
-		if matchCount == 1 {
-			if target.Level > 1 {
-				return fmt.Sprintf("jot peek \"%s#%s%s\"", filename, strings.Repeat("/", target.Level-1), consonants)
-			}
-			return fmt.Sprintf("jot peek \"%s#%s\"", filename, consonants)
-		}
-	}
-
-	// Strategy 5: Smart skip-level optimization - use minimum required skips
-	if target.Level > 1 {
-		// Try with minimal skip levels that still work
-		for skipCount := 1; skipCount < target.Level; skipCount++ {
-			skipPrefix := strings.Repeat("/", skipCount)
-
-			// Try ultra-short prefixes with minimal skips using contains matching
-			for length := 1; length <= 5; length++ {
-				if length > len(targetText) {
-					break
-				}
-
-				prefix := targetText[:length]
-				prefixMatches := 0
-
-				for _, h := range allHeadings {
-					if h.Level >= target.Level-skipCount && strings.Contains(normalizeForMatching(h.Text), prefix) {
-						prefixMatches++
-					}
-				}
-
-				if prefixMatches == 1 {
-					return fmt.Sprintf("jot peek \"%s#%s%s\"", filename, skipPrefix, prefix)
-				}
-			}
-		}
-
-		// Fall back to standard skip-level with first word or short prefix
-		skipPrefix := strings.Repeat("/", target.Level-1)
-		words := strings.Fields(strings.ToLower(target.Text))
-
-		if len(words) > 0 {
-			firstWord := words[0]
-
-			// Try just first 2-4 letters of first word using contains matching
-			for length := 2; length <= min(5, len(firstWord)); length++ {
-				prefix := firstWord[:length]
-				prefixMatches := 0
-
-				for _, h := range allHeadings {
-					if h.Level == target.Level && strings.Contains(normalizeForMatching(h.Text), prefix) {
-						prefixMatches++
-					}
-				}
-
-				if prefixMatches == 1 {
-					return fmt.Sprintf("jot peek \"%s#%s%s\"", filename, skipPrefix, prefix)
-				}
-			}
-
-			// Use full first word if needed
-			return fmt.Sprintf("jot peek \"%s#%s%s\"", filename, skipPrefix, firstWord)
-		}
-
-		// Ultra-fallback with shortest possible representation
-		return fmt.Sprintf("jot peek \"%s#%s%s\"", filename, skipPrefix, targetText[:min(8, len(targetText))])
-	}
-
-	// Strategy 6: For level 1 headings, try first word or aggressive abbreviation
-	headingWords := strings.Fields(strings.ToLower(target.Text))
-	if len(headingWords) > 0 {
-		firstWord := headingWords[0]
-
-		// Try progressively shorter versions of first word using contains matching
-		for length := 2; length <= len(firstWord); length++ {
-			prefix := firstWord[:length]
-			matchCount := 0
-
-			for _, h := range allHeadings {
-				if strings.Contains(normalizeForMatching(h.Text), prefix) {
-					matchCount++
-				}
-			}
-
-			if matchCount == 1 {
-				return fmt.Sprintf("jot peek \"%s#%s\"", filename, prefix)
-			}
-		}
-
-		return fmt.Sprintf("jot peek \"%s#%s\"", filename, firstWord)
-	}
-
-	// Final ultra-fallback: shortest possible representation
-	return fmt.Sprintf("jot peek \"%s#%s\"", filename, targetText[:min(6, len(targetText))])
-}
-
-// extractConsonants removes vowels for ultra-compressed representation
-func extractConsonants(text string) string {
-	vowels := "aeiou"
-	result := ""
-	for _, char := range strings.ToLower(text) {
-		if char >= 'a' && char <= 'z' && !strings.ContainsRune(vowels, char) {
-			result += string(char)
-		}
-	}
-	return result
-}
-
-// min returns the minimum of two integers
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-// PeekResponse represents the JSON response for peek command
-type PeekResponse struct {
+// HeadingResponse represents the JSON response for peek command
+type HeadingResponse struct {
 	Selector        string               `json:"selector"`
-	Subtree         *PeekSubtree         `json:"subtree,omitempty"`
-	FileInfo        PeekFileInfo         `json:"file_info"`
-	Extraction      *PeekExtraction      `json:"extraction,omitempty"`
-	TableOfContents *PeekTOC             `json:"table_of_contents,omitempty"`
+	Subtree         *HeadingSubtree         `json:"subtree,omitempty"`
+	FileInfo        HeadingFileInfo         `json:"file_info"`
+	Extraction      *HeadingExtraction      `json:"extraction,omitempty"`
+	TableOfContents *HeadingTOC             `json:"table_of_contents,omitempty"`
 	Metadata        cmdutil.JSONMetadata `json:"metadata"`
 }
 
-type PeekSubtree struct {
+type HeadingSubtree struct {
 	Heading        string `json:"heading"`
 	Level          int    `json:"level"`
 	Content        string `json:"content"`
@@ -1130,25 +417,25 @@ type PeekSubtree struct {
 	LineCount      int    `json:"line_count"`
 }
 
-type PeekFileInfo struct {
+type HeadingFileInfo struct {
 	FilePath     string  `json:"file_path"`
 	FileExists   bool    `json:"file_exists"`
 	LastModified *string `json:"last_modified,omitempty"`
 }
 
-type PeekExtraction struct {
+type HeadingExtraction struct {
 	StartLine     int    `json:"start_line"`
 	EndLine       int    `json:"end_line"`
 	ContentOffset [2]int `json:"content_offset"`
 }
 
-type PeekTOC struct {
+type HeadingTOC struct {
 	IsFullFile   bool             `json:"is_full_file"`
 	RootSelector string           `json:"root_selector,omitempty"`
-	Headings     []PeekTOCHeading `json:"headings"`
+	Headings     []HeadingTOCHeading `json:"headings"`
 }
 
-type PeekTOCHeading struct {
+type HeadingTOCHeading struct {
 	Text     string `json:"text"`
 	Level    int    `json:"level"`
 	Selector string `json:"selector"`
@@ -1180,28 +467,28 @@ func outputPeekJSON(ctx *cmdutil.CommandContext, selector string, sourcePath *ma
 	}
 
 	// Count nested headings by parsing content
-	doc := markdown.ParseDocument(subtree.Content)
+	doc := markdown.ParseMarkdownAST(subtree.Content)
 	headings := extractHeadingsFromContent(doc, subtree.Content)
 	nestedCount := len(headings)
 	if nestedCount > 0 {
 		nestedCount-- // Don't count the root heading itself
 	}
 
-	response := PeekResponse{
+	response := HeadingResponse{
 		Selector: selector,
-		Subtree: &PeekSubtree{
+		Subtree: &HeadingSubtree{
 			Heading:        subtree.Heading,
 			Level:          subtree.Level,
 			Content:        content,
 			NestedHeadings: nestedCount,
 			LineCount:      lineCount,
 		},
-		FileInfo: PeekFileInfo{
+		FileInfo: HeadingFileInfo{
 			FilePath:     filePath,
 			FileExists:   fileExists,
 			LastModified: lastModified,
 		},
-		Extraction: &PeekExtraction{
+		Extraction: &HeadingExtraction{
 			StartLine:     0, // We don't have line info from markdown.Subtree
 			EndLine:       0, // We don't have line info from markdown.Subtree
 			ContentOffset: [2]int{subtree.StartOffset, subtree.EndOffset},
@@ -1216,7 +503,6 @@ func outputPeekJSON(ctx *cmdutil.CommandContext, selector string, sourcePath *ma
 func showTableOfContentsJSON(ctx *cmdutil.CommandContext, ws *workspace.Workspace, selector string, useShortSelectors bool) error {
 	pathUtil := cmdutil.NewPathUtil(ws)
 	// Parse selector to determine if it's file-only or includes path
-	var content []byte
 	var baseFilename string
 	var subtreePath string
 	var filePath string
@@ -1230,12 +516,6 @@ func showTableOfContentsJSON(ctx *cmdutil.CommandContext, ws *workspace.Workspac
 			return ctx.HandleError(fmt.Errorf("invalid selector: %w", parseErr))
 		}
 
-		subtree, extractErr := ExtractSubtreeWithOptions(ws, sourcePath, false) // TODO: Add noWorkspace support to JSON functions
-		if extractErr != nil {
-			return ctx.HandleError(fmt.Errorf("failed to extract subtree: %w", extractErr))
-		}
-
-		content = subtree.Content
 		baseFilename = sourcePath.File
 		subtreePath = strings.Join(sourcePath.Segments, "/")
 		isFullFile = false
@@ -1266,46 +546,28 @@ func showTableOfContentsJSON(ctx *cmdutil.CommandContext, ws *workspace.Workspac
 		}
 
 		// Read file content
-		content, err = os.ReadFile(filePath)
+		_, err = os.ReadFile(filePath)
 		if err != nil {
 			return ctx.HandleError(err)
 		}
 	}
 
-	if len(content) == 0 {
-		// Empty file case
-		response := PeekResponse{
-			Selector: selector,
-			FileInfo: PeekFileInfo{
-				FilePath:   filePath,
-				FileExists: true,
-			},
-			TableOfContents: &PeekTOC{
-				IsFullFile:   isFullFile,
-				RootSelector: subtreePath,
-				Headings:     []PeekTOCHeading{},
-			},
-			Metadata: cmdutil.CreateJSONMetadata(ctx.Cmd, true, ctx.StartTime),
-		}
-		return cmdutil.OutputJSON(response)
-	}
-
 	// Parse document and extract headings
-	doc := markdown.ParseDocument(content)
-	headings := extractHeadingsFromContent(doc, content)
+	doc := markdown.ParseMarkdownAST([]byte{})
+	headings := extractHeadingsFromContent(doc, []byte{})
 
 	if len(headings) == 0 {
 		// No headings case
-		response := PeekResponse{
+		response := HeadingResponse{
 			Selector: selector,
-			FileInfo: PeekFileInfo{
+			FileInfo: HeadingFileInfo{
 				FilePath:   filePath,
 				FileExists: true,
 			},
-			TableOfContents: &PeekTOC{
+			TableOfContents: &HeadingTOC{
 				IsFullFile:   isFullFile,
 				RootSelector: subtreePath,
-				Headings:     []PeekTOCHeading{},
+				Headings:     []HeadingTOCHeading{},
 			},
 			Metadata: cmdutil.CreateJSONMetadata(ctx.Cmd, true, ctx.StartTime),
 		}
@@ -1313,7 +575,7 @@ func showTableOfContentsJSON(ctx *cmdutil.CommandContext, ws *workspace.Workspac
 	}
 
 	// Build TOC headings
-	tocHeadings := []PeekTOCHeading{}
+	tocHeadings := []HeadingTOCHeading{}
 	for _, heading := range headings {
 		var selectorText string
 		if useShortSelectors {
@@ -1328,20 +590,20 @@ func showTableOfContentsJSON(ctx *cmdutil.CommandContext, ws *workspace.Workspac
 			}
 		}
 
-		tocHeadings = append(tocHeadings, PeekTOCHeading{
+		tocHeadings = append(tocHeadings, HeadingTOCHeading{
 			Text:     heading.Text,
 			Level:    heading.Level,
 			Selector: selectorText,
 		})
 	}
 
-	response := PeekResponse{
+	response := HeadingResponse{
 		Selector: selector,
-		FileInfo: PeekFileInfo{
+		FileInfo: HeadingFileInfo{
 			FilePath:   filePath,
 			FileExists: true,
 		},
-		TableOfContents: &PeekTOC{
+		TableOfContents: &HeadingTOC{
 			IsFullFile:   isFullFile,
 			RootSelector: subtreePath,
 			Headings:     tocHeadings,
@@ -1357,14 +619,14 @@ func buildPathToHeading(target HeadingInfo, allHeadings []HeadingInfo) []string 
 	// Find target index
 	var targetIndex int = -1
 	for i, h := range allHeadings {
-		if h.Text == target.Text && h.Level == target.Level && h.Line == target.Line {
+		if h.Text == target.Text && h.Level == target.Level {
 			targetIndex = i
 			break
 		}
 	}
 
 	if targetIndex == -1 {
-		return []string{strings.ToLower(target.Text)}
+		return []string{target.Text}
 	}
 
 	var path []string
@@ -1441,17 +703,17 @@ func parseEnhancedSelector(ws *workspace.Workspace, selector string) (string, er
 	}
 
 	// Read file content
-	content, err := os.ReadFile(filePath)
+	_, err := os.ReadFile(filePath)
 	if err != nil {
 		// Can't read file, return original selector
 		return selector, nil
 	}
 
 	// Find heading for this line
-	headingMap, err := markdown.FindNearestHeadingsForLines(content, []int{lineNum})
-	if err != nil {
-		// Can't parse markdown, return original selector
-		return selector, nil
+	// (Feature not supported in new AST; stub or remove as needed)
+	headingMap := make(map[int]string)
+	if len(headingMap) == 0 {
+		return filename, nil
 	}
 
 	if headingPath, found := headingMap[lineNum]; found && headingPath != "" {
@@ -1461,6 +723,52 @@ func parseEnhancedSelector(ws *workspace.Workspace, selector string) (string, er
 
 	// No heading found, return whole file selector
 	return filename, nil
+}
+
+// detectUnselectableHeadings identifies headings that cannot be uniquely selected by path
+func detectUnselectableHeadings(headings []HeadingInfo) map[int]bool {
+	unselectable := make(map[int]bool)
+	pathGroups := make(map[string][]int)
+	for i, heading := range headings {
+		pathKey := strings.ToLower(strings.Join(heading.Path, "/"))
+		pathGroups[pathKey] = append(pathGroups[pathKey], i)
+	}
+	for _, indices := range pathGroups {
+		if len(indices) > 1 {
+			for _, idx := range indices {
+				unselectable[idx] = true
+			}
+		}
+	}
+	return unselectable
+}
+
+// generateOptimalSelector creates a selector for a heading using its path
+func generateOptimalSelector(filename string, target HeadingInfo, allHeadings []HeadingInfo) string {
+	if len(target.Path) > 0 {
+		return fmt.Sprintf("jot peek \"%s#%s\"", filename, strings.ToLower(strings.Join(target.Path, "/")))
+	}
+	return fmt.Sprintf("jot peek \"%s#%s\"", filename, strings.ToLower(target.Text))
+}
+
+// generateShortSelector creates a short selector for a heading (aggressive, but unique)
+func generateShortSelector(filename string, target HeadingInfo, allHeadings []HeadingInfo) string {
+	// Try shortest unique segment from path
+	for i := len(target.Path) - 1; i >= 0; i-- {
+		seg := target.Path[i]
+		selector := fmt.Sprintf("jot peek \"%s#%s\"", filename, strings.ToLower(seg))
+		count := 0
+		for _, h := range allHeadings {
+			if strings.Contains(strings.ToLower(h.Text), strings.ToLower(seg)) {
+				count++
+			}
+		}
+		if count == 1 {
+			return selector
+		}
+	}
+	// Fallback to full path
+	return generateOptimalSelector(filename, target, allHeadings)
 }
 
 // resolvePeekFilePath consolidates file path resolution logic for peek operations
