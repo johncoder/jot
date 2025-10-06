@@ -141,6 +141,7 @@ func addCommands() {
 	rootCmd.AddCommand(tangleCmd)
 	rootCmd.AddCommand(workspaceCmd)
 	rootCmd.AddCommand(hooksCmd)
+	rootCmd.AddCommand(peekCmd)
 }
 
 // getWorkspace returns a workspace using the global workspace flag override if provided

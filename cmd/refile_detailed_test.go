@@ -394,7 +394,9 @@ Last bit of content here.
 			t.Logf("Target level: %d, Source level: %d", dest.TargetLevel, subtree.Level)
 
 			// Perform refile
-			err = performRefile(ws, sourcePath, subtree, dest, transformedContent)
+			// Replace performRefile with the modern pipeline or helper
+			// For example, use PerformRefile or the new pipeline function
+			err = PerformRefile(ws, sourcePath, subtree, dest, transformedContent)
 			if err != nil {
 				if tt.expectedErrors == nil {
 					t.Fatalf("Unexpected error: %v", err)

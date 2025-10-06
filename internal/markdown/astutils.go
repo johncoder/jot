@@ -116,7 +116,7 @@ func FindSubtree(doc ast.Node, content []byte, path *HeadingPath) (*Subtree, err
 		if len(h.Path) == len(path.Segments) {
 			match := true
 			for i := range h.Path {
-				if strings.ToLower(h.Path[i]) != strings.ToLower(path.Segments[i]) {
+				if !strings.EqualFold(h.Path[i], path.Segments[i]) {
 					match = false
 					break
 				}

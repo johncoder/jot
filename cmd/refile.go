@@ -19,6 +19,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+
+var refileInteractive bool
 var refileNoVerify bool
 
 var refileCmd = &cobra.Command{
@@ -49,12 +51,10 @@ Examples:
 		to, _ := cmd.Flags().GetString("to")
 		prepend, _ := cmd.Flags().GetBool("prepend")
 		verbose, _ := cmd.Flags().GetBool("verbose")
-		interactive, _ := cmd.Flags().GetBool("interactive")
-
-		// Check for interactive mode
-		if fzf.ShouldUseFZF(interactive) {
-			return RunInteractiveRefile(ctx, args, ws)
-		}
+	   // Check for interactive mode
+	   if fzf.ShouldUseFZF(refileInteractive) {
+		   return RunInteractiveRefile(ctx, args, ws)
+	   }
 
 		// No source and no destination: show usage help
 		if len(args) == 0 && to == "" {
@@ -207,6 +207,11 @@ Examples:
 }
 
 // inspectDestination analyzes destination path without performing refile
+
+func init() {
+   refileCmd.Flags().BoolVar(&refileInteractive, "interactive", false, "Launch interactive FZF-based refile UI")
+   // Register other flags here as needed
+}
 func inspectDestination(ws *workspace.Workspace, destPath *md.HeadingPath) error {
 	pathUtil := cmdutil.NewPathUtil(ws)
 	fmt.Printf("Destination analysis for \"%s#%s\":\n",

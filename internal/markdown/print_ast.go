@@ -22,11 +22,8 @@ func PrintAST(n ast.Node, depth int) {
 		fmt.Printf(" (Text: %q)", t.Literal)
 	}
 	fmt.Println()
-	for c := n.GetChildren(); c != nil && len(c) > 0; {
-		for _, child := range c {
-			PrintAST(child, depth+1)
-		}
-		break
+	for _, child := range n.GetChildren() {
+		PrintAST(child, depth+1)
 	}
 }
 
