@@ -4,11 +4,11 @@ package cmd
 
 // RefileResponse is the response structure for the refile operation.
 type RefileResponse struct {
-	Operation   string               `json:"operation"`
-	Source      RefileSource         `json:"source"`
-	Destination RefileDestination    `json:"destination"`
-	Content     RefileContent        `json:"content"`
-	Metadata    interface{}          `json:"metadata"`
+	Operation   string            `json:"operation"`
+	Source      RefileSource      `json:"source"`
+	Destination RefileDestination `json:"destination"`
+	Content     RefileContent     `json:"content"`
+	Metadata    interface{}       `json:"metadata"`
 }
 
 // RefileSource represents the source details in a refile operation.

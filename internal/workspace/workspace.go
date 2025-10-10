@@ -34,7 +34,7 @@ func LoadWorkspaceConfig(jotDir string) (*WorkspaceConfig, error) {
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		return &WorkspaceConfig{
 			ArchiveLocation:         "archive/archive.md#Archive", // Default simple path
-			AllowCreateMissingFiles: false, // Default: do not allow creating missing files
+			AllowCreateMissingFiles: false,                        // Default: do not allow creating missing files
 		}, nil
 	}
 

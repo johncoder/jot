@@ -246,8 +246,8 @@ func archiveWithRefile(ctx *cmdutil.CommandContext, ws *workspace.Workspace, sou
 	// Call the internal refile function directly to avoid recursion
 	refileCtx := &RefileContext{
 		SourceFile: source,
-		DestFile: archiveLocation,
-		WS: ws,
+		DestFile:   archiveLocation,
+		WS:         ws,
 	}
 	err := executeRefilePipeline(refileCtx)
 

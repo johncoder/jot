@@ -35,6 +35,6 @@ func renderNode(buf *bytes.Buffer, node ast.Node, depth int) {
 		buf.WriteByte('\n')
 	case *ast.Text:
 		buf.Write(n.Literal)
-	// Add more node types as needed
+		// Add more node types as needed
 	}
 }

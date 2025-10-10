@@ -112,17 +112,17 @@ func TestCalculatePathMatch(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-// Use the new path-based matching logic, which is case-insensitive and supports partial/contains matches
-match := markdown.CalculatePathMatch(tt.headingPath, tt.targetSegments, tt.skipLevels)
-if match != tt.expectedMatch {
-	t.Errorf("CalculatePathMatch() = %d, want %d", match, tt.expectedMatch)
-}
+			// Use the new path-based matching logic, which is case-insensitive and supports partial/contains matches
+			match := markdown.CalculatePathMatch(tt.headingPath, tt.targetSegments, tt.skipLevels)
+			if match != tt.expectedMatch {
+				t.Errorf("CalculatePathMatch() = %d, want %d", match, tt.expectedMatch)
+			}
 		})
 	}
 }
 
 func TestNavigateHeadingPath(t *testing.T) {
-// ...existing code...
+	// ...existing code...
 
 	tests := []struct {
 		name              string
@@ -190,34 +190,34 @@ func TestNavigateHeadingPath(t *testing.T) {
 				SkipLevels: tt.skipLevels,
 			}
 
-// Use the new AST/path-based navigation logic
-doc := markdown.ParseMarkdownAST([]byte(testMarkdownContent))
-result, err := markdown.NavigateHeadingPath(doc, destPath)
-if err != nil {
-	t.Fatalf("NavigateHeadingPath() error = %v", err)
-}
+			// Use the new AST/path-based navigation logic
+			doc := markdown.ParseMarkdownAST([]byte(testMarkdownContent))
+			result, err := markdown.NavigateHeadingPath(doc, destPath)
+			if err != nil {
+				t.Fatalf("NavigateHeadingPath() error = %v", err)
+			}
 
-// Check if target was found
-targetFound := result.TargetHeading != nil
-if targetFound != tt.expectTargetFound {
-	t.Errorf("NavigateHeadingPath() target found = %v, want %v", targetFound, tt.expectTargetFound)
-}
+			// Check if target was found
+			targetFound := result.TargetHeading != nil
+			if targetFound != tt.expectTargetFound {
+				t.Errorf("NavigateHeadingPath() target found = %v, want %v", targetFound, tt.expectTargetFound)
+			}
 
-// Check found segments
-if !sliceEqual(result.FoundSegments, tt.expectedFound) {
-	t.Errorf("NavigateHeadingPath() found segments = %v, want %v", result.FoundSegments, tt.expectedFound)
-}
+			// Check found segments
+			if !sliceEqual(result.FoundSegments, tt.expectedFound) {
+				t.Errorf("NavigateHeadingPath() found segments = %v, want %v", result.FoundSegments, tt.expectedFound)
+			}
 
-// Check missing segments
-if !sliceEqual(result.MissingSegments, tt.expectedMissing) {
-	t.Errorf("NavigateHeadingPath() missing segments = %v, want %v", result.MissingSegments, tt.expectedMissing)
-}
+			// Check missing segments
+			if !sliceEqual(result.MissingSegments, tt.expectedMissing) {
+				t.Errorf("NavigateHeadingPath() missing segments = %v, want %v", result.MissingSegments, tt.expectedMissing)
+			}
 		})
 	}
 }
 
 func TestResolveDestinationPath(t *testing.T) {
-// ...existing code...
+	// ...existing code...
 
 	tests := []struct {
 		name           string
@@ -274,28 +274,28 @@ func TestResolveDestinationPath(t *testing.T) {
 				SkipLevels: tt.skipLevels,
 			}
 
-// Use the new AST/path-based destination resolution logic
-// This logic is now in cmd/refile_pipeline.go: ResolveDestination
-ws := &workspace.Workspace{Root: ".", LibDir: "."}
-dest, err := ResolveDestination(ws, destPath, tt.prepend)
-if err != nil {
-	t.Fatalf("ResolveDestination() error = %v", err)
-}
+			// Use the new AST/path-based destination resolution logic
+			// This logic is now in cmd/refile_pipeline.go: ResolveDestination
+			ws := &workspace.Workspace{Root: ".", LibDir: "."}
+			dest, err := ResolveDestination(ws, destPath, tt.prepend)
+			if err != nil {
+				t.Fatalf("ResolveDestination() error = %v", err)
+			}
 
-// Check if path exists
-if dest.Exists != tt.expectExists {
-	t.Errorf("ResolveDestination() exists = %v, want %v", dest.Exists, tt.expectExists)
-}
+			// Check if path exists
+			if dest.Exists != tt.expectExists {
+				t.Errorf("ResolveDestination() exists = %v, want %v", dest.Exists, tt.expectExists)
+			}
 
-// Check target level
-if dest.TargetLevel != tt.expectedLevel {
-	t.Errorf("ResolveDestination() target level = %d, want %d", dest.TargetLevel, tt.expectedLevel)
-}
+			// Check target level
+			if dest.TargetLevel != tt.expectedLevel {
+				t.Errorf("ResolveDestination() target level = %d, want %d", dest.TargetLevel, tt.expectedLevel)
+			}
 
-// Check create path
-if !sliceEqual(dest.CreatePath, tt.expectedCreate) {
-	t.Errorf("ResolveDestination() create path = %v, want %v", dest.CreatePath, tt.expectedCreate)
-}
+			// Check create path
+			if !sliceEqual(dest.CreatePath, tt.expectedCreate) {
+				t.Errorf("ResolveDestination() create path = %v, want %v", dest.CreatePath, tt.expectedCreate)
+			}
 		})
 	}
 }
@@ -370,53 +370,53 @@ Old stuff
 		Segments: []string{"Projects", "Backend"},
 	}
 
-// Extract subtree using the new AST/path-based logic
-subtree, err := ExtractSubtree(ws, sourcePath)
-if err != nil {
-	t.Fatalf("ExtractSubtree() error = %v", err)
-}
+	// Extract subtree using the new AST/path-based logic
+	subtree, err := ExtractSubtree(ws, sourcePath)
+	if err != nil {
+		t.Fatalf("ExtractSubtree() error = %v", err)
+	}
 
-// Resolve destination using the new logic
-dest, err := ResolveDestination(ws, destPath, false)
-if err != nil {
-	t.Fatalf("ResolveDestination() error = %v", err)
-}
+	// Resolve destination using the new logic
+	dest, err := ResolveDestination(ws, destPath, false)
+	if err != nil {
+		t.Fatalf("ResolveDestination() error = %v", err)
+	}
 
-// Transform subtree level for correct insertion
-transformedContent := TransformSubtreeLevel(subtree, dest.TargetLevel)
+	// Transform subtree level for correct insertion
+	transformedContent := TransformSubtreeLevel(subtree, dest.TargetLevel)
 
-// Perform refile using the new logic
-err = PerformRefile(ws, sourcePath, subtree, dest, transformedContent)
-if err != nil {
-	t.Fatalf("PerformRefile() error = %v", err)
-}
+	// Perform refile using the new logic
+	err = PerformRefile(ws, sourcePath, subtree, dest, transformedContent)
+	if err != nil {
+		t.Fatalf("PerformRefile() error = %v", err)
+	}
 
-// Verify source file no longer contains refiled content
-sourceResult, err := os.ReadFile(sourceFile)
-if err != nil {
-	t.Fatalf("Failed to read source file after refile: %v", err)
-}
+	// Verify source file no longer contains refiled content
+	sourceResult, err := os.ReadFile(sourceFile)
+	if err != nil {
+		t.Fatalf("Failed to read source file after refile: %v", err)
+	}
 
-if strings.Contains(string(sourceResult), "Important Task") {
-	t.Errorf("Source file still contains refiled content")
-}
+	if strings.Contains(string(sourceResult), "Important Task") {
+		t.Errorf("Source file still contains refiled content")
+	}
 
-// Verify destination file contains refiled content and created headings
-destResult, err := os.ReadFile(destFile)
-if err != nil {
-	t.Fatalf("Failed to read destination file after refile: %v", err)
-}
+	// Verify destination file contains refiled content and created headings
+	destResult, err := os.ReadFile(destFile)
+	if err != nil {
+		t.Fatalf("Failed to read destination file after refile: %v", err)
+	}
 
-destStr := string(destResult)
-if !strings.Contains(destStr, "Backend") {
-	t.Errorf("Destination file missing created Backend section")
-}
-if !strings.Contains(destStr, "Important Task") {
-	t.Errorf("Destination file missing refiled content")
-}
-if !strings.Contains(destStr, "Priority: High") {
-	t.Errorf("Destination file missing nested content from refile")
-}
+	destStr := string(destResult)
+	if !strings.Contains(destStr, "Backend") {
+		t.Errorf("Destination file missing created Backend section")
+	}
+	if !strings.Contains(destStr, "Important Task") {
+		t.Errorf("Destination file missing refiled content")
+	}
+	if !strings.Contains(destStr, "Priority: High") {
+		t.Errorf("Destination file missing nested content from refile")
+	}
 }
 
 // Helper function to compare string slices

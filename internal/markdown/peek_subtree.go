@@ -94,4 +94,5 @@ func CountChildHeadings(subtree ast.Node) int {
 var ErrSubtreeNotFound = &SubtreeError{"subtree not found"}
 
 type SubtreeError struct{ msg string }
+
 func (e *SubtreeError) Error() string { return e.msg }

@@ -48,8 +48,8 @@ Flags:
   --json             Output result as JSON
   --no-verify        Skip hooks verification
 `,
-	Args:  cobra.MaximumNArgs(1),
-	RunE:  runCapture,
+	Args: cobra.MaximumNArgs(1),
+	RunE: runCapture,
 }
 
 func init() {
